@@ -87,15 +87,15 @@ export default function Vitals() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: vitals = [], isLoading } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`, pid] });
+  const { data: vitals = [], isLoading } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`] });
 
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/vitals", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Vitals logged" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`] }); setOpen(false); toast({ title: "Vitals logged" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/vitals/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`, pid] }); toast({ title: "Entry deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`] }); toast({ title: "Entry deleted" }); },
   });
 
   const latest = vitals[0];

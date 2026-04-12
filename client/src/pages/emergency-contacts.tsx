@@ -73,19 +73,19 @@ export default function EmergencyContacts() {
   const [editing, setEditing] = useState<EmergencyContact | null>(null);
   const { toast } = useToast();
 
-  const { data: contacts = [], isLoading } = useQuery<EmergencyContact[]>({ queryKey: [`/api/emergency-contacts?patientId=${pid}`, pid] });
+  const { data: contacts = [], isLoading } = useQuery<EmergencyContact[]>({ queryKey: [`/api/emergency-contacts?patientId=${pid}`] });
 
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/emergency-contacts", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/emergency-contacts?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Contact added" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/emergency-contacts?patientId=${pid}`] }); setOpen(false); toast({ title: "Contact added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/emergency-contacts/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/emergency-contacts?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Contact updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/emergency-contacts?patientId=${pid}`] }); setEditing(null); toast({ title: "Contact updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/emergency-contacts/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/emergency-contacts?patientId=${pid}`, pid] }); toast({ title: "Contact removed" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/emergency-contacts?patientId=${pid}`] }); toast({ title: "Contact removed" }); },
   });
 
   const sorted = [...contacts].sort((a, b) => (b.isPrimary || 0) - (a.isPrimary || 0));

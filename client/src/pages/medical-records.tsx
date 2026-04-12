@@ -240,20 +240,20 @@ export default function MedicalRecords() {
   const [catFilter, setCatFilter] = useState<string>("all");
   const { toast } = useToast();
 
-  const { data: records = [], isLoading } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`, pid] });
+  const { data: records = [], isLoading } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`] });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
 
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/medical-records", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Record added" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`] }); setOpen(false); toast({ title: "Record added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/medical-records/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Record updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`] }); setEditing(null); toast({ title: "Record updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/medical-records/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] }); toast({ title: "Record deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`] }); toast({ title: "Record deleted" }); },
   });
 
   const filtered = records.filter((r) => {

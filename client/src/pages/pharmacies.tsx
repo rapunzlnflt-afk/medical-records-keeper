@@ -94,19 +94,19 @@ export default function Pharmacies() {
   const [editing, setEditing] = useState<Pharmacy | null>(null);
   const { toast } = useToast();
 
-  const { data: pharmacyList = [], isLoading } = useQuery<Pharmacy[]>({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] });
+  const { data: pharmacyList = [], isLoading } = useQuery<Pharmacy[]>({ queryKey: [`/api/pharmacies?patientId=${pid}`] });
 
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/pharmacies", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Pharmacy added" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`] }); setOpen(false); toast({ title: "Pharmacy added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/pharmacies/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/pharmacies/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] }); toast({ title: "Pharmacy deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`] }); toast({ title: "Pharmacy deleted" }); },
   });
 
   // Show preferred pharmacies first

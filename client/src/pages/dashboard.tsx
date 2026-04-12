@@ -33,12 +33,12 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
 export default function Dashboard() {
   const { activePatientId, activePatient } = usePatient();
   const pid = activePatientId;
-  const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: [`/api/appointments?patientId=${pid}`, pid] });
-  const { data: medications = [] } = useQuery<Medication[]>({ queryKey: [`/api/medications?patientId=${pid}`, pid] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`, pid] });
-  const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] });
-  const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`, pid] });
-  const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: [`/api/emergency-contacts?patientId=${pid}`, pid] });
+  const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: [`/api/appointments?patientId=${pid}`] });
+  const { data: medications = [] } = useQuery<Medication[]>({ queryKey: [`/api/medications?patientId=${pid}`] });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
+  const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`] });
+  const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`] });
+  const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: [`/api/emergency-contacts?patientId=${pid}`] });
 
   const today = new Date().toISOString().split("T")[0];
   const upcoming = appointments.filter(
