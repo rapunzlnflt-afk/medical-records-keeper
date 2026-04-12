@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
 import { storage, db } from "./storage";
 import {
   physicians, appointments, medications, medicationLogs,
@@ -7,6 +10,43 @@ import {
 } from "@shared/schema";
 
 export function registerRoutes(server: Server, app: Express) {
+  // === File Uploads ===
+  const uploadDir = path.resolve("uploads");
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+  const upload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, uploadDir),
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname) || ".jpg";
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
+        cb(null, true);
+      } else {
+        cb(new Error("Only images and PDFs are allowed"));
+      }
+    },
+  });
+
+  // Serve uploaded files
+  app.use("/api/uploads", (req, res, next) => {
+    const filePath = path.join(uploadDir, path.basename(req.path));
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+    res.status(404).json({ error: "File not found" });
+  });
+
+  app.post("/api/upload", upload.single("photo"), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const url = `/api/uploads/${req.file.filename}`;
+    res.json({ url, filename: req.file.filename });
+  });
+
   // === Physicians ===
   app.get("/api/physicians", (_req, res) => {
     res.json(storage.getPhysicians());

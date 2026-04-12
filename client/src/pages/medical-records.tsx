@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getApiBase } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +10,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe, AlertTriangle, Heart, Shield, FolderOpen, ImageIcon, ExternalLink } from "lucide-react";
+import {
+  FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe,
+  AlertTriangle, Heart, Shield, FolderOpen, ImageIcon, ExternalLink,
+  Upload, Link2, Info, HardDrive, X,
+} from "lucide-react";
 import type { MedicalRecord, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
+
+/** Resolve image URLs — uploaded photos need the API base prefix for deployed mode */
+function resolveImageUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("/api/")) return `${getApiBase()}${url}`;
+  return url;
+}
 
 const CATEGORIES = [
   { value: "lab-results", label: "Lab Results", icon: FlaskConical },
@@ -43,6 +54,42 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
     notes: initial?.notes || "",
     imageUrl: initial?.imageUrl || "",
   });
+
+  // Photo mode: "upload" or "link"
+  const [photoMode, setPhotoMode] = useState<"upload" | "link">(
+    initial?.imageUrl && !initial.imageUrl.startsWith("/api/uploads/") ? "link" : "upload"
+  );
+  const [uploading, setUploading] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(
+    initial?.imageUrl && initial.imageUrl.startsWith("/api/uploads/") ? initial.imageUrl : null
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const res = await fetch(`${getApiBase()}/api/upload`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setForm((prev) => ({ ...prev, imageUrl: url }));
+      setUploadPreview(url);
+    } catch {
+      // Show inline error
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const clearPhoto = () => {
+    setForm((prev) => ({ ...prev, imageUrl: "" }));
+    setUploadPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   return (
     <div className="space-y-4">
@@ -79,16 +126,94 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
           <Textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Results summary, key findings..." data-testid="input-rec-description" />
         </div>
       </div>
-      <div>
-        <Label className="text-xs font-body">Photo / Image Link</Label>
-        <Input value={form.imageUrl || ""} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://example.com/lab-results.jpg" data-testid="input-rec-image-url" />
-        <p className="text-xs text-muted-foreground mt-1">Paste a link to a photo of the actual document or results</p>
-        {form.imageUrl && (
-          <div className="mt-2 rounded-md border overflow-hidden max-h-40">
-            <img src={form.imageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+
+      {/* Photo Section — beauty planner style */}
+      <div className="rounded-lg border p-4 space-y-3">
+        <Label className="text-sm font-heading font-semibold flex items-center gap-2">
+          <ImageIcon className="w-4 h-4 text-primary" />
+          Attach Photo of Record
+        </Label>
+
+        {/* Upload vs Link toggle */}
+        <div className="flex gap-2">
+          <Button
+            type="button" size="sm"
+            variant={photoMode === "upload" ? "default" : "outline"}
+            className={photoMode === "upload" ? "gradient-primary text-white border-none gap-1.5" : "gap-1.5"}
+            onClick={() => { setPhotoMode("upload"); }}
+            data-testid="button-photo-upload-mode"
+          >
+            <Upload className="w-3.5 h-3.5" /> Upload Photo
+          </Button>
+          <Button
+            type="button" size="sm"
+            variant={photoMode === "link" ? "default" : "outline"}
+            className={photoMode === "link" ? "gradient-primary text-white border-none gap-1.5" : "gap-1.5"}
+            onClick={() => { setPhotoMode("link"); }}
+            data-testid="button-photo-link-mode"
+          >
+            <Link2 className="w-3.5 h-3.5" /> Use Link Instead
+          </Button>
+        </div>
+
+        {photoMode === "upload" ? (
+          <div className="space-y-2">
+            {uploadPreview ? (
+              <div className="relative rounded-md border overflow-hidden">
+                <img src={resolveImageUrl(uploadPreview)} alt="Uploaded photo" className="w-full max-h-48 object-contain bg-muted/30" />
+                <Button
+                  type="button" size="icon" variant="destructive"
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full"
+                  onClick={clearPhoto}
+                  data-testid="button-remove-photo"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/30 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="dropzone-photo"
+              >
+                <Upload className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-sm text-muted-foreground font-body">
+                  {uploading ? "Uploading..." : "Click to select a photo"}
+                </p>
+                <p className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, or PDF up to 10 MB</p>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+              data-testid="input-photo-file"
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Input
+              value={form.imageUrl || ""}
+              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+              placeholder="https://drive.google.com/... or https://dropbox.com/..."
+              data-testid="input-rec-image-url"
+            />
+            <p className="text-xs text-muted-foreground">Paste a link from Google Drive, Dropbox, or any cloud storage</p>
+            {form.imageUrl && !form.imageUrl.startsWith("/api/uploads/") && (
+              <div className="rounded-md border overflow-hidden max-h-48">
+                <img
+                  src={form.imageUrl} alt="Preview"
+                  className="w-full h-full object-contain bg-muted/30"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
+
       <div>
         <Label className="text-xs font-body">Notes</Label>
         <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-rec-notes" />
@@ -153,6 +278,36 @@ export default function MedicalRecords() {
         </Dialog>
       </div>
 
+      {/* Info Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-heading text-sm font-semibold">How It Works</h3>
+                <p className="text-xs text-muted-foreground mt-1 font-body leading-relaxed">
+                  Upload photos directly or paste cloud storage links (Google Drive, Dropbox). Organize by category to track your records visually.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-400/30 bg-amber-50/50 dark:bg-amber-950/10">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-2.5">
+              <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-heading text-sm font-semibold">Device Storage</h3>
+                <p className="text-xs text-muted-foreground mt-1 font-body leading-relaxed">
+                  Uploaded photos stay on this device. Cloud links remain accessible from any device. Use Save My Data to back up everything.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex gap-3 flex-wrap items-end">
         <Input placeholder="Search records..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" data-testid="input-search-records" />
         <Select value={catFilter} onValueChange={setCatFilter}>
@@ -179,17 +334,38 @@ export default function MedicalRecords() {
             const catInfo = getCategoryInfo(rec.category);
             const CatIcon = catInfo.icon;
             const doc = physicians.find((p) => p.id === rec.physicianId);
+            const hasUploadedPhoto = rec.imageUrl?.startsWith("/api/uploads/");
+            const hasLinkedPhoto = rec.imageUrl && !rec.imageUrl.startsWith("/api/uploads/");
             return (
               <Card key={rec.id} className="hover-elevate" data-testid={`record-${rec.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-                      <CatIcon className="w-5 h-5 text-white" />
-                    </div>
+                    {/* Thumbnail if there's a photo */}
+                    {rec.imageUrl ? (
+                      <a href={resolveImageUrl(rec.imageUrl)} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                        <div className="w-14 h-14 rounded-lg border overflow-hidden bg-muted/30">
+                          <img src={resolveImageUrl(rec.imageUrl)} alt={rec.title} className="w-full h-full object-cover" onError={(e) => {
+                            const parent = (e.target as HTMLImageElement).parentElement;
+                            if (parent) {
+                              parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground/40"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>';
+                            }
+                          }} />
+                        </div>
+                      </a>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+                        <CatIcon className="w-5 h-5 text-white" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-heading text-sm font-semibold">{rec.title}</h3>
                         <Badge variant="secondary" className="text-xs">{catInfo.label}</Badge>
+                        {rec.imageUrl && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <ImageIcon className="w-3 h-3" />Photo
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {format(parseISO(rec.date), "MMM d, yyyy")}
@@ -198,7 +374,7 @@ export default function MedicalRecords() {
                       {rec.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{rec.description}</p>}
                       {rec.notes && <p className="text-xs text-muted-foreground/70 mt-1 italic line-clamp-1">{rec.notes}</p>}
                       {rec.imageUrl && (
-                        <a href={rec.imageUrl} target="_blank" rel="noopener noreferrer"
+                        <a href={resolveImageUrl(rec.imageUrl)} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-primary hover:underline" data-testid={`link-image-${rec.id}`}>
                           <ImageIcon className="w-3 h-3" /> View Photo
                           <ExternalLink className="w-3 h-3" />
