@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Plus, Trash2, Edit2, Phone, MapPin, Clock, Globe, Star, Printer } from "lucide-react";
 import type { Pharmacy } from "@shared/schema";
+import { formatPhone } from "@/lib/format-phone";
 
 function PharmacyForm({ initial, onSubmit, onCancel }: {
   initial?: Partial<Pharmacy>;
@@ -41,7 +42,7 @@ function PharmacyForm({ initial, onSubmit, onCancel }: {
         </div>
         <div>
           <Label className="text-xs font-body">Phone</Label>
-          <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(817) 555-0123" data-testid="input-pharm-phone" />
+          <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} placeholder="(817) 555-0123" data-testid="input-pharm-phone" />
         </div>
         <div>
           <Label className="text-xs font-body">Website</Label>

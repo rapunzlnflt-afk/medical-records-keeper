@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { Phone, Plus, Trash2, Edit2, Mail, Star, User } from "lucide-react";
 import type { EmergencyContact } from "@shared/schema";
+import { formatPhone } from "@/lib/format-phone";
 
 function ContactForm({ initial, onSubmit, onCancel }: {
   initial?: Partial<EmergencyContact>;
@@ -40,11 +41,11 @@ function ContactForm({ initial, onSubmit, onCancel }: {
         </div>
         <div>
           <Label className="text-xs font-body">Phone</Label>
-          <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(555) 123-4567" data-testid="input-ec-phone" />
+          <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" data-testid="input-ec-phone" />
         </div>
         <div>
           <Label className="text-xs font-body">Alternate Phone</Label>
-          <Input value={form.altPhone || ""} onChange={(e) => setForm({ ...form, altPhone: e.target.value })} placeholder="(555) 987-6543" data-testid="input-ec-alt-phone" />
+          <Input value={form.altPhone || ""} onChange={(e) => setForm({ ...form, altPhone: formatPhone(e.target.value) })} placeholder="(555) 987-6543" data-testid="input-ec-alt-phone" />
         </div>
         <div className="sm:col-span-2">
           <Label className="text-xs font-body">Email</Label>

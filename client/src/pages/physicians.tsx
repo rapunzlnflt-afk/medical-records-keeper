@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText } from "lucide-react";
 import type { Physician } from "@shared/schema";
+import { formatPhone } from "@/lib/format-phone";
 
 function PhysicianForm({ initial, onSubmit, onCancel }: {
   initial?: Partial<Physician>;
@@ -44,7 +45,7 @@ function PhysicianForm({ initial, onSubmit, onCancel }: {
         </div>
         <div>
           <Label className="text-xs font-body">Phone</Label>
-          <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(555) 123-4567" data-testid="input-doc-phone" />
+          <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" data-testid="input-doc-phone" />
         </div>
         <div>
           <Label className="text-xs font-body">Fax</Label>
