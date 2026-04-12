@@ -83,6 +83,22 @@
       align-items: center;
       justify-content: center;
     }
+    .hero-cta {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: 0.65rem 2rem;
+      background: white;
+      color: var(--blue);
+      border-radius: 999px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .hero-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
 
     /* Screenshot mockup */
     .screenshot-wrap {
@@ -295,6 +311,7 @@
     <span class="hero-badge font-heading">Medical Records Keeper</span>
     <h1 class="font-heading">All Your Family's Health Info in One Place</h1>
     <p>Track doctors, medications, appointments, vitals, medical records, and more — for up to 6 family members. Private. Offline. Simple.</p>
+    <a href="https://rapunzlnflt-afk.github.io/medical-records-keeper/" target="_blank" class="hero-cta font-heading">Try the Demo</a>
   </div>
 
   <!-- Screenshot -->
@@ -367,8 +384,8 @@
       <div class="step">
         <div class="step-num font-heading">1</div>
         <div>
-          <h3 class="font-heading">Download &amp; Open</h3>
-          <p>Download the files and open index.html in any web browser. No install required.</p>
+          <h3 class="font-heading">Open &amp; Use</h3>
+          <p>Open the app in any web browser — or install it to your home screen as an app. No download or setup needed.</p>
         </div>
       </div>
       <div class="step">
@@ -434,7 +451,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
         </div>
         <h3 class="font-heading">Mobile Friendly</h3>
-        <p>The app is fully responsive. Open it in your phone's browser and it looks and works just like a native app.</p>
+        <p>Fully responsive and installable as a PWA. Add it to your home screen and it works just like a native app — even offline.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">
@@ -449,6 +466,13 @@
         </div>
         <h3 class="font-heading">Sync Between Devices</h3>
         <p>Use "Save My Data" to export a backup file, then "Load My Data" on another device. Move your records anywhere in seconds.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3 class="font-heading">Works Offline</h3>
+        <p>Once loaded, the app works completely offline. No internet connection needed to view or manage your records.</p>
       </div>
     </div>
   </div>
