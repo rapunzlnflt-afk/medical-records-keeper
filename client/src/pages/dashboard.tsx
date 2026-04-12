@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, AlertCircle } from "lucide-react";
+import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, AlertCircle, Bell } from "lucide-react";
 import { Link } from "wouter";
 import type { Appointment, Medication, Physician, MedicalRecord, Vital, EmergencyContact } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -49,6 +49,12 @@ export default function Dashboard() {
     return isBefore(refill, addDays(new Date(), 7)) && isAfter(refill, addDays(new Date(), -1));
   });
 
+  // Appointment reminders: show reminders where reminderDate is today or in the past (and appointment is still upcoming)
+  const reminders = appointments.filter((a) => {
+    if (!a.reminderDate || a.status !== "upcoming") return false;
+    return a.reminderDate <= today;
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
       {/* Header */}
@@ -66,6 +72,41 @@ export default function Dashboard() {
         <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
         <StatCard title="Records" value={records.length} icon={FileText} href="/records" />
       </div>
+
+      {/* Appointment Reminders */}
+      {reminders.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5 dark:bg-primary/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
+              <Bell className="w-4 h-4 text-primary" />
+              Appointment Reminders
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {reminders.map((apt) => {
+              const doc = physicians.find((p) => p.id === apt.physicianId);
+              return (
+                <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-card" data-testid={`reminder-apt-${apt.id}`}>
+                  <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0">
+                    <Bell className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">{apt.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {format(parseISO(apt.date), "MMM d, yyyy")} at {apt.time}
+                      {doc ? ` · ${doc.name}` : ""}
+                    </p>
+                    {apt.location && (
+                      <p className="text-xs text-muted-foreground truncate">{apt.location}</p>
+                    )}
+                  </div>
+                  <Badge variant="secondary" className="text-xs flex-shrink-0">{apt.type}</Badge>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Upcoming Appointments */}

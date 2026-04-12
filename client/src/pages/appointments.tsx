@@ -44,7 +44,17 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
         </div>
         <div>
           <Label className="text-xs font-body">Physician</Label>
-          <Select value={form.physicianId?.toString() || "none"} onValueChange={(v) => setForm({ ...form, physicianId: v === "none" ? null : Number(v) })}>
+          <Select value={form.physicianId?.toString() || "none"} onValueChange={(v) => {
+            const selectedId = v === "none" ? null : Number(v);
+            const doc = physicians.find((p) => p.id === selectedId);
+            const docAddress = doc ? [doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ") : "";
+            setForm(prev => ({
+              ...prev,
+              physicianId: selectedId,
+              // Auto-fill location from physician address if location is empty
+              location: prev.location || docAddress,
+            }));
+          }}>
             <SelectTrigger data-testid="select-apt-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
@@ -83,8 +93,9 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
           <Input value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="123 Medical Pkwy" data-testid="input-apt-location" />
         </div>
         <div>
-          <Label className="text-xs font-body">Reminder Date</Label>
+          <Label className="text-xs font-body">Remind Me On</Label>
           <Input type="date" value={form.reminderDate || ""} onChange={(e) => setForm({ ...form, reminderDate: e.target.value })} data-testid="input-apt-reminder" />
+          <p className="text-xs text-muted-foreground mt-1">Pick a date to see a reminder on the Dashboard</p>
         </div>
       </div>
       <div>

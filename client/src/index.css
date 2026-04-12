@@ -133,6 +133,17 @@
   background-clip: text;
 }
 
+/* Lighter placeholder text — clearly distinguish hints from entered values */
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--muted-foreground) / 0.45) !important;
+  font-style: italic;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: hsl(var(--muted-foreground) / 0.4) !important;
+}
+
 /* Disabled gradient button override — make it clearly grayed out */
 button.gradient-primary:disabled,
 button.gradient-primary[disabled] {
