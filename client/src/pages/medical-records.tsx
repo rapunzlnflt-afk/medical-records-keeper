@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe,
   AlertTriangle, Heart, Shield, FolderOpen, ImageIcon, ExternalLink,
-  Upload, Link2, Info, HardDrive, X,
+  Upload, Link2, Info, HardDrive, X, TriangleAlert,
 } from "lucide-react";
 import type { MedicalRecord, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
@@ -404,6 +404,30 @@ export default function MedicalRecords() {
           })
         )}
       </div>
+
+      {/* Cache Warning */}
+      <Card className="border-red-300/40 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/30">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-2.5">
+            <TriangleAlert className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-heading text-sm font-semibold">Important: Back Up Your Data</h3>
+              <p className="text-xs text-muted-foreground mt-1 font-body leading-relaxed">
+                All your records, appointments, medications, and uploaded photos are stored on this device.
+                If you clear your browser cache or data, everything will be erased.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2 font-body leading-relaxed font-semibold">
+                To protect your data:
+              </p>
+              <ol className="text-xs text-muted-foreground mt-1 font-body leading-relaxed list-decimal list-inside space-y-1">
+                <li>Tap <span className="font-semibold">Save My Data</span> in the sidebar regularly to download a backup file.</li>
+                <li>Keep the backup file in a safe place (email it to yourself, save to a USB drive, etc.).</li>
+                <li>If your data is ever erased, open the app and tap <span className="font-semibold">Load My Data</span>, then select your backup file to restore everything.</li>
+              </ol>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
