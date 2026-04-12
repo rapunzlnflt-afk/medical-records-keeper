@@ -6,6 +6,17 @@ export function getApiBase() {
   return API_BASE;
 }
 
+// Global active patient ID — updated by PatientContext
+let _activePatientId = 1;
+export function setGlobalPatientId(id: number) { _activePatientId = id; }
+export function getGlobalPatientId() { return _activePatientId; }
+
+/** Build a URL with ?patientId=X appended for patient-scoped endpoints */
+export function patientUrl(base: string): string {
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}patientId=${_activePatientId}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

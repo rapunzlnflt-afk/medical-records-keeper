@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getApiBase } from "@/lib/queryClient";
+import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -231,26 +232,28 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
 }
 
 export default function MedicalRecords() {
+  const { activePatientId } = usePatient();
+  const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MedicalRecord | null>(null);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<string>("all");
   const { toast } = useToast();
 
-  const { data: records = [], isLoading } = useQuery<MedicalRecord[]>({ queryKey: ["/api/medical-records"] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: ["/api/physicians"] });
+  const { data: records = [], isLoading } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`, pid] });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/medical-records", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/medical-records"] }); setOpen(false); toast({ title: "Record added" }); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/medical-records", { ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Record added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/medical-records/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/medical-records"] }); setEditing(null); toast({ title: "Record updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Record updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/medical-records/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/medical-records"] }); toast({ title: "Record deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] }); toast({ title: "Record deleted" }); },
   });
 
   const filtered = records.filter((r) => {

@@ -2,9 +2,23 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Patients (family members — up to 6)
+export const patients = sqliteTable("patients", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  relationship: text("relationship"), // e.g. "Self", "Spouse", "Child", "Parent"
+  dateOfBirth: text("date_of_birth"),
+  color: text("color").notNull().default("#3b82f6"), // avatar color
+});
+
+export const insertPatientSchema = createInsertSchema(patients).omit({ id: true });
+export type InsertPatient = z.infer<typeof insertPatientSchema>;
+export type Patient = typeof patients.$inferSelect;
+
 // Physicians
 export const physicians = sqliteTable("physicians", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   name: text("name").notNull(),
   specialty: text("specialty").notNull(),
   phone: text("phone"),
@@ -25,6 +39,7 @@ export type Physician = typeof physicians.$inferSelect;
 // Appointments
 export const appointments = sqliteTable("appointments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   title: text("title").notNull(),
   physicianId: integer("physician_id"),
   date: text("date").notNull(),
@@ -43,6 +58,7 @@ export type Appointment = typeof appointments.$inferSelect;
 // Medications
 export const medications = sqliteTable("medications", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   name: text("name").notNull(),
   type: text("type").notNull(), // prescription, otc, supplement, vitamin
   dosage: text("dosage").notNull(),
@@ -80,8 +96,9 @@ export type MedicationLog = typeof medicationLogs.$inferSelect;
 // Medical Records / Documents
 export const medicalRecords = sqliteTable("medical_records", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   title: text("title").notNull(),
-  category: text("category").notNull(), // lab-results, imaging, vaccination, allergy, condition, insurance, other
+  category: text("category").notNull(), // lab-results, imaging, vaccination, allergy, condition, insurance, receipt, other
   date: text("date").notNull(),
   physicianId: integer("physician_id"),
   description: text("description"),
@@ -96,6 +113,7 @@ export type MedicalRecord = typeof medicalRecords.$inferSelect;
 // Vitals / Health Metrics
 export const vitals = sqliteTable("vitals", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   date: text("date").notNull(),
   weight: text("weight"),
   bloodPressureSystolic: text("blood_pressure_systolic"),
@@ -114,6 +132,7 @@ export type Vital = typeof vitals.$inferSelect;
 // Emergency Contacts
 export const emergencyContacts = sqliteTable("emergency_contacts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   name: text("name").notNull(),
   relationship: text("relationship").notNull(),
   phone: text("phone").notNull(),
@@ -129,6 +148,7 @@ export type EmergencyContact = typeof emergencyContacts.$inferSelect;
 // Preferred Pharmacies
 export const pharmacies = sqliteTable("pharmacies", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  patientId: integer("patient_id").notNull().default(1),
   name: text("name").notNull(),
   phone: text("phone"),
   address: text("address"),

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,25 +114,27 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
 }
 
 export default function Appointments() {
+  const { activePatientId } = usePatient();
+  const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const { toast } = useToast();
 
-  const { data: appointments = [], isLoading } = useQuery<Appointment[]>({ queryKey: ["/api/appointments"] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: ["/api/physicians"] });
+  const { data: appointments = [], isLoading } = useQuery<Appointment[]>({ queryKey: [`/api/appointments?patientId=${pid}`, pid] });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`, pid] });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/appointments", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/appointments"] }); setOpen(false); toast({ title: "Appointment added" }); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/appointments", { ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/appointments?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Appointment added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/appointments/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/appointments"] }); setEditing(null); toast({ title: "Appointment updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/appointments?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Appointment updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/appointments/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/appointments"] }); toast({ title: "Appointment deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/appointments?patientId=${pid}`, pid] }); toast({ title: "Appointment deleted" }); },
   });
 
   const today = new Date().toISOString().split("T")[0];

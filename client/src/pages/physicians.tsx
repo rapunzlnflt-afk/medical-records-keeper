@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,24 +91,26 @@ function PhysicianForm({ initial, onSubmit, onCancel }: {
 }
 
 export default function Physicians() {
+  const { activePatientId } = usePatient();
+  const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Physician | null>(null);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
 
-  const { data: physicians = [], isLoading } = useQuery<Physician[]>({ queryKey: ["/api/physicians"] });
+  const { data: physicians = [], isLoading } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`, pid] });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/physicians", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/physicians"] }); setOpen(false); toast({ title: "Physician added" }); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/physicians", { ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/physicians?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Physician added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/physicians/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/physicians"] }); setEditing(null); toast({ title: "Physician updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/physicians?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Physician updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/physicians/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/physicians"] }); toast({ title: "Physician removed" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/physicians?patientId=${pid}`, pid] }); toast({ title: "Physician removed" }); },
   });
 
   const filtered = physicians.filter((p) =>

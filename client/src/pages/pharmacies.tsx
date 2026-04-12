@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,23 +88,25 @@ function PharmacyForm({ initial, onSubmit, onCancel }: {
 }
 
 export default function Pharmacies() {
+  const { activePatientId } = usePatient();
+  const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Pharmacy | null>(null);
   const { toast } = useToast();
 
-  const { data: pharmacyList = [], isLoading } = useQuery<Pharmacy[]>({ queryKey: ["/api/pharmacies"] });
+  const { data: pharmacyList = [], isLoading } = useQuery<Pharmacy[]>({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/pharmacies", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/pharmacies"] }); setOpen(false); toast({ title: "Pharmacy added" }); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/pharmacies", { ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Pharmacy added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/pharmacies/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/pharmacies"] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/pharmacies/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/pharmacies"] }); toast({ title: "Pharmacy deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`, pid] }); toast({ title: "Pharmacy deleted" }); },
   });
 
   // Show preferred pharmacies first

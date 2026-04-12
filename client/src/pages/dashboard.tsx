@@ -5,6 +5,7 @@ import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, Al
 import { Link } from "wouter";
 import type { Appointment, Medication, Physician, MedicalRecord, Vital, EmergencyContact } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { usePatient } from "@/lib/patient-context";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
@@ -30,12 +31,14 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
 }
 
 export default function Dashboard() {
-  const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: ["/api/appointments"] });
-  const { data: medications = [] } = useQuery<Medication[]>({ queryKey: ["/api/medications"] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: ["/api/physicians"] });
-  const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: ["/api/medical-records"] });
-  const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: ["/api/vitals"] });
-  const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: ["/api/emergency-contacts"] });
+  const { activePatientId, activePatient } = usePatient();
+  const pid = activePatientId;
+  const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: [`/api/appointments?patientId=${pid}`, pid] });
+  const { data: medications = [] } = useQuery<Medication[]>({ queryKey: [`/api/medications?patientId=${pid}`, pid] });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`, pid] });
+  const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`, pid] });
+  const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`, pid] });
+  const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: [`/api/emergency-contacts?patientId=${pid}`, pid] });
 
   const today = new Date().toISOString().split("T")[0];
   const upcoming = appointments.filter(
@@ -61,7 +64,7 @@ export default function Dashboard() {
       <div>
         <h1 className="font-heading text-xl font-bold">Dashboard</h1>
         <p className="text-sm text-muted-foreground font-body mt-1">
-          Your health overview at a glance
+          {activePatient ? `${activePatient.name.endsWith('s') ? activePatient.name + "'" : activePatient.name + "'s"} health overview` : "Your health overview at a glance"}
         </p>
       </div>
 

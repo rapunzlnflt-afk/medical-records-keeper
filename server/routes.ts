@@ -5,9 +5,13 @@ import fs from "fs";
 import multer from "multer";
 import { storage, db } from "./storage";
 import {
-  physicians, appointments, medications, medicationLogs,
+  patients, physicians, appointments, medications, medicationLogs,
   medicalRecords, vitals, emergencyContacts, pharmacies,
 } from "@shared/schema";
+
+function getPid(req: any): number {
+  return Number(req.query.patientId) || 1;
+}
 
 export function registerRoutes(server: Server, app: Express) {
   // === File Uploads ===
@@ -47,9 +51,42 @@ export function registerRoutes(server: Server, app: Express) {
     res.json({ url, filename: req.file.filename });
   });
 
+  // === Patients ===
+  app.get("/api/patients", (_req, res) => {
+    res.json(storage.getPatients());
+  });
+  app.get("/api/patients/:id", (req, res) => {
+    const p = storage.getPatient(Number(req.params.id));
+    if (!p) return res.status(404).json({ error: "Not found" });
+    res.json(p);
+  });
+  app.post("/api/patients", (req, res) => {
+    // Enforce max 6
+    const existing = storage.getPatients();
+    if (existing.length >= 6) {
+      return res.status(400).json({ error: "Maximum of 6 family members allowed" });
+    }
+    const p = storage.createPatient(req.body);
+    res.status(201).json(p);
+  });
+  app.patch("/api/patients/:id", (req, res) => {
+    const p = storage.updatePatient(Number(req.params.id), req.body);
+    if (!p) return res.status(404).json({ error: "Not found" });
+    res.json(p);
+  });
+  app.delete("/api/patients/:id", (req, res) => {
+    // Don't allow deleting the last patient
+    const existing = storage.getPatients();
+    if (existing.length <= 1) {
+      return res.status(400).json({ error: "Cannot delete the last family member" });
+    }
+    storage.deletePatient(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // === Physicians ===
-  app.get("/api/physicians", (_req, res) => {
-    res.json(storage.getPhysicians());
+  app.get("/api/physicians", (req, res) => {
+    res.json(storage.getPhysicians(getPid(req)));
   });
   app.get("/api/physicians/:id", (req, res) => {
     const p = storage.getPhysician(Number(req.params.id));
@@ -57,7 +94,7 @@ export function registerRoutes(server: Server, app: Express) {
     res.json(p);
   });
   app.post("/api/physicians", (req, res) => {
-    const p = storage.createPhysician(req.body);
+    const p = storage.createPhysician({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(p);
   });
   app.patch("/api/physicians/:id", (req, res) => {
@@ -71,8 +108,8 @@ export function registerRoutes(server: Server, app: Express) {
   });
 
   // === Appointments ===
-  app.get("/api/appointments", (_req, res) => {
-    res.json(storage.getAppointments());
+  app.get("/api/appointments", (req, res) => {
+    res.json(storage.getAppointments(getPid(req)));
   });
   app.get("/api/appointments/:id", (req, res) => {
     const a = storage.getAppointment(Number(req.params.id));
@@ -80,7 +117,7 @@ export function registerRoutes(server: Server, app: Express) {
     res.json(a);
   });
   app.post("/api/appointments", (req, res) => {
-    const a = storage.createAppointment(req.body);
+    const a = storage.createAppointment({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(a);
   });
   app.patch("/api/appointments/:id", (req, res) => {
@@ -94,8 +131,8 @@ export function registerRoutes(server: Server, app: Express) {
   });
 
   // === Medications ===
-  app.get("/api/medications", (_req, res) => {
-    res.json(storage.getMedications());
+  app.get("/api/medications", (req, res) => {
+    res.json(storage.getMedications(getPid(req)));
   });
   app.get("/api/medications/:id", (req, res) => {
     const m = storage.getMedication(Number(req.params.id));
@@ -103,7 +140,7 @@ export function registerRoutes(server: Server, app: Express) {
     res.json(m);
   });
   app.post("/api/medications", (req, res) => {
-    const m = storage.createMedication(req.body);
+    const m = storage.createMedication({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(m);
   });
   app.patch("/api/medications/:id", (req, res) => {
@@ -131,8 +168,8 @@ export function registerRoutes(server: Server, app: Express) {
   });
 
   // === Medical Records ===
-  app.get("/api/medical-records", (_req, res) => {
-    res.json(storage.getMedicalRecords());
+  app.get("/api/medical-records", (req, res) => {
+    res.json(storage.getMedicalRecords(getPid(req)));
   });
   app.get("/api/medical-records/:id", (req, res) => {
     const r = storage.getMedicalRecord(Number(req.params.id));
@@ -140,7 +177,7 @@ export function registerRoutes(server: Server, app: Express) {
     res.json(r);
   });
   app.post("/api/medical-records", (req, res) => {
-    const r = storage.createMedicalRecord(req.body);
+    const r = storage.createMedicalRecord({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(r);
   });
   app.patch("/api/medical-records/:id", (req, res) => {
@@ -154,11 +191,11 @@ export function registerRoutes(server: Server, app: Express) {
   });
 
   // === Vitals ===
-  app.get("/api/vitals", (_req, res) => {
-    res.json(storage.getVitals());
+  app.get("/api/vitals", (req, res) => {
+    res.json(storage.getVitals(getPid(req)));
   });
   app.post("/api/vitals", (req, res) => {
-    const v = storage.createVital(req.body);
+    const v = storage.createVital({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(v);
   });
   app.delete("/api/vitals/:id", (req, res) => {
@@ -167,11 +204,11 @@ export function registerRoutes(server: Server, app: Express) {
   });
 
   // === Emergency Contacts ===
-  app.get("/api/emergency-contacts", (_req, res) => {
-    res.json(storage.getEmergencyContacts());
+  app.get("/api/emergency-contacts", (req, res) => {
+    res.json(storage.getEmergencyContacts(getPid(req)));
   });
   app.post("/api/emergency-contacts", (req, res) => {
-    const c = storage.createEmergencyContact(req.body);
+    const c = storage.createEmergencyContact({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(c);
   });
   app.patch("/api/emergency-contacts/:id", (req, res) => {
@@ -185,8 +222,8 @@ export function registerRoutes(server: Server, app: Express) {
   });
 
   // === Pharmacies ===
-  app.get("/api/pharmacies", (_req, res) => {
-    res.json(storage.getPharmacies());
+  app.get("/api/pharmacies", (req, res) => {
+    res.json(storage.getPharmacies(getPid(req)));
   });
   app.get("/api/pharmacies/:id", (req, res) => {
     const p = storage.getPharmacy(Number(req.params.id));
@@ -194,7 +231,7 @@ export function registerRoutes(server: Server, app: Express) {
     res.json(p);
   });
   app.post("/api/pharmacies", (req, res) => {
-    const p = storage.createPharmacy(req.body);
+    const p = storage.createPharmacy({ ...req.body, patientId: req.body.patientId || getPid(req) });
     res.status(201).json(p);
   });
   app.patch("/api/pharmacies/:id", (req, res) => {
@@ -209,17 +246,19 @@ export function registerRoutes(server: Server, app: Express) {
 
   // === Backup: Save My Data ===
   app.get("/api/backup/export", (_req, res) => {
+    const allPatients = storage.getPatients();
     const data = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
-      physicians: storage.getPhysicians(),
-      appointments: storage.getAppointments(),
-      medications: storage.getMedications(),
-      medicationLogs: storage.getMedicationLogs(),
-      medicalRecords: storage.getMedicalRecords(),
-      vitals: storage.getVitals(),
-      emergencyContacts: storage.getEmergencyContacts(),
-      pharmacies: storage.getPharmacies(),
+      patients: allPatients,
+      physicians: db.select().from(physicians).all(),
+      appointments: db.select().from(appointments).all(),
+      medications: db.select().from(medications).all(),
+      medicationLogs: db.select().from(medicationLogs).all(),
+      medicalRecords: db.select().from(medicalRecords).all(),
+      vitals: db.select().from(vitals).all(),
+      emergencyContacts: db.select().from(emergencyContacts).all(),
+      pharmacies: db.select().from(pharmacies).all(),
     };
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
@@ -246,35 +285,54 @@ export function registerRoutes(server: Server, app: Express) {
       db.delete(emergencyContacts).run();
       db.delete(physicians).run();
       db.delete(pharmacies).run();
+      db.delete(patients).run();
 
-      // Import physicians first (other tables may reference them)
+      // Import patients (or create default for v1 backups)
+      let patientIdMap: Record<number, number> = {};
+      if (data.patients?.length) {
+        for (const p of data.patients) {
+          const oldId = p.id;
+          const { id, ...rest } = p;
+          const created = db.insert(patients).values(rest).returning().get();
+          patientIdMap[oldId] = created.id;
+        }
+      } else {
+        // v1 backup — create a default patient
+        const created = db.insert(patients).values({ name: "My Records", relationship: "Self", color: "#3b82f6" }).returning().get();
+        patientIdMap[1] = created.id;
+      }
+
+      // Import physicians (remap patient_id)
       let physicianIdMap: Record<number, number> = {};
       if (data.physicians?.length) {
         for (const p of data.physicians) {
           const oldId = p.id;
           const { id, ...rest } = p;
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           const created = db.insert(physicians).values(rest).returning().get();
           physicianIdMap[oldId] = created.id;
         }
       }
 
-      // Import appointments (remap physician_id)
+      // Import appointments (remap physician_id + patient_id)
       if (data.appointments?.length) {
         for (const a of data.appointments) {
           const { id, ...rest } = a;
           if (rest.physicianId && physicianIdMap[rest.physicianId]) {
             rest.physicianId = physicianIdMap[rest.physicianId];
           }
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           db.insert(appointments).values(rest).returning().get();
         }
       }
 
-      // Import medications
+      // Import medications (remap patient_id)
       let medicationIdMap: Record<number, number> = {};
       if (data.medications?.length) {
         for (const m of data.medications) {
           const oldId = m.id;
           const { id, ...rest } = m;
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           const created = db.insert(medications).values(rest).returning().get();
           medicationIdMap[oldId] = created.id;
         }
@@ -291,37 +349,41 @@ export function registerRoutes(server: Server, app: Express) {
         }
       }
 
-      // Import medical records (remap physician_id)
+      // Import medical records (remap physician_id + patient_id)
       if (data.medicalRecords?.length) {
         for (const r of data.medicalRecords) {
           const { id, ...rest } = r;
           if (rest.physicianId && physicianIdMap[rest.physicianId]) {
             rest.physicianId = physicianIdMap[rest.physicianId];
           }
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           db.insert(medicalRecords).values(rest).returning().get();
         }
       }
 
-      // Import vitals
+      // Import vitals (remap patient_id)
       if (data.vitals?.length) {
         for (const v of data.vitals) {
           const { id, ...rest } = v;
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           db.insert(vitals).values(rest).returning().get();
         }
       }
 
-      // Import emergency contacts
+      // Import emergency contacts (remap patient_id)
       if (data.emergencyContacts?.length) {
         for (const c of data.emergencyContacts) {
           const { id, ...rest } = c;
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           db.insert(emergencyContacts).values(rest).returning().get();
         }
       }
 
-      // Import pharmacies
+      // Import pharmacies (remap patient_id)
       if (data.pharmacies?.length) {
         for (const p of data.pharmacies) {
           const { id, ...rest } = p;
+          rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
           db.insert(pharmacies).values(rest).returning().get();
         }
       }

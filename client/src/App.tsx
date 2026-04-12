@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/lib/theme";
+import { PatientProvider } from "@/lib/patient-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Dashboard from "@/pages/dashboard";
 import Appointments from "@/pages/appointments";
@@ -65,14 +66,16 @@ export default function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Router hook={useHashLocation}>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <AppLayout />
-            </SidebarProvider>
-          </Router>
-          <Toaster />
-        </TooltipProvider>
+        <PatientProvider>
+          <TooltipProvider>
+            <Router hook={useHashLocation}>
+              <SidebarProvider style={style as React.CSSProperties}>
+                <AppLayout />
+              </SidebarProvider>
+            </Router>
+            <Toaster />
+          </TooltipProvider>
+        </PatientProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

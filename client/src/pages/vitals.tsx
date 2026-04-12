@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,18 +82,20 @@ function VitalForm({ onSubmit, onCancel }: {
 }
 
 export default function Vitals() {
+  const { activePatientId } = usePatient();
+  const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: vitals = [], isLoading } = useQuery<Vital[]>({ queryKey: ["/api/vitals"] });
+  const { data: vitals = [], isLoading } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`, pid] });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/vitals", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vitals"] }); setOpen(false); toast({ title: "Vitals logged" }); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/vitals", { ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`, pid] }); setOpen(false); toast({ title: "Vitals logged" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/vitals/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vitals"] }); toast({ title: "Entry deleted" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`, pid] }); toast({ title: "Entry deleted" }); },
   });
 
   const latest = vitals[0];
