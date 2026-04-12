@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer } from "lucide-react";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 
@@ -147,17 +147,22 @@ export default function Appointments() {
           <h1 className="font-heading text-xl font-bold">Appointments</h1>
           <p className="text-sm text-muted-foreground font-body mt-1">Manage your doctor visits and procedures</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-appointment">
-              <Plus className="w-4 h-4" /> Add Appointment
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => window.print()} data-testid="button-print-appointments">
+            <Printer className="w-4 h-4" /> Print
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-appointment">
+                <Plus className="w-4 h-4" /> Add Appointment
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-heading">New Appointment</DialogTitle></DialogHeader>
             <AppointmentForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Mini Calendar */}

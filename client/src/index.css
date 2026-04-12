@@ -181,3 +181,57 @@
 .status-cancelled {
   @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300;
 }
+
+/* Print styles */
+@media print {
+  /* Hide non-essential UI */
+  [data-sidebar],
+  [data-testid="button-add-appointment"],
+  [data-testid="button-add-medication"],
+  [data-testid="button-add-record"],
+  button,
+  .no-print,
+  nav,
+  header {
+    display: none !important;
+  }
+
+  /* Keep print button target's sibling content visible but hide the button itself */
+  .print-button-area {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for paper */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure cards print cleanly */
+  .hover-elevate {
+    transform: none !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* Make gradient badges readable on print */
+  .gradient-primary {
+    background: #1d4ed8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove scrollbar artifacts */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Full width for print */
+  main, [role="main"], .max-w-6xl {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}

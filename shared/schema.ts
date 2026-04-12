@@ -86,6 +86,7 @@ export const medicalRecords = sqliteTable("medical_records", {
   physicianId: integer("physician_id"),
   description: text("description"),
   notes: text("notes"),
+  imageUrl: text("image_url"), // link to photo of actual results
 });
 
 export const insertMedicalRecordSchema = createInsertSchema(medicalRecords).omit({ id: true });

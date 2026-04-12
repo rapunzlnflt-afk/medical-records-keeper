@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer } from "lucide-react";
 import type { Medication, MedicationLog } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 
@@ -255,17 +255,22 @@ export default function Medications() {
           <h1 className="font-heading text-xl font-bold">Medications</h1>
           <p className="text-sm text-muted-foreground font-body mt-1">Track prescriptions, supplements, and daily doses</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-medication">
-              <Plus className="w-4 h-4" /> Add Medication
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => window.print()} data-testid="button-print-medications">
+            <Printer className="w-4 h-4" /> Print
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-medication">
+                <Plus className="w-4 h-4" /> Add Medication
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-heading">New Medication</DialogTitle></DialogHeader>
             <MedicationForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Today's Schedule */}

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe, AlertTriangle, Heart, Shield, FolderOpen } from "lucide-react";
+import { FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe, AlertTriangle, Heart, Shield, FolderOpen, ImageIcon, ExternalLink } from "lucide-react";
 import type { MedicalRecord, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 
@@ -41,6 +41,7 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
     physicianId: initial?.physicianId || null,
     description: initial?.description || "",
     notes: initial?.notes || "",
+    imageUrl: initial?.imageUrl || "",
   });
 
   return (
@@ -77,6 +78,16 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
           <Label className="text-xs font-body">Description</Label>
           <Textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Results summary, key findings..." data-testid="input-rec-description" />
         </div>
+      </div>
+      <div>
+        <Label className="text-xs font-body">Photo / Image Link</Label>
+        <Input value={form.imageUrl || ""} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://example.com/lab-results.jpg" data-testid="input-rec-image-url" />
+        <p className="text-xs text-muted-foreground mt-1">Paste a link to a photo of the actual document or results</p>
+        {form.imageUrl && (
+          <div className="mt-2 rounded-md border overflow-hidden max-h-40">
+            <img src={form.imageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          </div>
+        )}
       </div>
       <div>
         <Label className="text-xs font-body">Notes</Label>
@@ -186,6 +197,13 @@ export default function MedicalRecords() {
                       </p>
                       {rec.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{rec.description}</p>}
                       {rec.notes && <p className="text-xs text-muted-foreground/70 mt-1 italic line-clamp-1">{rec.notes}</p>}
+                      {rec.imageUrl && (
+                        <a href={rec.imageUrl} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-primary hover:underline" data-testid={`link-image-${rec.id}`}>
+                          <ImageIcon className="w-3 h-3" /> View Photo
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
                       <Dialog open={editing?.id === rec.id} onOpenChange={(o) => !o && setEditing(null)}>

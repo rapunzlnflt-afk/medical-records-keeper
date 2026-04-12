@@ -75,7 +75,8 @@ sqlite.exec(`
     date TEXT NOT NULL,
     physician_id INTEGER,
     description TEXT,
-    notes TEXT
+    notes TEXT,
+    image_url TEXT
   );
   CREATE TABLE IF NOT EXISTS vitals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,6 +100,13 @@ sqlite.exec(`
     is_primary INTEGER NOT NULL DEFAULT 0
   );
 `);
+
+// Migration: add image_url column if it doesn't exist
+try {
+  sqlite.exec(`ALTER TABLE medical_records ADD COLUMN image_url TEXT`);
+} catch (e: any) {
+  // Column already exists — ignore
+}
 
 export interface IStorage {
   // Physicians
