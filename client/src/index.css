@@ -133,6 +133,15 @@
   background-clip: text;
 }
 
+/* Disabled gradient button override — make it clearly grayed out */
+button.gradient-primary:disabled,
+button.gradient-primary[disabled] {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 /* Elevation classes */
 .hover-elevate {
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),

@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/lib/theme";
+import { useIsMobile } from "@/hooks/use-mobile";
 import Dashboard from "@/pages/dashboard";
 import Appointments from "@/pages/appointments";
 import Medications from "@/pages/medications";
@@ -31,6 +32,28 @@ function AppRouter() {
   );
 }
 
+function AppLayout() {
+  const isMobile = useIsMobile();
+
+  return (
+    <div className="flex h-screen w-full">
+      <AppSidebar />
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Only show header with menu toggle on mobile */}
+        {isMobile && (
+          <header className="flex items-center gap-2 p-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex-1" />
+          </header>
+        )}
+        <main className="flex-1 overflow-auto">
+          <AppRouter />
+        </main>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const style = {
     "--sidebar-width": "16rem",
@@ -43,18 +66,7 @@ export default function App() {
         <TooltipProvider>
           <Router hook={useHashLocation}>
             <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <header className="flex items-center gap-2 p-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="flex-1" />
-                  </header>
-                  <main className="flex-1 overflow-auto">
-                    <AppRouter />
-                  </main>
-                </div>
-              </div>
+              <AppLayout />
             </SidebarProvider>
           </Router>
           <Toaster />
