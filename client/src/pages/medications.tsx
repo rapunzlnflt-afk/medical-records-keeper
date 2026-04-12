@@ -256,7 +256,35 @@ export default function Medications() {
           <p className="text-sm text-muted-foreground font-body mt-1">Track prescriptions, supplements, and daily doses</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => window.print()} data-testid="button-print-medications">
+          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => {
+            const w = window.open('', '_blank', 'width=800,height=600');
+            if (!w) return;
+            w.document.write(`<!DOCTYPE html><html><head><title>Medications</title><style>
+              body { font-family: 'Karla', Arial, sans-serif; padding: 24px; color: #1e293b; }
+              h1 { font-family: 'Montserrat', Arial, sans-serif; font-size: 20px; margin-bottom: 16px; }
+              h2 { font-family: 'Montserrat', Arial, sans-serif; font-size: 16px; margin: 16px 0 8px; }
+              .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; }
+              .title { font-weight: 600; font-size: 14px; }
+              .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+              .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: #dbeafe; color: #1e40af; margin-left: 6px; }
+            </style></head><body><h1>Medications</h1>`);
+            if (active.length) {
+              w.document.write('<h2>Active</h2>');
+              active.forEach((med) => {
+                w.document.write(`<div class="card"><div class="title">${med.name} <span class="badge">${med.type}</span></div><div class="meta">${med.dosage} &mdash; ${med.frequency}${med.timeOfDay ? ' (' + med.timeOfDay + ')' : ''}</div>${med.prescribedBy ? '<div class="meta">Prescribed by: ' + med.prescribedBy + '</div>' : ''}${med.pharmacy ? '<div class="meta">Pharmacy: ' + med.pharmacy + '</div>' : ''}${med.purpose ? '<div class="meta">Purpose: ' + med.purpose + '</div>' : ''}${med.refillDate ? '<div class="meta">Refill: ' + med.refillDate + '</div>' : ''}</div>`);
+              });
+            }
+            if (inactive.length) {
+              w.document.write('<h2>Inactive</h2>');
+              inactive.forEach((med) => {
+                w.document.write(`<div class="card"><div class="title">${med.name} <span class="badge">${med.type}</span> <span class="badge">Inactive</span></div><div class="meta">${med.dosage} &mdash; ${med.frequency}</div></div>`);
+              });
+            }
+            w.document.write('</body></html>');
+            w.document.close();
+            w.focus();
+            w.print();
+          }} data-testid="button-print-medications">
             <Printer className="w-4 h-4" /> Print
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>

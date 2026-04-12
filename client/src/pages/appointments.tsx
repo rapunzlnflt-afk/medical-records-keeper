@@ -159,7 +159,28 @@ export default function Appointments() {
           <p className="text-sm text-muted-foreground font-body mt-1">Manage your doctor visits and procedures</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => window.print()} data-testid="button-print-appointments">
+          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => {
+            const printContent = document.querySelector('[data-testid="appointments-list"]');
+            if (!printContent) return;
+            const w = window.open('', '_blank', 'width=800,height=600');
+            if (!w) return;
+            w.document.write(`<!DOCTYPE html><html><head><title>Appointments</title><style>
+              body { font-family: 'Karla', Arial, sans-serif; padding: 24px; color: #1e293b; }
+              h1 { font-family: 'Montserrat', Arial, sans-serif; font-size: 20px; margin-bottom: 16px; }
+              .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; }
+              .title { font-weight: 600; font-size: 14px; }
+              .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+              .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: #dbeafe; color: #1e40af; margin-left: 6px; }
+            </style></head><body><h1>Appointments</h1>`);
+            filtered.forEach((apt) => {
+              const doc = physicians.find((p) => p.id === apt.physicianId);
+              w.document.write(`<div class="card"><div class="title">${apt.title} <span class="badge">${apt.type}</span> <span class="badge">${apt.status}</span></div><div class="meta">${apt.date} at ${apt.time}${doc ? ' &mdash; ' + doc.name : ''}${apt.location ? ' &mdash; ' + apt.location : ''}</div>${apt.notes ? '<div class="meta">' + apt.notes + '</div>' : ''}</div>`);
+            });
+            w.document.write('</body></html>');
+            w.document.close();
+            w.focus();
+            w.print();
+          }} data-testid="button-print-appointments">
             <Printer className="w-4 h-4" /> Print
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -220,7 +241,7 @@ export default function Appointments() {
       </div>
 
       {/* List */}
-      <div className="space-y-3">
+      <div className="space-y-3" data-testid="appointments-list">
         {isLoading ? (
           <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (
