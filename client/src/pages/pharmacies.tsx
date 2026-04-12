@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Trash2, Edit2, Phone, MapPin, Clock, Globe, Star } from "lucide-react";
+import { Building2, Plus, Trash2, Edit2, Phone, MapPin, Clock, Globe, Star, Printer } from "lucide-react";
 import type { Pharmacy } from "@shared/schema";
 
 function PharmacyForm({ initial, onSubmit, onCancel }: {
@@ -116,6 +116,43 @@ export default function Pharmacies() {
           <h1 className="font-heading text-xl font-bold">Preferred Pharmacies</h1>
           <p className="text-sm text-muted-foreground font-body mt-1">Manage your pharmacy locations</p>
         </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm" variant="outline" className="gap-1"
+            data-testid="button-print-pharmacies"
+            onClick={() => {
+              const list = sorted.map((p) => {
+                const addr = [p.address, p.city, p.state, p.zip].filter(Boolean).join(", ");
+                return `<tr>
+                  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600">${p.name}${p.isPrimary ? ' ⭐' : ''}</td>
+                  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${p.phone || '—'}</td>
+                  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${addr || '—'}</td>
+                  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${p.hours || '—'}</td>
+                  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${p.website || '—'}</td>
+                  <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${p.notes || '—'}</td>
+                </tr>`;
+              }).join("");
+              const html = `<html><head><title>My Pharmacies</title></head><body style="font-family:system-ui,sans-serif;padding:24px;max-width:900px;margin:auto">
+                <h1 style="font-size:20px;margin-bottom:4px">Preferred Pharmacies</h1>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:16px">Printed ${new Date().toLocaleDateString()}</p>
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                  <thead><tr style="background:#f3f4f6">
+                    <th style="padding:8px 12px;text-align:left">Name</th>
+                    <th style="padding:8px 12px;text-align:left">Phone</th>
+                    <th style="padding:8px 12px;text-align:left">Address</th>
+                    <th style="padding:8px 12px;text-align:left">Hours</th>
+                    <th style="padding:8px 12px;text-align:left">Website</th>
+                    <th style="padding:8px 12px;text-align:left">Notes</th>
+                  </tr></thead>
+                  <tbody>${list}</tbody>
+                </table>
+              </body></html>`;
+              const w = window.open("", "_blank");
+              if (w) { w.document.write(html); w.document.close(); w.print(); }
+            }}
+          >
+            <Printer className="w-4 h-4" /> Print
+          </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-pharmacy">
@@ -127,6 +164,7 @@ export default function Pharmacies() {
             <PharmacyForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="space-y-3">

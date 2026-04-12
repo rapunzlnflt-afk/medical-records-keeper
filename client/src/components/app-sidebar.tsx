@@ -161,22 +161,22 @@ export function AppSidebar() {
             size="sm"
             onClick={handleSaveData}
             disabled={saving}
-            className="flex-1 gap-1.5 font-body text-xs"
+            className="flex-1 gap-1 font-body text-[11px] px-2"
             data-testid="button-save-data"
           >
-            <Download className="w-3.5 h-3.5" />
-            {saving ? "Saving..." : "Save My Data"}
+            <Download className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{saving ? "Saving..." : "Save My Data"}</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex-1 gap-1.5 font-body text-xs"
+            className="flex-1 gap-1 font-body text-[11px] px-2"
             data-testid="button-load-data"
           >
-            <Upload className="w-3.5 h-3.5" />
-            {loading ? "Loading..." : "Load My Data"}
+            <Upload className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{loading ? "Loading..." : "Load My Data"}</span>
           </Button>
           <input
             ref={fileInputRef}

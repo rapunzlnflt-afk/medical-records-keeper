@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe,
   AlertTriangle, Heart, Shield, FolderOpen, ImageIcon, ExternalLink,
-  Upload, Link2, Info, HardDrive, X, TriangleAlert,
+  Upload, Link2, Info, HardDrive, X, TriangleAlert, Receipt,
 } from "lucide-react";
 import type { MedicalRecord, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
@@ -32,6 +32,7 @@ const CATEGORIES = [
   { value: "allergy", label: "Allergy", icon: AlertTriangle },
   { value: "condition", label: "Condition", icon: Heart },
   { value: "insurance", label: "Insurance", icon: Shield },
+  { value: "receipt", label: "Receipts", icon: Receipt },
   { value: "other", label: "Other", icon: FolderOpen },
 ];
 
