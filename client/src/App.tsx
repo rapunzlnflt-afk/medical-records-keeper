@@ -42,7 +42,6 @@ function AppLayout() {
     <div className="flex h-screen w-full">
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Only show header with menu toggle on mobile */}
         {isMobile && (
           <header className="flex items-center gap-2 p-3 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
             <SidebarTrigger data-testid="button-sidebar-toggle" />

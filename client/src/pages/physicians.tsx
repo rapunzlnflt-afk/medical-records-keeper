@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { getPhysicians, createPhysician, updatePhysician, deletePhysician } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,19 +100,22 @@ export default function Physicians() {
   const [search, setSearch] = useState("");
   const { toast } = useToast();
 
-  const { data: physicians = [], isLoading } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
+  const { data: physicians = [], isLoading } = useQuery<Physician[]>({
+    queryKey: ["physicians", pid],
+    queryFn: () => getPhysicians(pid),
+  });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/physicians", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/physicians?patientId=${pid}`] }); setOpen(false); toast({ title: "Physician added" }); },
+    mutationFn: (data: any) => createPhysician({ ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["physicians", pid] }); setOpen(false); toast({ title: "Physician added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/physicians/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/physicians?patientId=${pid}`] }); setEditing(null); toast({ title: "Physician updated" }); },
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePhysician(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["physicians", pid] }); setEditing(null); toast({ title: "Physician updated" }); },
   });
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/physicians/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/physicians?patientId=${pid}`] }); toast({ title: "Physician removed" }); },
+    mutationFn: (id: number) => deletePhysician(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["physicians", pid] }); toast({ title: "Physician removed" }); },
   });
 
   const filtered = physicians.filter((p) =>
@@ -195,10 +199,10 @@ export default function Physicians() {
                       </DialogTrigger>
                       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                         <DialogHeader><DialogTitle className="font-heading">Edit Physician</DialogTitle></DialogHeader>
-                        <PhysicianForm initial={doc} onSubmit={(data) => updateMut.mutate({ id: doc.id, data })} onCancel={() => setEditing(null)} />
+                        <PhysicianForm initial={doc} onSubmit={(data) => updateMut.mutate({ id: doc.id!, data })} onCancel={() => setEditing(null)} />
                       </DialogContent>
                     </Dialog>
-                    <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(doc.id)} data-testid={`button-delete-doc-${doc.id}`}>
+                    <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(doc.id!)} data-testid={`button-delete-doc-${doc.id}`}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>

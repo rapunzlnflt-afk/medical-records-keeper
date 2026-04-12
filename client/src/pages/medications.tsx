@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { getMedications, createMedication, updateMedication, deleteMedication, getMedicationLogs, createMedicationLog, getPhysicians } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -162,25 +163,34 @@ export default function Medications() {
   const [logOpen, setLogOpen] = useState<number | null>(null);
   const { toast } = useToast();
 
-  const { data: medications = [], isLoading } = useQuery<Medication[]>({ queryKey: [`/api/medications?patientId=${pid}`] });
-  const { data: logs = [] } = useQuery<MedicationLog[]>({ queryKey: ["/api/medication-logs"] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
+  const { data: medications = [], isLoading } = useQuery<Medication[]>({
+    queryKey: ["medications", pid],
+    queryFn: () => getMedications(pid),
+  });
+  const { data: logs = [] } = useQuery<MedicationLog[]>({
+    queryKey: ["medication-logs"],
+    queryFn: () => getMedicationLogs(),
+  });
+  const { data: physicians = [] } = useQuery<Physician[]>({
+    queryKey: ["physicians", pid],
+    queryFn: () => getPhysicians(pid),
+  });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/medications", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medications?patientId=${pid}`] }); setOpen(false); toast({ title: "Medication added" }); },
+    mutationFn: (data: any) => createMedication({ ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); setOpen(false); toast({ title: "Medication added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/medications/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medications?patientId=${pid}`] }); setEditing(null); toast({ title: "Medication updated" }); },
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateMedication(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); setEditing(null); toast({ title: "Medication updated" }); },
   });
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/medications/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medications?patientId=${pid}`] }); toast({ title: "Medication deleted" }); },
+    mutationFn: (id: number) => deleteMedication(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); toast({ title: "Medication deleted" }); },
   });
   const logMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/medication-logs", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/medication-logs"] }); toast({ title: "Dose logged" }); },
+    mutationFn: (data: any) => createMedicationLog(data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medication-logs"] }); toast({ title: "Dose logged" }); },
   });
 
   const active = medications.filter((m) => m.active === 1);
@@ -235,10 +245,10 @@ export default function Medications() {
                     <Badge className="status-completed text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Taken</Badge>
                   ) : (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => logDose(med.id, true)} className="text-xs h-7" data-testid={`button-take-${med.id}`}>
+                      <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-xs h-7" data-testid={`button-take-${med.id}`}>
                         <CheckCircle2 className="w-3 h-3 mr-1" /> Take
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => logDose(med.id, false)} className="text-xs h-7 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
+                      <Button size="sm" variant="ghost" onClick={() => logDose(med.id!, false)} className="text-xs h-7 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
                         Skip
                       </Button>
                     </>
@@ -254,10 +264,10 @@ export default function Medications() {
                   </DialogTrigger>
                   <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle className="font-heading">Edit Medication</DialogTitle></DialogHeader>
-                    <MedicationForm physicians={physicians} initial={med} onSubmit={(data) => updateMut.mutate({ id: med.id, data })} onCancel={() => setEditing(null)} />
+                    <MedicationForm physicians={physicians} initial={med} onSubmit={(data) => updateMut.mutate({ id: med.id!, data })} onCancel={() => setEditing(null)} />
                   </DialogContent>
                 </Dialog>
-                <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(med.id)} data-testid={`button-delete-med-${med.id}`}>
+                <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(med.id!)} data-testid={`button-delete-med-${med.id}`}>
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               </div>

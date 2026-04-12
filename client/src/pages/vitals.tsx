@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { getVitals, createVital, deleteVital } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,15 +88,18 @@ export default function Vitals() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: vitals = [], isLoading } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`] });
+  const { data: vitals = [], isLoading } = useQuery<Vital[]>({
+    queryKey: ["vitals", pid],
+    queryFn: () => getVitals(pid),
+  });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/vitals", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`] }); setOpen(false); toast({ title: "Vitals logged" }); },
+    mutationFn: (data: any) => createVital({ ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["vitals", pid] }); setOpen(false); toast({ title: "Vitals logged" }); },
   });
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/vitals/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/vitals?patientId=${pid}`] }); toast({ title: "Entry deleted" }); },
+    mutationFn: (id: number) => deleteVital(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["vitals", pid] }); toast({ title: "Entry deleted" }); },
   });
 
   const latest = vitals[0];
@@ -203,7 +207,7 @@ export default function Vitals() {
                       <TableCell className="text-xs">{v.bloodSugar || "—"}</TableCell>
                       <TableCell className="text-xs">{v.oxygenSaturation ? `${v.oxygenSaturation}%` : "—"}</TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(v.id)}>
+                        <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(v.id!)}>
                           <Trash2 className="w-3 h-3 text-destructive" />
                         </Button>
                       </TableCell>

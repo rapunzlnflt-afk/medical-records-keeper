@@ -1,166 +1,120 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+// Plain TypeScript types — no Drizzle, no server dependencies.
+// These are used by both the Dexie DB layer and all UI components.
 
-// Patients (family members — up to 6)
-export const patients = sqliteTable("patients", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  relationship: text("relationship"), // e.g. "Self", "Spouse", "Child", "Parent"
-  dateOfBirth: text("date_of_birth"),
-  color: text("color").notNull().default("#3b82f6"), // avatar color
-});
+export interface Patient {
+  id?: number;
+  name: string;
+  relationship: string | null;
+  dateOfBirth: string | null;
+  color: string;
+}
 
-export const insertPatientSchema = createInsertSchema(patients).omit({ id: true });
-export type InsertPatient = z.infer<typeof insertPatientSchema>;
-export type Patient = typeof patients.$inferSelect;
+export interface Physician {
+  id?: number;
+  patientId: number;
+  name: string;
+  specialty: string;
+  phone: string | null;
+  fax: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  npi: string | null;
+  notes: string | null;
+}
 
-// Physicians
-export const physicians = sqliteTable("physicians", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  name: text("name").notNull(),
-  specialty: text("specialty").notNull(),
-  phone: text("phone"),
-  fax: text("fax"),
-  email: text("email"),
-  address: text("address"),
-  city: text("city"),
-  state: text("state"),
-  zip: text("zip"),
-  npi: text("npi"),
-  notes: text("notes"),
-});
+export interface Appointment {
+  id?: number;
+  patientId: number;
+  title: string;
+  physicianId: number | null;
+  date: string;
+  time: string;
+  location: string | null;
+  type: string;
+  status: string;
+  notes: string | null;
+  reminderDate: string | null;
+}
 
-export const insertPhysicianSchema = createInsertSchema(physicians).omit({ id: true });
-export type InsertPhysician = z.infer<typeof insertPhysicianSchema>;
-export type Physician = typeof physicians.$inferSelect;
+export interface Medication {
+  id?: number;
+  patientId: number;
+  name: string;
+  type: string;
+  dosage: string;
+  frequency: string;
+  timeOfDay: string | null;
+  prescribedBy: string | null;
+  pharmacy: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  refillDate: string | null;
+  purpose: string | null;
+  sideEffects: string | null;
+  notes: string | null;
+  active: number;
+}
 
-// Appointments
-export const appointments = sqliteTable("appointments", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  title: text("title").notNull(),
-  physicianId: integer("physician_id"),
-  date: text("date").notNull(),
-  time: text("time").notNull(),
-  location: text("location"),
-  type: text("type").notNull(), // checkup, specialist, lab, imaging, procedure, other
-  status: text("status").notNull().default("upcoming"), // upcoming, completed, cancelled
-  notes: text("notes"),
-  reminderDate: text("reminder_date"),
-});
+export interface MedicationLog {
+  id?: number;
+  medicationId: number;
+  date: string;
+  taken: number;
+  time: string | null;
+  notes: string | null;
+}
 
-export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true });
-export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-export type Appointment = typeof appointments.$inferSelect;
+export interface MedicalRecord {
+  id?: number;
+  patientId: number;
+  title: string;
+  category: string;
+  date: string;
+  physicianId: number | null;
+  description: string | null;
+  notes: string | null;
+  imageUrl: string | null;
+}
 
-// Medications
-export const medications = sqliteTable("medications", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  name: text("name").notNull(),
-  type: text("type").notNull(), // prescription, otc, supplement, vitamin
-  dosage: text("dosage").notNull(),
-  frequency: text("frequency").notNull(), // daily, twice-daily, weekly, as-needed, etc.
-  timeOfDay: text("time_of_day"), // morning, afternoon, evening, bedtime
-  prescribedBy: text("prescribed_by"),
-  pharmacy: text("pharmacy"),
-  startDate: text("start_date"),
-  endDate: text("end_date"),
-  refillDate: text("refill_date"),
-  purpose: text("purpose"),
-  sideEffects: text("side_effects"),
-  notes: text("notes"),
-  active: integer("active").notNull().default(1),
-});
+export interface Vital {
+  id?: number;
+  patientId: number;
+  date: string;
+  weight: string | null;
+  bloodPressureSystolic: string | null;
+  bloodPressureDiastolic: string | null;
+  heartRate: string | null;
+  temperature: string | null;
+  bloodSugar: string | null;
+  oxygenSaturation: string | null;
+  notes: string | null;
+}
 
-export const insertMedicationSchema = createInsertSchema(medications).omit({ id: true });
-export type InsertMedication = z.infer<typeof insertMedicationSchema>;
-export type Medication = typeof medications.$inferSelect;
+export interface EmergencyContact {
+  id?: number;
+  patientId: number;
+  name: string;
+  relationship: string;
+  phone: string;
+  altPhone: string | null;
+  email: string | null;
+  isPrimary: number;
+}
 
-// Medication Log (tracking daily adherence)
-export const medicationLogs = sqliteTable("medication_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  medicationId: integer("medication_id").notNull(),
-  date: text("date").notNull(),
-  taken: integer("taken").notNull().default(1), // 1=taken, 0=skipped
-  time: text("time"),
-  notes: text("notes"),
-});
-
-export const insertMedicationLogSchema = createInsertSchema(medicationLogs).omit({ id: true });
-export type InsertMedicationLog = z.infer<typeof insertMedicationLogSchema>;
-export type MedicationLog = typeof medicationLogs.$inferSelect;
-
-// Medical Records / Documents
-export const medicalRecords = sqliteTable("medical_records", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  title: text("title").notNull(),
-  category: text("category").notNull(), // lab-results, imaging, vaccination, allergy, condition, insurance, receipt, other
-  date: text("date").notNull(),
-  physicianId: integer("physician_id"),
-  description: text("description"),
-  notes: text("notes"),
-  imageUrl: text("image_url"), // link to photo of actual results
-});
-
-export const insertMedicalRecordSchema = createInsertSchema(medicalRecords).omit({ id: true });
-export type InsertMedicalRecord = z.infer<typeof insertMedicalRecordSchema>;
-export type MedicalRecord = typeof medicalRecords.$inferSelect;
-
-// Vitals / Health Metrics
-export const vitals = sqliteTable("vitals", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  date: text("date").notNull(),
-  weight: text("weight"),
-  bloodPressureSystolic: text("blood_pressure_systolic"),
-  bloodPressureDiastolic: text("blood_pressure_diastolic"),
-  heartRate: text("heart_rate"),
-  temperature: text("temperature"),
-  bloodSugar: text("blood_sugar"),
-  oxygenSaturation: text("oxygen_saturation"),
-  notes: text("notes"),
-});
-
-export const insertVitalSchema = createInsertSchema(vitals).omit({ id: true });
-export type InsertVital = z.infer<typeof insertVitalSchema>;
-export type Vital = typeof vitals.$inferSelect;
-
-// Emergency Contacts
-export const emergencyContacts = sqliteTable("emergency_contacts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  name: text("name").notNull(),
-  relationship: text("relationship").notNull(),
-  phone: text("phone").notNull(),
-  altPhone: text("alt_phone"),
-  email: text("email"),
-  isPrimary: integer("is_primary").notNull().default(0),
-});
-
-export const insertEmergencyContactSchema = createInsertSchema(emergencyContacts).omit({ id: true });
-export type InsertEmergencyContact = z.infer<typeof insertEmergencyContactSchema>;
-export type EmergencyContact = typeof emergencyContacts.$inferSelect;
-
-// Preferred Pharmacies
-export const pharmacies = sqliteTable("pharmacies", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull().default(1),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  address: text("address"),
-  city: text("city"),
-  state: text("state"),
-  zip: text("zip"),
-  hours: text("hours"),
-  website: text("website"),
-  notes: text("notes"),
-  isPrimary: integer("is_primary").notNull().default(0),
-});
-
-export const insertPharmacySchema = createInsertSchema(pharmacies).omit({ id: true });
-export type InsertPharmacy = z.infer<typeof insertPharmacySchema>;
-export type Pharmacy = typeof pharmacies.$inferSelect;
+export interface Pharmacy {
+  id?: number;
+  patientId: number;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  hours: string | null;
+  website: string | null;
+  notes: string | null;
+  isPrimary: number;
+}

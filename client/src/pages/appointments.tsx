@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { getAppointments, createAppointment, updateAppointment, deleteAppointment, getPhysicians } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
             <SelectTrigger data-testid="select-apt-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
-              {physicians.map((p) => <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>)}
+              {physicians.map((p) => <SelectItem key={p.id} value={p.id!.toString()}>{p.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -121,20 +122,26 @@ export default function Appointments() {
   const [filter, setFilter] = useState<string>("all");
   const { toast } = useToast();
 
-  const { data: appointments = [], isLoading } = useQuery<Appointment[]>({ queryKey: [`/api/appointments?patientId=${pid}`] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
+  const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
+    queryKey: ["appointments", pid],
+    queryFn: () => getAppointments(pid),
+  });
+  const { data: physicians = [] } = useQuery<Physician[]>({
+    queryKey: ["physicians", pid],
+    queryFn: () => getPhysicians(pid),
+  });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/appointments", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/appointments?patientId=${pid}`] }); setOpen(false); toast({ title: "Appointment added" }); },
+    mutationFn: (data: any) => createAppointment({ ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments", pid] }); setOpen(false); toast({ title: "Appointment added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/appointments/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/appointments?patientId=${pid}`] }); setEditing(null); toast({ title: "Appointment updated" }); },
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateAppointment(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments", pid] }); setEditing(null); toast({ title: "Appointment updated" }); },
   });
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/appointments/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/appointments?patientId=${pid}`] }); toast({ title: "Appointment deleted" }); },
+    mutationFn: (id: number) => deleteAppointment(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments", pid] }); toast({ title: "Appointment deleted" }); },
   });
 
   const today = new Date().toISOString().split("T")[0];
@@ -292,11 +299,11 @@ export default function Appointments() {
                         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                           <DialogHeader><DialogTitle className="font-heading">Edit Appointment</DialogTitle></DialogHeader>
                           <AppointmentForm physicians={physicians} initial={apt}
-                            onSubmit={(data) => updateMut.mutate({ id: apt.id, data })}
+                            onSubmit={(data) => updateMut.mutate({ id: apt.id!, data })}
                             onCancel={() => setEditing(null)} />
                         </DialogContent>
                       </Dialog>
-                      <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(apt.id)} data-testid={`button-delete-apt-${apt.id}`}>
+                      <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(apt.id!)} data-testid={`button-delete-apt-${apt.id}`}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>

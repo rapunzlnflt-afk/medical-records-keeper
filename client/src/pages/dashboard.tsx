@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, AlertCircle, Bell, Sparkles, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import type { Appointment, Medication, Physician, MedicalRecord, Vital, EmergencyContact } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
 import { usePatient } from "@/lib/patient-context";
+import { getAppointments, getMedications, getPhysicians, getMedicalRecords, getVitals, getEmergencyContacts } from "@/lib/db";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
@@ -33,12 +33,12 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
 export default function Dashboard() {
   const { activePatientId, activePatient } = usePatient();
   const pid = activePatientId;
-  const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: [`/api/appointments?patientId=${pid}`] });
-  const { data: medications = [] } = useQuery<Medication[]>({ queryKey: [`/api/medications?patientId=${pid}`] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
-  const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`] });
-  const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: [`/api/vitals?patientId=${pid}`] });
-  const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: [`/api/emergency-contacts?patientId=${pid}`] });
+  const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: ["appointments", pid], queryFn: () => getAppointments(pid) });
+  const { data: medications = [] } = useQuery<Medication[]>({ queryKey: ["medications", pid], queryFn: () => getMedications(pid) });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: ["physicians", pid], queryFn: () => getPhysicians(pid) });
+  const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: ["medicalRecords", pid], queryFn: () => getMedicalRecords(pid) });
+  const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: ["vitals", pid], queryFn: () => getVitals(pid) });
+  const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: ["emergencyContacts", pid], queryFn: () => getEmergencyContacts(pid) });
 
   const today = new Date().toISOString().split("T")[0];
   const upcoming = appointments.filter(
@@ -52,7 +52,6 @@ export default function Dashboard() {
     return isBefore(refill, addDays(new Date(), 7)) && isAfter(refill, addDays(new Date(), -1));
   });
 
-  // Appointment reminders: show reminders where reminderDate is today or in the past (and appointment is still upcoming)
   const reminders = appointments.filter((a) => {
     if (!a.reminderDate || a.status !== "upcoming") return false;
     return a.reminderDate <= today;
@@ -60,7 +59,6 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
-      {/* Header */}
       <div>
         <h1 className="font-heading text-xl font-bold">Dashboard</h1>
         <p className="text-sm text-muted-foreground font-body mt-1">
@@ -68,7 +66,6 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Getting Started — shown when everything is empty */}
       {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
           <CardContent className="p-5">
@@ -101,7 +98,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <StatCard title="Appointments" value={appointments.filter(a => a.status === "upcoming").length} icon={CalendarDays} href="/appointments" gradient />
         <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
@@ -109,7 +105,6 @@ export default function Dashboard() {
         <StatCard title="Records" value={records.length} icon={FileText} href="/records" />
       </div>
 
-      {/* Appointment Reminders */}
       {reminders.length > 0 && (
         <Card className="border-primary/30 bg-primary/5 dark:bg-primary/10">
           <CardHeader className="pb-3">
@@ -145,7 +140,6 @@ export default function Dashboard() {
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Upcoming Appointments */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
@@ -187,7 +181,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Medication Alerts */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
@@ -236,7 +229,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Links */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard title="Vitals Logged" value={vitals.length} icon={HeartPulse} href="/vitals" />
         <StatCard title="Emergency Contacts" value={contacts.length} icon={Phone} href="/emergency" />

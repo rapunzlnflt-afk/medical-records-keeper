@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./queryClient";
+import { getPatients, ensureDefaultPatient } from "./db";
 import type { Patient } from "@shared/schema";
 
 interface PatientContextValue {
@@ -21,9 +22,17 @@ const PatientContext = createContext<PatientContextValue>({
 
 export function PatientProvider({ children }: { children: ReactNode }) {
   const [activePatientId, setActivePatientId] = useState(1);
+  const [seeded, setSeeded] = useState(false);
+
+  // Ensure default patient exists on first load
+  useEffect(() => {
+    ensureDefaultPatient().then(() => setSeeded(true));
+  }, []);
 
   const { data: patients = [], isLoading } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
+    queryKey: ["patients"],
+    queryFn: getPatients,
+    enabled: seeded,
   });
 
   // When patients load, ensure active ID is valid
@@ -31,7 +40,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     if (patients.length > 0) {
       const exists = patients.find((p) => p.id === activePatientId);
       if (!exists) {
-        setActivePatientId(patients[0].id);
+        setActivePatientId(patients[0].id!);
       }
     }
   }, [patients, activePatientId]);

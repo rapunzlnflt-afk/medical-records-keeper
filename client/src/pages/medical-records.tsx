@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getApiBase } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { getMedicalRecords, createMedicalRecord, updateMedicalRecord, deleteMedicalRecord, getPhysicians } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,13 +19,6 @@ import {
 } from "lucide-react";
 import type { MedicalRecord, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
-
-/** Resolve image URLs — uploaded photos need the API base prefix for deployed mode */
-function resolveImageUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  if (url.startsWith("/api/")) return `${getApiBase()}${url}`;
-  return url;
-}
 
 const CATEGORIES = [
   { value: "lab-results", label: "Lab Results", icon: FlaskConical },
@@ -58,12 +52,15 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
   });
 
   // Photo mode: "upload" or "link"
+  // If existing imageUrl is a data URL or external URL (not a server upload path), detect mode
+  const isDataUrl = initial?.imageUrl?.startsWith("data:");
+  const isExternalUrl = initial?.imageUrl && !initial.imageUrl.startsWith("data:") && initial.imageUrl.startsWith("http");
   const [photoMode, setPhotoMode] = useState<"upload" | "link">(
-    initial?.imageUrl && !initial.imageUrl.startsWith("/api/uploads/") ? "link" : "upload"
+    isExternalUrl ? "link" : "upload"
   );
   const [uploading, setUploading] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<string | null>(
-    initial?.imageUrl && initial.imageUrl.startsWith("/api/uploads/") ? initial.imageUrl : null
+    isDataUrl ? (initial?.imageUrl ?? null) : null
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,15 +69,16 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
     if (!file) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("photo", file);
-      const res = await fetch(`${getApiBase()}/api/upload`, { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
-      setForm((prev) => ({ ...prev, imageUrl: url }));
-      setUploadPreview(url);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setForm((prev) => ({ ...prev, imageUrl: dataUrl }));
+      setUploadPreview(dataUrl);
     } catch {
-      // Show inline error
+      // Show inline error silently
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -119,7 +117,7 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
             <SelectTrigger data-testid="select-rec-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
-              {physicians.map((p) => <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>)}
+              {physicians.map((p) => <SelectItem key={p.id} value={p.id!.toString()}>{p.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -162,7 +160,7 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
           <div className="space-y-2">
             {uploadPreview ? (
               <div className="relative rounded-md border overflow-hidden">
-                <img src={resolveImageUrl(uploadPreview)} alt="Uploaded photo" className="w-full max-h-48 object-contain bg-muted/30" />
+                <img src={uploadPreview} alt="Uploaded photo" className="w-full max-h-48 object-contain bg-muted/30" />
                 <Button
                   type="button" size="icon" variant="destructive"
                   className="absolute top-2 right-2 w-7 h-7 rounded-full"
@@ -180,7 +178,7 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
               >
                 <Upload className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground font-body">
-                  {uploading ? "Uploading..." : "Click to select a photo"}
+                  {uploading ? "Processing..." : "Click to select a photo"}
                 </p>
                 <p className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, or PDF up to 10 MB</p>
               </div>
@@ -203,7 +201,7 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
               data-testid="input-rec-image-url"
             />
             <p className="text-xs text-muted-foreground">Paste a link from Google Drive, Dropbox, or any cloud storage</p>
-            {form.imageUrl && !form.imageUrl.startsWith("/api/uploads/") && (
+            {form.imageUrl && !form.imageUrl.startsWith("data:") && (
               <div className="rounded-md border overflow-hidden max-h-48">
                 <img
                   src={form.imageUrl} alt="Preview"
@@ -240,20 +238,26 @@ export default function MedicalRecords() {
   const [catFilter, setCatFilter] = useState<string>("all");
   const { toast } = useToast();
 
-  const { data: records = [], isLoading } = useQuery<MedicalRecord[]>({ queryKey: [`/api/medical-records?patientId=${pid}`] });
-  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: [`/api/physicians?patientId=${pid}`] });
+  const { data: records = [], isLoading } = useQuery<MedicalRecord[]>({
+    queryKey: ["medical-records", pid],
+    queryFn: () => getMedicalRecords(pid),
+  });
+  const { data: physicians = [] } = useQuery<Physician[]>({
+    queryKey: ["physicians", pid],
+    queryFn: () => getPhysicians(pid),
+  });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/medical-records", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`] }); setOpen(false); toast({ title: "Record added" }); },
+    mutationFn: (data: any) => createMedicalRecord({ ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medical-records", pid] }); setOpen(false); toast({ title: "Record added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/medical-records/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`] }); setEditing(null); toast({ title: "Record updated" }); },
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateMedicalRecord(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medical-records", pid] }); setEditing(null); toast({ title: "Record updated" }); },
   });
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/medical-records/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/medical-records?patientId=${pid}`] }); toast({ title: "Record deleted" }); },
+    mutationFn: (id: number) => deleteMedicalRecord(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medical-records", pid] }); toast({ title: "Record deleted" }); },
   });
 
   const filtered = records.filter((r) => {
@@ -338,17 +342,15 @@ export default function MedicalRecords() {
             const catInfo = getCategoryInfo(rec.category);
             const CatIcon = catInfo.icon;
             const doc = physicians.find((p) => p.id === rec.physicianId);
-            const hasUploadedPhoto = rec.imageUrl?.startsWith("/api/uploads/");
-            const hasLinkedPhoto = rec.imageUrl && !rec.imageUrl.startsWith("/api/uploads/");
             return (
               <Card key={rec.id} className="hover-elevate" data-testid={`record-${rec.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     {/* Thumbnail if there's a photo */}
                     {rec.imageUrl ? (
-                      <a href={resolveImageUrl(rec.imageUrl)} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                      <a href={rec.imageUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
                         <div className="w-14 h-14 rounded-lg border overflow-hidden bg-muted/30">
-                          <img src={resolveImageUrl(rec.imageUrl)} alt={rec.title} className="w-full h-full object-cover" onError={(e) => {
+                          <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-cover" onError={(e) => {
                             const parent = (e.target as HTMLImageElement).parentElement;
                             if (parent) {
                               parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground/40"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>';
@@ -378,7 +380,7 @@ export default function MedicalRecords() {
                       {rec.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{rec.description}</p>}
                       {rec.notes && <p className="text-xs text-muted-foreground/70 mt-1 italic line-clamp-1">{rec.notes}</p>}
                       {rec.imageUrl && (
-                        <a href={resolveImageUrl(rec.imageUrl)} target="_blank" rel="noopener noreferrer"
+                        <a href={rec.imageUrl} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-primary hover:underline" data-testid={`link-image-${rec.id}`}>
                           <ImageIcon className="w-3 h-3" /> View Photo
                           <ExternalLink className="w-3 h-3" />
@@ -394,10 +396,10 @@ export default function MedicalRecords() {
                         </DialogTrigger>
                         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                           <DialogHeader><DialogTitle className="font-heading">Edit Record</DialogTitle></DialogHeader>
-                          <RecordForm physicians={physicians} initial={rec} onSubmit={(data) => updateMut.mutate({ id: rec.id, data })} onCancel={() => setEditing(null)} />
+                          <RecordForm physicians={physicians} initial={rec} onSubmit={(data) => updateMut.mutate({ id: rec.id!, data })} onCancel={() => setEditing(null)} />
                         </DialogContent>
                       </Dialog>
-                      <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(rec.id)}>
+                      <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(rec.id!)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>

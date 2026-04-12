@@ -1,50 +1,29 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  LayoutDashboard,
-  CalendarDays,
-  Pill,
-  Stethoscope,
-  FileText,
-  HeartPulse,
-  Phone,
-  Building2,
-  Sun,
-  Moon,
-  Download,
-  Upload,
-  Users,
-  Plus,
-  X,
-  Check,
-  ChevronDown,
-  Pencil,
-  Trash2,
+  LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
+  HeartPulse, Phone, Building2, Sun, Moon, Download, Upload,
+  Plus, X, Check, ChevronDown, Pencil, Trash2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarHeader, SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/lib/theme";
-import { apiRequest, setGlobalPatientId } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { usePatient } from "@/lib/patient-context";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
+import {
+  createPatient, updatePatient, deletePatient as deletePatientDb,
+  exportAllData, importAllData, getPatients,
+} from "@/lib/db";
 import type { Patient } from "@shared/schema";
 
 const navItems = [
@@ -91,9 +70,13 @@ function PatientSwitcher() {
   const { toast } = useToast();
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/patients", data),
+    mutationFn: async (data: any) => {
+      const existing = await getPatients();
+      if (existing.length >= 6) throw new Error("Maximum of 6 family members allowed");
+      return createPatient(data);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       setShowAdd(false);
       setNewName("");
       setNewRelationship("");
@@ -105,18 +88,22 @@ function PatientSwitcher() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/patients/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePatient(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       setEditingId(null);
       toast({ title: "Updated" });
     },
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/patients/${id}`),
+    mutationFn: async (id: number) => {
+      const existing = await getPatients();
+      if (existing.length <= 1) throw new Error("Cannot delete the last family member");
+      return deletePatientDb(id);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       toast({ title: "Family member removed" });
     },
     onError: (err: any) => {
@@ -124,16 +111,10 @@ function PatientSwitcher() {
     },
   });
 
-  // Sync global patient ID whenever active changes
-  useEffect(() => {
-    setGlobalPatientId(activePatientId);
-  }, [activePatientId]);
-
   if (!activePatient) return null;
 
   return (
     <div className="space-y-1">
-      {/* Active patient button */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors"
@@ -151,7 +132,6 @@ function PatientSwitcher() {
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Expanded patient list */}
       {expanded && (
         <div className="space-y-1 pl-1 pr-1">
           {patients.map((p) => {
@@ -164,12 +144,12 @@ function PatientSwitcher() {
                     data-testid={`input-edit-patient-${p.id}`}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
-                        updateMut.mutate({ id: p.id, data: { name: (e.target as HTMLInputElement).value } });
+                        updateMut.mutate({ id: p.id!, data: { name: (e.target as HTMLInputElement).value } });
                       }
                     }}
                     onBlur={(e) => {
                       if (e.target.value !== p.name) {
-                        updateMut.mutate({ id: p.id, data: { name: e.target.value } });
+                        updateMut.mutate({ id: p.id!, data: { name: e.target.value } });
                       } else {
                         setEditingId(null);
                       }
@@ -188,7 +168,7 @@ function PatientSwitcher() {
               >
                 <div
                   className="flex items-center gap-2 flex-1 min-w-0"
-                  onClick={() => { setActivePatientId(p.id); setExpanded(false); }}
+                  onClick={() => { setActivePatientId(p.id!); setExpanded(false); }}
                   data-testid={`button-select-patient-${p.id}`}
                 >
                   <PatientAvatar patient={p} size="sm" />
@@ -200,7 +180,7 @@ function PatientSwitcher() {
                 {p.id === activePatientId && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                   <button
-                    onClick={(e) => { e.stopPropagation(); setEditingId(p.id); }}
+                    onClick={(e) => { e.stopPropagation(); setEditingId(p.id!); }}
                     className="p-1 rounded hover:bg-sidebar-accent"
                     data-testid={`button-edit-patient-${p.id}`}
                   >
@@ -208,7 +188,7 @@ function PatientSwitcher() {
                   </button>
                   {patients.length > 1 && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); deleteMut.mutate(p.id); }}
+                      onClick={(e) => { e.stopPropagation(); deleteMut.mutate(p.id!); }}
                       className="p-1 rounded hover:bg-destructive/10"
                       data-testid={`button-delete-patient-${p.id}`}
                     >
@@ -220,7 +200,6 @@ function PatientSwitcher() {
             );
           })}
 
-          {/* Add new family member */}
           {showAdd ? (
             <div className="p-2 rounded-lg bg-sidebar-accent/30 space-y-2">
               <Input
@@ -256,7 +235,7 @@ function PatientSwitcher() {
                 <Button
                   size="sm"
                   className="h-6 text-xs px-2 gradient-primary text-white border-none"
-                  onClick={() => createMut.mutate({ name: newName, relationship: newRelationship || null, color: newColor })}
+                  onClick={() => createMut.mutate({ name: newName, relationship: newRelationship || null, dateOfBirth: null, color: newColor })}
                   disabled={!newName.trim()}
                   data-testid="button-save-new-patient"
                 >
@@ -297,8 +276,7 @@ export function AppSidebar() {
   const handleSaveData = async () => {
     setSaving(true);
     try {
-      const res = await apiRequest("GET", "/api/backup/export");
-      const data = await res.json();
+      const data = await exportAllData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -324,8 +302,7 @@ export function AppSidebar() {
       const text = await file.text();
       const data = JSON.parse(text);
       if (!data.version) throw new Error("Invalid backup file");
-      await apiRequest("POST", "/api/backup/import", data);
-      // Refresh all queries so the UI updates
+      await importAllData(data);
       await queryClient.invalidateQueries();
       toast({ title: "Data Loaded", description: "Your records have been restored." });
     } catch {

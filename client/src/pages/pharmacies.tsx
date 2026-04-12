@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { getPharmacies, createPharmacy, updatePharmacy, deletePharmacy } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,19 +96,22 @@ export default function Pharmacies() {
   const [editing, setEditing] = useState<Pharmacy | null>(null);
   const { toast } = useToast();
 
-  const { data: pharmacyList = [], isLoading } = useQuery<Pharmacy[]>({ queryKey: [`/api/pharmacies?patientId=${pid}`] });
+  const { data: pharmacyList = [], isLoading } = useQuery<Pharmacy[]>({
+    queryKey: ["pharmacies", pid],
+    queryFn: () => getPharmacies(pid),
+  });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/pharmacies", { ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`] }); setOpen(false); toast({ title: "Pharmacy added" }); },
+    mutationFn: (data: any) => createPharmacy({ ...data, patientId: pid }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pharmacies", pid] }); setOpen(false); toast({ title: "Pharmacy added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/pharmacies/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePharmacy(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pharmacies", pid] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
   });
   const deleteMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/pharmacies/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [`/api/pharmacies?patientId=${pid}`] }); toast({ title: "Pharmacy deleted" }); },
+    mutationFn: (id: number) => deletePharmacy(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pharmacies", pid] }); toast({ title: "Pharmacy deleted" }); },
   });
 
   // Show preferred pharmacies first
@@ -229,10 +233,10 @@ export default function Pharmacies() {
                       </DialogTrigger>
                       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                         <DialogHeader><DialogTitle className="font-heading">Edit Pharmacy</DialogTitle></DialogHeader>
-                        <PharmacyForm initial={pharm} onSubmit={(data) => updateMut.mutate({ id: pharm.id, data })} onCancel={() => setEditing(null)} />
+                        <PharmacyForm initial={pharm} onSubmit={(data) => updateMut.mutate({ id: pharm.id!, data })} onCancel={() => setEditing(null)} />
                       </DialogContent>
                     </Dialog>
-                    <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(pharm.id)} data-testid={`button-delete-pharm-${pharm.id}`}>
+                    <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(pharm.id!)} data-testid={`button-delete-pharm-${pharm.id}`}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
