@@ -216,9 +216,12 @@
       padding: 1rem;
     }
     .audience-icon {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 0.6rem;
     }
+    .audience-icon svg { width: 22px; height: 22px; color: white; stroke: white; }
     .audience-item h3 {
       font-size: 0.9rem;
       font-weight: 700;
@@ -398,19 +401,54 @@
     <p class="subtitle">Built for real families managing real health needs.</p>
     <div class="audience-list">
       <div class="audience-item">
-        <div class="audience-icon">👨‍👩‍👧‍👦</div>
+        <div class="audience-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
         <h3 class="font-heading">Parents</h3>
         <p>Keep track of the whole family's doctors, shots, and medications in one place.</p>
       </div>
       <div class="audience-item">
-        <div class="audience-icon">🧓</div>
+        <div class="audience-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+        </div>
         <h3 class="font-heading">Seniors</h3>
         <p>Simple and easy to use — no cloud accounts, no passwords, no confusion.</p>
       </div>
       <div class="audience-item">
-        <div class="audience-icon">💛</div>
+        <div class="audience-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+        </div>
         <h3 class="font-heading">Caregivers</h3>
         <p>Organize medical info for loved ones you care for, all from your own device.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Works on Any Device -->
+  <div class="section">
+    <h2 class="font-heading">Works on Any Device</h2>
+    <p class="subtitle">Use it on your computer, tablet, or phone — and keep everything in sync.</p>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+        </div>
+        <h3 class="font-heading">Mobile Friendly</h3>
+        <p>The app is fully responsive. Open it in your phone's browser and it looks and works just like a native app.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+        </div>
+        <h3 class="font-heading">Desktop &amp; Laptop</h3>
+        <p>Works on Windows, Mac, and Linux — any device with a web browser. Nothing to install.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3 class="font-heading">Sync Between Devices</h3>
+        <p>Use "Save My Data" to export a backup file, then "Load My Data" on another device. Move your records anywhere in seconds.</p>
       </div>
     </div>
   </div>
