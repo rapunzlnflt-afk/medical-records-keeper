@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, AlertCircle, Bell } from "lucide-react";
+import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, AlertCircle, Bell, Sparkles, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import type { Appointment, Medication, Physician, MedicalRecord, Vital, EmergencyContact } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -67,6 +67,39 @@ export default function Dashboard() {
           {activePatient ? `${activePatient.name.endsWith('s') ? activePatient.name + "'" : activePatient.name + "'s"} health overview` : "Your health overview at a glance"}
         </p>
       </div>
+
+      {/* Getting Started — shown when everything is empty */}
+      {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="font-heading text-sm font-bold">Welcome to Medical Records Keeper</h2>
+                <p className="text-xs text-muted-foreground mt-1.5 font-body leading-relaxed">
+                  The best way to get started is to add your physicians first. Their names will then appear in dropdown menus when you add appointments, medications, and medical records.
+                </p>
+                <div className="mt-3 space-y-1.5">
+                  <Link href="/physicians" className="flex items-center gap-2 text-xs font-semibold text-primary hover:underline" data-testid="link-get-started-physicians">
+                    <Stethoscope className="w-3.5 h-3.5" /> Step 1: Add your physicians <ChevronRight className="w-3 h-3" />
+                  </Link>
+                  <Link href="/appointments" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary hover:underline">
+                    <CalendarDays className="w-3.5 h-3.5" /> Step 2: Schedule appointments
+                  </Link>
+                  <Link href="/medications" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary hover:underline">
+                    <Pill className="w-3.5 h-3.5" /> Step 3: Add your medications
+                  </Link>
+                  <Link href="/records" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary hover:underline">
+                    <FileText className="w-3.5 h-3.5" /> Step 4: Upload medical records
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
