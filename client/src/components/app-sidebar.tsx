@@ -28,6 +28,8 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/lib/theme";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -47,6 +49,8 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { theme, toggle } = useTheme();
   const { toast } = useToast();
+  const { setOpenMobile } = useSidebar();
+  const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -132,7 +136,11 @@ export function AppSidebar() {
                           : ""
                       }
                     >
-                      <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                      <Link
+                        href={item.url}
+                        data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                        onClick={() => { if (isMobile) setOpenMobile(false); }}
+                      >
                         <item.icon className="w-4 h-4" />
                         <span className="font-body text-sm">{item.title}</span>
                       </Link>
