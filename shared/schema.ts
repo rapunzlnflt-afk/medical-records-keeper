@@ -125,3 +125,22 @@ export const emergencyContacts = sqliteTable("emergency_contacts", {
 export const insertEmergencyContactSchema = createInsertSchema(emergencyContacts).omit({ id: true });
 export type InsertEmergencyContact = z.infer<typeof insertEmergencyContactSchema>;
 export type EmergencyContact = typeof emergencyContacts.$inferSelect;
+
+// Preferred Pharmacies
+export const pharmacies = sqliteTable("pharmacies", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  hours: text("hours"),
+  website: text("website"),
+  notes: text("notes"),
+  isPrimary: integer("is_primary").notNull().default(0),
+});
+
+export const insertPharmacySchema = createInsertSchema(pharmacies).omit({ id: true });
+export type InsertPharmacy = z.infer<typeof insertPharmacySchema>;
+export type Pharmacy = typeof pharmacies.$inferSelect;

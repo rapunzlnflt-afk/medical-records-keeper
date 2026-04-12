@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage, db } from "./storage";
 import {
   physicians, appointments, medications, medicationLogs,
-  medicalRecords, vitals, emergencyContacts,
+  medicalRecords, vitals, emergencyContacts, pharmacies,
 } from "@shared/schema";
 
 export function registerRoutes(server: Server, app: Express) {
@@ -144,6 +144,29 @@ export function registerRoutes(server: Server, app: Express) {
     res.status(204).send();
   });
 
+  // === Pharmacies ===
+  app.get("/api/pharmacies", (_req, res) => {
+    res.json(storage.getPharmacies());
+  });
+  app.get("/api/pharmacies/:id", (req, res) => {
+    const p = storage.getPharmacy(Number(req.params.id));
+    if (!p) return res.status(404).json({ error: "Not found" });
+    res.json(p);
+  });
+  app.post("/api/pharmacies", (req, res) => {
+    const p = storage.createPharmacy(req.body);
+    res.status(201).json(p);
+  });
+  app.patch("/api/pharmacies/:id", (req, res) => {
+    const p = storage.updatePharmacy(Number(req.params.id), req.body);
+    if (!p) return res.status(404).json({ error: "Not found" });
+    res.json(p);
+  });
+  app.delete("/api/pharmacies/:id", (req, res) => {
+    storage.deletePharmacy(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // === Backup: Save My Data ===
   app.get("/api/backup/export", (_req, res) => {
     const data = {
@@ -156,6 +179,7 @@ export function registerRoutes(server: Server, app: Express) {
       medicalRecords: storage.getMedicalRecords(),
       vitals: storage.getVitals(),
       emergencyContacts: storage.getEmergencyContacts(),
+      pharmacies: storage.getPharmacies(),
     };
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
@@ -181,6 +205,7 @@ export function registerRoutes(server: Server, app: Express) {
       db.delete(vitals).run();
       db.delete(emergencyContacts).run();
       db.delete(physicians).run();
+      db.delete(pharmacies).run();
 
       // Import physicians first (other tables may reference them)
       let physicianIdMap: Record<number, number> = {};
@@ -250,6 +275,14 @@ export function registerRoutes(server: Server, app: Express) {
         for (const c of data.emergencyContacts) {
           const { id, ...rest } = c;
           db.insert(emergencyContacts).values(rest).returning().get();
+        }
+      }
+
+      // Import pharmacies
+      if (data.pharmacies?.length) {
+        for (const p of data.pharmacies) {
+          const { id, ...rest } = p;
+          db.insert(pharmacies).values(rest).returning().get();
         }
       }
 

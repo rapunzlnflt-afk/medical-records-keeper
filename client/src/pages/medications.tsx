@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer } from "lucide-react";
-import type { Medication, MedicationLog } from "@shared/schema";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert } from "lucide-react";
+import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
+import { useLocation } from "wouter";
 
 const MED_TYPES = ["prescription", "otc", "supplement", "vitamin"];
 const FREQUENCIES = ["daily", "twice-daily", "three-times-daily", "weekly", "bi-weekly", "monthly", "as-needed"];
@@ -28,11 +29,13 @@ const timeIcon = (t: string | null) => {
   return <Clock className="w-3 h-3" />;
 };
 
-function MedicationForm({ initial, onSubmit, onCancel }: {
+function MedicationForm({ initial, onSubmit, onCancel, physicians }: {
   initial?: Partial<Medication>;
   onSubmit: (data: any) => void;
   onCancel: () => void;
+  physicians: Physician[];
 }) {
+  const [, navigate] = useLocation();
   const [form, setForm] = useState({
     name: initial?.name || "",
     type: initial?.type || "prescription",
@@ -91,7 +94,20 @@ function MedicationForm({ initial, onSubmit, onCancel }: {
         </div>
         <div>
           <Label className="text-xs font-body">Prescribed By</Label>
-          <Input value={form.prescribedBy || ""} onChange={(e) => setForm({ ...form, prescribedBy: e.target.value })} placeholder="Dr. Smith" data-testid="input-med-prescribed" />
+          <Select value={form.prescribedBy || "none"} onValueChange={(v) => {
+            if (v === "__add_physician__") {
+              navigate("/physicians");
+              return;
+            }
+            setForm({ ...form, prescribedBy: v === "none" ? "" : v });
+          }}>
+            <SelectTrigger data-testid="select-med-prescribed"><SelectValue placeholder="Select physician" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Not specified</SelectItem>
+              {physicians.map((p) => <SelectItem key={p.id} value={p.name}>{p.name} — {p.specialty}</SelectItem>)}
+              <SelectItem value="__add_physician__" className="text-primary font-semibold">+ Add Physician</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label className="text-xs font-body">Pharmacy</Label>
@@ -145,6 +161,7 @@ export default function Medications() {
 
   const { data: medications = [], isLoading } = useQuery<Medication[]>({ queryKey: ["/api/medications"] });
   const { data: logs = [] } = useQuery<MedicationLog[]>({ queryKey: ["/api/medication-logs"] });
+  const { data: physicians = [] } = useQuery<Physician[]>({ queryKey: ["/api/physicians"] });
 
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/medications", data),
@@ -234,7 +251,7 @@ export default function Medications() {
                   </DialogTrigger>
                   <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle className="font-heading">Edit Medication</DialogTitle></DialogHeader>
-                    <MedicationForm initial={med} onSubmit={(data) => updateMut.mutate({ id: med.id, data })} onCancel={() => setEditing(null)} />
+                    <MedicationForm physicians={physicians} initial={med} onSubmit={(data) => updateMut.mutate({ id: med.id, data })} onCancel={() => setEditing(null)} />
                   </DialogContent>
                 </Dialog>
                 <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(med.id)} data-testid={`button-delete-med-${med.id}`}>
@@ -295,7 +312,7 @@ export default function Medications() {
             </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-heading">New Medication</DialogTitle></DialogHeader>
-            <MedicationForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
+            <MedicationForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
           </Dialog>
         </div>
@@ -353,6 +370,62 @@ export default function Medications() {
           ) : inactive.map((med) => <MedCard key={med.id} med={med} />)}
         </TabsContent>
       </Tabs>
+
+      {/* Helpful Links */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Drug Interaction Checkers */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-destructive" />
+              Drug Interaction Checkers
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground mb-3">Check if your medications interact with each other</p>
+            {[
+              { name: "Drugs.com Interaction Checker", url: "https://www.drugs.com/drug_interactions.html" },
+              { name: "WebMD Interaction Checker", url: "https://www.webmd.com/interaction-checker/default.htm" },
+              { name: "Medscape Drug Interaction Checker", url: "https://reference.medscape.com/drug-interactionchecker" },
+              { name: "RxList Interaction Checker", url: "https://www.rxlist.com/drug-interaction-checker.htm" },
+            ].map((link) => (
+              <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                data-testid={`link-interaction-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                {link.name}
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Prescription Discounts */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
+              <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
+              Prescription Discounts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground mb-3">Save money on your prescriptions</p>
+            {[
+              { name: "GoodRx", url: "https://www.goodrx.com" },
+              { name: "RxSaver by RetailMeNot", url: "https://www.rxsaver.com" },
+              { name: "NeedyMeds", url: "https://www.needymeds.org" },
+              { name: "RxAssist", url: "https://www.rxassist.org" },
+              { name: "Medicare Extra Help", url: "https://www.ssa.gov/medicare/part-d-extra-help" },
+            ].map((link) => (
+              <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                data-testid={`link-discount-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                {link.name}
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

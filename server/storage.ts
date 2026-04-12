@@ -9,6 +9,7 @@ import {
   medicalRecords, insertMedicalRecordSchema, type InsertMedicalRecord, type MedicalRecord,
   vitals, insertVitalSchema, type InsertVital, type Vital,
   emergencyContacts, insertEmergencyContactSchema, type InsertEmergencyContact, type EmergencyContact,
+  pharmacies, insertPharmacySchema, type InsertPharmacy, type Pharmacy,
 } from "@shared/schema";
 
 const sqlite = new Database("medical_records.db");
@@ -99,6 +100,19 @@ sqlite.exec(`
     email TEXT,
     is_primary INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS pharmacies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    zip TEXT,
+    hours TEXT,
+    website TEXT,
+    notes TEXT,
+    is_primary INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 // Migration: add image_url column if it doesn't exist
@@ -152,6 +166,13 @@ export interface IStorage {
   createEmergencyContact(data: InsertEmergencyContact): EmergencyContact;
   updateEmergencyContact(id: number, data: Partial<InsertEmergencyContact>): EmergencyContact | undefined;
   deleteEmergencyContact(id: number): void;
+
+  // Pharmacies
+  getPharmacies(): Pharmacy[];
+  getPharmacy(id: number): Pharmacy | undefined;
+  createPharmacy(data: InsertPharmacy): Pharmacy;
+  updatePharmacy(id: number, data: Partial<InsertPharmacy>): Pharmacy | undefined;
+  deletePharmacy(id: number): void;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -260,6 +281,23 @@ export class DatabaseStorage implements IStorage {
   }
   deleteEmergencyContact(id: number): void {
     db.delete(emergencyContacts).where(eq(emergencyContacts.id, id)).run();
+  }
+
+  // Pharmacies
+  getPharmacies(): Pharmacy[] {
+    return db.select().from(pharmacies).all();
+  }
+  getPharmacy(id: number): Pharmacy | undefined {
+    return db.select().from(pharmacies).where(eq(pharmacies.id, id)).get();
+  }
+  createPharmacy(data: InsertPharmacy): Pharmacy {
+    return db.insert(pharmacies).values(data).returning().get();
+  }
+  updatePharmacy(id: number, data: Partial<InsertPharmacy>): Pharmacy | undefined {
+    return db.update(pharmacies).set(data).where(eq(pharmacies.id, id)).returning().get();
+  }
+  deletePharmacy(id: number): void {
+    db.delete(pharmacies).where(eq(pharmacies.id, id)).run();
   }
 }
 

@@ -88,12 +88,22 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
-  // Helper to toggle the sidebar.
+  // Helper to toggle the sidebar — mobile only, desktop stays open always.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+    if (isMobile) {
+      setOpenMobile((open) => !open)
+    }
+    // Desktop: do nothing — sidebar always visible
+  }, [isMobile, setOpenMobile])
 
-  // Adds a keyboard shortcut to toggle the sidebar.
+  // Force sidebar open on desktop at all times
+  React.useEffect(() => {
+    if (!isMobile && !open) {
+      setOpen(true)
+    }
+  }, [isMobile, open, setOpen])
+
+  // Keyboard shortcut — mobile only
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -101,13 +111,13 @@ function SidebarProvider({
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
-        toggleSidebar()
+        if (isMobile) toggleSidebar()
       }
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [toggleSidebar])
+  }, [toggleSidebar, isMobile])
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.

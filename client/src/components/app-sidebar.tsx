@@ -7,6 +7,7 @@ import {
   FileText,
   HeartPulse,
   Phone,
+  Building2,
   Sun,
   Moon,
   Download,
@@ -42,6 +43,7 @@ const navItems = [
   { title: "Physicians", url: "/physicians", icon: Stethoscope },
   { title: "Medical Records", url: "/records", icon: FileText },
   { title: "Vitals", url: "/vitals", icon: HeartPulse },
+  { title: "Pharmacies", url: "/pharmacies", icon: Building2 },
   { title: "Emergency Contacts", url: "/emergency", icon: Phone },
 ];
 

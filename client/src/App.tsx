@@ -15,6 +15,7 @@ import Physicians from "@/pages/physicians";
 import MedicalRecords from "@/pages/medical-records";
 import Vitals from "@/pages/vitals";
 import EmergencyContacts from "@/pages/emergency-contacts";
+import Pharmacies from "@/pages/pharmacies";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -27,6 +28,7 @@ function AppRouter() {
       <Route path="/records" component={MedicalRecords} />
       <Route path="/vitals" component={Vitals} />
       <Route path="/emergency" component={EmergencyContacts} />
+      <Route path="/pharmacies" component={Pharmacies} />
       <Route component={NotFound} />
     </Switch>
   );
