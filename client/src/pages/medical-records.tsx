@@ -279,7 +279,7 @@ export default function MedicalRecords() {
               <Plus className="w-4 h-4" /> Add Record
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="font-heading">New Medical Record</DialogTitle></DialogHeader>
             <RecordForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
@@ -394,7 +394,7 @@ export default function MedicalRecords() {
                             <Edit2 className="w-4 h-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                        <DialogContent className="max-w-lg">
                           <DialogHeader><DialogTitle className="font-heading">Edit Record</DialogTitle></DialogHeader>
                           <RecordForm physicians={physicians} initial={rec} onSubmit={(data) => updateMut.mutate({ id: rec.id!, data })} onCancel={() => setEditing(null)} />
                         </DialogContent>

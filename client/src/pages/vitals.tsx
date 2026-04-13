@@ -117,7 +117,7 @@ export default function Vitals() {
               <Plus className="w-4 h-4" /> Log Vitals
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle className="font-heading">Log Vitals</DialogTitle></DialogHeader>
             <VitalForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>

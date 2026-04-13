@@ -167,7 +167,7 @@ export default function Pharmacies() {
               <Plus className="w-4 h-4" /> Add Pharmacy
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="font-heading">New Pharmacy</DialogTitle></DialogHeader>
             <PharmacyForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
@@ -231,7 +231,7 @@ export default function Pharmacies() {
                           <Edit2 className="w-4 h-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                      <DialogContent className="max-w-lg">
                         <DialogHeader><DialogTitle className="font-heading">Edit Pharmacy</DialogTitle></DialogHeader>
                         <PharmacyForm initial={pharm} onSubmit={(data) => updateMut.mutate({ id: pharm.id!, data })} onCancel={() => setEditing(null)} />
                       </DialogContent>

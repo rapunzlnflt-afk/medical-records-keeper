@@ -262,7 +262,7 @@ export default function Medications() {
                       <Edit2 className="w-4 h-4" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="max-w-lg">
                     <DialogHeader><DialogTitle className="font-heading">Edit Medication</DialogTitle></DialogHeader>
                     <MedicationForm physicians={physicians} initial={med} onSubmit={(data) => updateMut.mutate({ id: med.id!, data })} onCancel={() => setEditing(null)} />
                   </DialogContent>
@@ -323,7 +323,7 @@ export default function Medications() {
                 <Plus className="w-4 h-4" /> Add Medication
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="font-heading">New Medication</DialogTitle></DialogHeader>
             <MedicationForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>

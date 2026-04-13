@@ -199,7 +199,7 @@ export default function Appointments() {
                 <Plus className="w-4 h-4" /> Add Appointment
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="font-heading">New Appointment</DialogTitle></DialogHeader>
             <AppointmentForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
@@ -296,7 +296,7 @@ export default function Appointments() {
                             <Edit2 className="w-4 h-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                        <DialogContent className="max-w-lg">
                           <DialogHeader><DialogTitle className="font-heading">Edit Appointment</DialogTitle></DialogHeader>
                           <AppointmentForm physicians={physicians} initial={apt}
                             onSubmit={(data) => updateMut.mutate({ id: apt.id!, data })}

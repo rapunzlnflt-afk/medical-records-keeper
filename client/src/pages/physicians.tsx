@@ -135,7 +135,7 @@ export default function Physicians() {
               <Plus className="w-4 h-4" /> Add Physician
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle className="font-heading">New Physician</DialogTitle></DialogHeader>
             <PhysicianForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
@@ -197,7 +197,7 @@ export default function Physicians() {
                           <Edit2 className="w-4 h-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                      <DialogContent className="max-w-lg">
                         <DialogHeader><DialogTitle className="font-heading">Edit Physician</DialogTitle></DialogHeader>
                         <PhysicianForm initial={doc} onSubmit={(data) => updateMut.mutate({ id: doc.id!, data })} onCancel={() => setEditing(null)} />
                       </DialogContent>
