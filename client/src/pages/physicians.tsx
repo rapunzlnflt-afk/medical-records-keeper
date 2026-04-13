@@ -83,10 +83,10 @@ function PhysicianForm({ initial, onSubmit, onCancel }: {
           <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-doc-notes" />
         </div>
       </div>
-      <div className="flex gap-2 justify-end pt-4 border-t mt-4 flex-shrink-0">
-        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSubmit(form)} disabled={!form.name || !form.specialty}
-          className="gradient-primary text-white border-none" data-testid="button-doc-save">
+      <div className="flex gap-3 justify-end pt-4 pb-1 border-t mt-4 flex-shrink-0">
+        <Button variant="outline" onClick={onCancel} className="h-10 px-5 text-sm">Cancel</Button>
+        <Button onClick={() => onSubmit(form)} disabled={!form.name || !form.specialty}
+          className="gradient-primary text-white border border-primary/30 h-10 px-5 text-sm" data-testid="button-doc-save">
           {initial?.id ? "Update" : "Add"} Physician
         </Button>
       </div>
