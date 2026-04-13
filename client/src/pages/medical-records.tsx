@@ -92,136 +92,132 @@ function RecordForm({ physicians, initial, onSubmit, onCancel }: {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Title</Label>
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Blood panel results" data-testid="input-rec-title" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Category</Label>
-          <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-            <SelectTrigger data-testid="select-rec-category"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-body">Date</Label>
-          <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="input-rec-date" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Physician</Label>
-          <Select value={form.physicianId?.toString() || "none"} onValueChange={(v) => setForm({ ...form, physicianId: v === "none" ? null : Number(v) })}>
-            <SelectTrigger data-testid="select-rec-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {physicians.map((p) => <SelectItem key={p.id} value={p.id!.toString()}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Description</Label>
-          <Textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Results summary, key findings..." data-testid="input-rec-description" />
-        </div>
-      </div>
-
-      {/* Photo Section — beauty planner style */}
-      <div className="rounded-lg border p-4 space-y-3">
-        <Label className="text-sm font-heading font-semibold flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-primary" />
-          Attach Photo of Record
-        </Label>
-
-        {/* Upload vs Link toggle */}
-        <div className="flex gap-2">
-          <Button
-            type="button" size="sm"
-            variant={photoMode === "upload" ? "default" : "outline"}
-            className={photoMode === "upload" ? "gradient-primary text-white border-none gap-1.5" : "gap-1.5"}
-            onClick={() => { setPhotoMode("upload"); }}
-            data-testid="button-photo-upload-mode"
-          >
-            <Upload className="w-3.5 h-3.5" /> Upload Photo
-          </Button>
-          <Button
-            type="button" size="sm"
-            variant={photoMode === "link" ? "default" : "outline"}
-            className={photoMode === "link" ? "gradient-primary text-white border-none gap-1.5" : "gap-1.5"}
-            onClick={() => { setPhotoMode("link"); }}
-            data-testid="button-photo-link-mode"
-          >
-            <Link2 className="w-3.5 h-3.5" /> Use Link Instead
-          </Button>
+    <div className="flex flex-col max-h-[calc(85vh-5rem)] sm:max-h-none">
+      <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
+            <Label className="text-xs font-body">Title</Label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Blood panel results" data-testid="input-rec-title" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">Category</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger data-testid="select-rec-category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs font-body">Date</Label>
+            <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="input-rec-date" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs font-body">Physician</Label>
+            <Select value={form.physicianId?.toString() || "none"} onValueChange={(v) => setForm({ ...form, physicianId: v === "none" ? null : Number(v) })}>
+              <SelectTrigger data-testid="select-rec-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {physicians.map((p) => <SelectItem key={p.id} value={p.id!.toString()}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs font-body">Description</Label>
+            <Textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Results summary, key findings..." data-testid="input-rec-description" />
+          </div>
         </div>
 
-        {photoMode === "upload" ? (
-          <div className="space-y-2">
-            {uploadPreview ? (
-              <div className="relative rounded-md border overflow-hidden">
-                <img src={uploadPreview} alt="Uploaded photo" className="w-full max-h-48 object-contain bg-muted/30" />
+        {/* Photo Section */}
+        <div className="rounded-lg border p-4 space-y-3">
+          <Label className="text-sm font-heading font-semibold flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-primary" />
+            Attach Photo of Record
+          </Label>
+
+          {photoMode === "upload" ? (
+            <div className="space-y-2">
+              {uploadPreview ? (
+                <div className="relative rounded-md border overflow-hidden">
+                  <img src={uploadPreview} alt="Uploaded photo" className="w-full max-h-48 object-contain bg-muted/30" />
+                  <Button
+                    type="button" size="icon" variant="destructive"
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full"
+                    onClick={clearPhoto}
+                    data-testid="button-remove-photo"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
                 <Button
-                  type="button" size="icon" variant="destructive"
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full"
-                  onClick={clearPhoto}
-                  data-testid="button-remove-photo"
+                  type="button"
+                  variant="outline"
+                  className="w-full h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed hover:bg-muted/30 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid="dropzone-photo"
                 >
-                  <X className="w-4 h-4" />
+                  <Upload className="w-6 h-6 text-muted-foreground/60" />
+                  <span className="text-sm text-muted-foreground font-body">
+                    {uploading ? "Processing..." : "Tap Here to Upload a Photo"}
+                  </span>
+                  <span className="text-xs text-muted-foreground/70">JPG, PNG, or PDF up to 10 MB</span>
                 </Button>
-              </div>
-            ) : (
-              <div
-                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="dropzone-photo"
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+                data-testid="input-photo-file"
+              />
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline font-body"
+                onClick={() => setPhotoMode("link")}
               >
-                <Upload className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                <p className="text-sm text-muted-foreground font-body">
-                  {uploading ? "Processing..." : "Click to select a photo"}
-                </p>
-                <p className="text-xs text-muted-foreground/70 mt-1">JPG, PNG, or PDF up to 10 MB</p>
-              </div>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={handleFileUpload}
-              className="hidden"
-              data-testid="input-photo-file"
-            />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Input
-              value={form.imageUrl || ""}
-              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-              placeholder="https://drive.google.com/... or https://dropbox.com/..."
-              data-testid="input-rec-image-url"
-            />
-            <p className="text-xs text-muted-foreground">Paste a link from Google Drive, Dropbox, or any cloud storage</p>
-            {form.imageUrl && !form.imageUrl.startsWith("data:") && (
-              <div className="rounded-md border overflow-hidden max-h-48">
-                <img
-                  src={form.imageUrl} alt="Preview"
-                  className="w-full h-full object-contain bg-muted/30"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                Or paste a link instead
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                value={form.imageUrl || ""}
+                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                placeholder="https://drive.google.com/... or https://dropbox.com/..."
+                data-testid="input-rec-image-url"
+              />
+              <p className="text-xs text-muted-foreground">Paste a link from Google Drive, Dropbox, or any cloud storage</p>
+              {form.imageUrl && !form.imageUrl.startsWith("data:") && (
+                <div className="rounded-md border overflow-hidden max-h-48">
+                  <img
+                    src={form.imageUrl} alt="Preview"
+                    className="w-full h-full object-contain bg-muted/30"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline font-body"
+                onClick={() => setPhotoMode("upload")}
+              >
+                Or upload a photo instead
+              </button>
+            </div>
+          )}
+        </div>
 
-      <div>
-        <Label className="text-xs font-body">Notes</Label>
-        <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-rec-notes" />
+        <div>
+          <Label className="text-xs font-body">Notes</Label>
+          <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-rec-notes" />
+        </div>
       </div>
-      <div className="flex gap-2 justify-end">
-        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSubmit(form)} disabled={!form.title || !form.date}
-          className="gradient-primary text-white border-none" data-testid="button-rec-save">
+      <div className="flex gap-3 justify-end pt-4 pb-1 border-t mt-4 flex-shrink-0">
+        <Button variant="outline" onClick={onCancel} className="h-10 px-5 text-sm">Cancel</Button>
+        <Button onClick={() => onSubmit(form)} disabled={!form.title || !form.date}
+          className="gradient-primary text-white border border-primary/30 h-10 px-5 text-sm" data-testid="button-rec-save">
           {initial?.id ? "Update" : "Add"} Record
         </Button>
       </div>
