@@ -34,54 +34,56 @@ function PhysicianForm({ initial, onSubmit, onCancel }: {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs font-body">Name</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Dr. Jane Smith" data-testid="input-doc-name" />
+    <div className="flex flex-col max-h-[calc(85vh-5rem)] sm:max-h-none">
+      <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs font-body">Name</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Dr. Jane Smith" data-testid="input-doc-name" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">Specialty</Label>
+            <Input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} placeholder="Cardiology" data-testid="input-doc-specialty" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">Phone</Label>
+            <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" data-testid="input-doc-phone" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">Fax</Label>
+            <Input value={form.fax || ""} onChange={(e) => setForm({ ...form, fax: e.target.value })} placeholder="(555) 123-4568" data-testid="input-doc-fax" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs font-body">Email</Label>
+            <Input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="doctor@clinic.com" data-testid="input-doc-email" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs font-body">Address</Label>
+            <Input value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="123 Medical Center Dr" data-testid="input-doc-address" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">City</Label>
+            <Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Fort Worth" data-testid="input-doc-city" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">State</Label>
+            <Input value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="TX" data-testid="input-doc-state" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">ZIP</Label>
+            <Input value={form.zip || ""} onChange={(e) => setForm({ ...form, zip: e.target.value })} placeholder="76109" data-testid="input-doc-zip" />
+          </div>
+          <div>
+            <Label className="text-xs font-body">NPI Number</Label>
+            <Input value={form.npi || ""} onChange={(e) => setForm({ ...form, npi: e.target.value })} placeholder="1234567890" data-testid="input-doc-npi" />
+          </div>
         </div>
         <div>
-          <Label className="text-xs font-body">Specialty</Label>
-          <Input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} placeholder="Cardiology" data-testid="input-doc-specialty" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Phone</Label>
-          <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" data-testid="input-doc-phone" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Fax</Label>
-          <Input value={form.fax || ""} onChange={(e) => setForm({ ...form, fax: e.target.value })} placeholder="(555) 123-4568" data-testid="input-doc-fax" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Email</Label>
-          <Input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="doctor@clinic.com" data-testid="input-doc-email" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Address</Label>
-          <Input value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="123 Medical Center Dr" data-testid="input-doc-address" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">City</Label>
-          <Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Fort Worth" data-testid="input-doc-city" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">State</Label>
-          <Input value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="TX" data-testid="input-doc-state" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">ZIP</Label>
-          <Input value={form.zip || ""} onChange={(e) => setForm({ ...form, zip: e.target.value })} placeholder="76109" data-testid="input-doc-zip" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">NPI Number</Label>
-          <Input value={form.npi || ""} onChange={(e) => setForm({ ...form, npi: e.target.value })} placeholder="1234567890" data-testid="input-doc-npi" />
+          <Label className="text-xs font-body">Notes</Label>
+          <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-doc-notes" />
         </div>
       </div>
-      <div>
-        <Label className="text-xs font-body">Notes</Label>
-        <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-doc-notes" />
-      </div>
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end pt-4 border-t mt-4 flex-shrink-0">
         <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
         <Button size="sm" onClick={() => onSubmit(form)} disabled={!form.name || !form.specialty}
           className="gradient-primary text-white border-none" data-testid="button-doc-save">
