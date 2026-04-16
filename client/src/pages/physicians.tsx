@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getPhysicians, createPhysician, updatePhysician, deletePhysician } from "@/lib/db";
@@ -10,9 +10,150 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText } from "lucide-react";
+import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText, Upload, Contact } from "lucide-react";
 import type { Physician } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
+
+/* ---- Contact import helpers ---- */
+
+function hasContactPicker(): boolean {
+  return 'contacts' in navigator && 'ContactsManager' in window;
+}
+
+interface ContactData {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+async function pickContact(): Promise<ContactData | null> {
+  try {
+    const nav = navigator as any;
+    const props = ['name', 'tel', 'email', 'address'];
+    const contacts = await nav.contacts.select(props, { multiple: false });
+    if (!contacts || contacts.length === 0) return null;
+    const c = contacts[0];
+    const name = c.name?.[0] || '';
+    const phone = c.tel?.[0] || '';
+    const email = c.email?.[0] || '';
+    // Address is an object with properties
+    const addr = c.address?.[0];
+    return {
+      name,
+      phone,
+      email,
+      address: addr?.streetAddress || addr?.addressLine?.[0] || '',
+      city: addr?.city || addr?.locality || '',
+      state: addr?.region || '',
+      zip: addr?.postalCode || '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseVCard(text: string): ContactData[] {
+  const results: ContactData[] = [];
+  const cards = text.split('BEGIN:VCARD');
+  for (const card of cards) {
+    if (!card.includes('END:VCARD')) continue;
+    // Unfold continuation lines (RFC 2425)
+    const unfolded = card.replace(/\r?\n[ \t]/g, '');
+    const lines = unfolded.split(/\r?\n/);
+    let name = '', phone = '', email = '', address = '', city = '', state = '', zip = '';
+    for (const raw of lines) {
+      const line = raw.trim();
+      // FN (formatted name) — preferred
+      if (/^FN[;:]/.test(line)) {
+        name = line.replace(/^FN[^:]*:/, '').trim();
+      }
+      // N (structured name) — fallback if FN is empty
+      if (/^N[;:]/.test(line) && !name) {
+        const parts = line.replace(/^N[^:]*:/, '').split(';');
+        const last = parts[0]?.trim() || '';
+        const first = parts[1]?.trim() || '';
+        name = [first, last].filter(Boolean).join(' ');
+      }
+      // TEL
+      if (/^TEL[;:]/.test(line)) {
+        const val = line.replace(/^TEL[^:]*:/, '').trim();
+        if (!phone) phone = val;
+      }
+      // EMAIL
+      if (/^EMAIL[;:]/.test(line)) {
+        const val = line.replace(/^EMAIL[^:]*:/, '').trim();
+        if (!email) email = val;
+      }
+      // ADR — structured: PO Box;Extended;Street;City;State;Zip;Country
+      if (/^ADR[;:]/.test(line)) {
+        const val = line.replace(/^ADR[^:]*:/, '');
+        const parts = val.split(';');
+        if (!address) address = parts[2]?.trim() || '';
+        if (!city) city = parts[3]?.trim() || '';
+        if (!state) state = parts[4]?.trim() || '';
+        if (!zip) zip = parts[5]?.trim() || '';
+      }
+    }
+    if (name) {
+      results.push({ name, phone, email, address, city, state, zip });
+    }
+  }
+  return results;
+}
+
+function ContactImportButton({ onImport }: { onImport: (data: ContactData) => void }) {
+  const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const showPicker = hasContactPicker();
+
+  async function handleContactPicker() {
+    const data = await pickContact();
+    if (data) onImport(data);
+    else toast({ title: 'No contact selected', variant: 'destructive' });
+  }
+
+  function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const contacts = parseVCard(text);
+      if (contacts.length > 0) {
+        onImport(contacts[0]);
+        toast({ title: `Imported ${contacts[0].name}` });
+      } else {
+        toast({ title: 'No contacts found in file', variant: 'destructive' });
+      }
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-picked
+    e.target.value = '';
+  }
+
+  return (
+    <div className="flex gap-2">
+      {showPicker && (
+        <Button size="sm" variant="outline" onClick={handleContactPicker}
+          className="gap-1 text-xs" data-testid="button-import-contact-picker">
+          <Contact className="w-3.5 h-3.5" /> From Contacts
+        </Button>
+      )}
+      <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}
+        className="gap-1 text-xs" data-testid="button-import-vcf">
+        <Upload className="w-3.5 h-3.5" /> Import .vcf
+      </Button>
+      <input ref={fileRef} type="file" accept=".vcf,text/vcard,text/x-vcard" className="hidden"
+        onChange={handleFileImport} data-testid="input-vcf-file" />
+    </div>
+  );
+}
+
+/* ---- Physician form ---- */
 
 function PhysicianForm({ initial, onSubmit, onCancel }: {
   initial?: Partial<Physician>;
@@ -33,9 +174,23 @@ function PhysicianForm({ initial, onSubmit, onCancel }: {
     notes: initial?.notes || "",
   });
 
+  function handleContactImport(data: ContactData) {
+    setForm(prev => ({
+      ...prev,
+      name: data.name || prev.name,
+      phone: data.phone ? formatPhone(data.phone) : prev.phone,
+      email: data.email || prev.email,
+      address: data.address || prev.address,
+      city: data.city || prev.city,
+      state: data.state || prev.state,
+      zip: data.zip || prev.zip,
+    }));
+  }
+
   return (
     <div className="flex flex-col max-h-[calc(85vh-5rem)] sm:max-h-none">
       <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+        <ContactImportButton onImport={handleContactImport} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label className="text-xs font-body">Name</Label>
