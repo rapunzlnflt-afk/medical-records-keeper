@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getPhysicians, createPhysician, updatePhysician, deletePhysician } from "@/lib/db";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText, Upload, Contact } from "lucide-react";
+import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText, Contact } from "lucide-react";
 import type { Physician } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
 
@@ -107,8 +107,7 @@ function parseVCard(text: string): ContactData[] {
 
 function ContactImportButton({ onImport }: { onImport: (data: ContactData) => void }) {
   const { toast } = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const showPicker = hasContactPicker();
+  if (!hasContactPicker()) return null;
 
   async function handleContactPicker() {
     const data = await pickContact();
@@ -116,40 +115,11 @@ function ContactImportButton({ onImport }: { onImport: (data: ContactData) => vo
     else toast({ title: 'No contact selected', variant: 'destructive' });
   }
 
-  function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = reader.result as string;
-      const contacts = parseVCard(text);
-      if (contacts.length > 0) {
-        onImport(contacts[0]);
-        toast({ title: `Imported ${contacts[0].name}` });
-      } else {
-        toast({ title: 'No contacts found in file', variant: 'destructive' });
-      }
-    };
-    reader.readAsText(file);
-    // Reset so same file can be re-picked
-    e.target.value = '';
-  }
-
   return (
-    <div className="flex gap-2">
-      {showPicker && (
-        <Button size="sm" variant="outline" onClick={handleContactPicker}
-          className="gap-1 text-xs" data-testid="button-import-contact-picker">
-          <Contact className="w-3.5 h-3.5" /> From Contacts
-        </Button>
-      )}
-      <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}
-        className="gap-1 text-xs" data-testid="button-import-vcf">
-        <Upload className="w-3.5 h-3.5" /> Import .vcf
-      </Button>
-      <input ref={fileRef} type="file" accept=".vcf,text/vcard,text/x-vcard" className="hidden"
-        onChange={handleFileImport} data-testid="input-vcf-file" />
-    </div>
+    <Button size="sm" variant="outline" onClick={handleContactPicker}
+      className="gap-1 text-xs" data-testid="button-import-contact">
+      <Contact className="w-3.5 h-3.5" /> Import from Contacts
+    </Button>
   );
 }
 
