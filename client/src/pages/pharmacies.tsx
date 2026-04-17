@@ -156,7 +156,7 @@ export default function Pharmacies() {
                 </table>
               </body></html>`;
               const w = window.open("", "_blank");
-              if (w) { w.document.write(html); w.document.close(); w.print(); }
+              if (w) { w.document.write(html); w.document.close(); w.print(); w.close(); }
             }}
           >
             <Printer className="w-4 h-4" /> Print

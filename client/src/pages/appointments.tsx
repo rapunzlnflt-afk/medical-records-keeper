@@ -190,6 +190,7 @@ export default function Appointments() {
             w.document.close();
             w.focus();
             w.print();
+            w.close();
           }} data-testid="button-print-appointments">
             <Printer className="w-4 h-4" /> Print
           </Button>
