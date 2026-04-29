@@ -1,7 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type {
   Patient, Physician, Appointment, Medication, MedicationLog,
-  MedicalRecord, Vital, EmergencyContact, Pharmacy,
+  MedicalRecord, Vital, EmergencyContact, Pharmacy, ReminderSoundPreferences,
 } from "@shared/schema";
 
 class MedicalRecordsDB extends Dexie {
@@ -14,10 +14,11 @@ class MedicalRecordsDB extends Dexie {
   vitals!: Table<Vital, number>;
   emergencyContacts!: Table<EmergencyContact, number>;
   pharmacies!: Table<Pharmacy, number>;
+  reminderSoundPreferences!: Table<ReminderSoundPreferences, number>;
 
   constructor() {
     super("MedicalRecordsKeeper");
-    this.version(1).stores({
+        this.version(1).stores({
       patients: "++id",
       physicians: "++id, patientId",
       appointments: "++id, patientId",
@@ -27,6 +28,19 @@ class MedicalRecordsDB extends Dexie {
       vitals: "++id, patientId",
       emergencyContacts: "++id, patientId",
       pharmacies: "++id, patientId",
+    });
+
+    this.version(2).stores({
+      patients: "++id",
+      physicians: "++id, patientId",
+      appointments: "++id, patientId",
+      medications: "++id, patientId",
+      medicationLogs: "++id, medicationId",
+      medicalRecords: "++id, patientId",
+      vitals: "++id, patientId",
+      emergencyContacts: "++id, patientId",
+      pharmacies: "++id, patientId",
+      reminderSoundPreferences: "++id, patientId",
     });
   }
 }
@@ -218,6 +232,48 @@ export async function deletePharmacy(id: number): Promise<void> {
   await db.pharmacies.delete(id);
 }
 
+// --- Reminder Sound Preferences ---
+const defaultReminderSoundPreferences = {
+  enabled: 0,
+  appointmentsSound: "soft-chime",
+  medicationsSound: "clear-bell",
+  vitalsSound: "soft-chime",
+};
+
+export async function getReminderSoundPreferences(patientId: number): Promise<ReminderSoundPreferences> {
+  const existing = await db.reminderSoundPreferences.where("patientId").equals(patientId).first();
+
+  if (existing) return existing;
+
+  const created: ReminderSoundPreferences = {
+    patientId,
+    ...defaultReminderSoundPreferences,
+  };
+
+  const id = await db.reminderSoundPreferences.add(created);
+  return { ...created, id };
+}
+
+export async function updateReminderSoundPreferences(
+  patientId: number,
+  data: Partial<ReminderSoundPreferences>,
+): Promise<ReminderSoundPreferences> {
+  const existing = await db.reminderSoundPreferences.where("patientId").equals(patientId).first();
+
+  if (!existing) {
+    const created: ReminderSoundPreferences = {
+      patientId,
+      ...defaultReminderSoundPreferences,
+      ...data,
+    };
+    const id = await db.reminderSoundPreferences.add(created);
+    return { ...created, id };
+  }
+
+  await db.reminderSoundPreferences.update(existing.id!, data);
+  return (await db.reminderSoundPreferences.get(existing.id!))!;
+}
+
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
@@ -232,6 +288,7 @@ export async function exportAllData() {
     vitals: await db.vitals.toArray(),
     emergencyContacts: await db.emergencyContacts.toArray(),
     pharmacies: await db.pharmacies.toArray(),
+    reminderSoundPreferences: await db.reminderSoundPreferences.toArray(),
   };
 }
 
@@ -334,12 +391,22 @@ export async function importAllData(data: any): Promise<void> {
     }
   }
 
-  // Import pharmacies
+   // Import pharmacies
   if (data.pharmacies?.length) {
     for (const p of data.pharmacies) {
       const { id, ...rest } = p;
       rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
       await db.pharmacies.add(rest);
+    }
+  }
+
+  if (data.reminderSoundPreferences?.length) {
+    for (const pref of data.reminderSoundPreferences) {
+      const { id, patientId, ...rest } = pref;
+      await db.reminderSoundPreferences.add({
+        patientId: patientIdMap[patientId] || patientId,
+        ...rest,
+      } as ReminderSoundPreferences);
     }
   }
 }
