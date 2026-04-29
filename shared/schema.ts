@@ -118,3 +118,12 @@ export interface Pharmacy {
   notes: string | null;
   isPrimary: number;
 }
+
+export interface ReminderSoundPreferences {
+  id?: number;
+  patientId: number;
+  enabled: number;
+  appointmentsSound: string;
+  medicationsSound: string;
+  vitalsSound: string;
+}
