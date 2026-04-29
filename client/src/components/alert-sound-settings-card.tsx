@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Pill, HeartPulse, Volume2, VolumeX } from "lucide-react";
 import type { ReminderSoundPreferences } from "@shared/schema";
@@ -27,7 +27,7 @@ const rows: Array<{
   key: ReminderType;
   label: string;
   description: string;
-  icon: any;
+  icon: ComponentType<{ className?: string }>;
 }> = [
   {
     key: "appointmentsSound",
@@ -60,8 +60,8 @@ export default function AlertSoundSettingsCard() {
     queryFn: () => getReminderSoundPreferences(activePatientId),
   });
 
-  const soundFiles = useMemo(
-    () => Object.fromEntries(SOUND_OPTIONS.map((option) => [option.value, option.file])),
+  const soundFiles: Record<string, string> = useMemo(
+    () => ({ "soft-chime": "/sounds/soft-chime.mp3", "clear-bell": "/sounds/clear-bell.mp3", "urgent-tone": "/sounds/urgent-tone.mp3" }),
     [],
   );
 
