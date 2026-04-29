@@ -1,11 +1,41 @@
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Pill, Stethoscope, FileText, HeartPulse, Phone, Clock, AlertCircle, Bell, Sparkles, ChevronRight } from "lucide-react";
+import AlertSoundSettingsCard from "@/components/alert-sound-settings-card";
+import {
+  CalendarDays,
+  Pill,
+  Stethoscope,
+  FileText,
+  HeartPulse,
+  Phone,
+  Clock,
+  AlertCircle,
+  Bell,
+  Sparkles,
+  ChevronRight,
+} from "lucide-react";
 import { Link } from "wouter";
-import type { Appointment, Medication, Physician, MedicalRecord, Vital, EmergencyContact } from "@shared/schema";
+import type {
+  Appointment,
+  Medication,
+  Physician,
+  MedicalRecord,
+  Vital,
+  EmergencyContact,
+  ReminderSoundPreferences,
+} from "@shared/schema";
 import { usePatient } from "@/lib/patient-context";
-import { getAppointments, getMedications, getPhysicians, getMedicalRecords, getVitals, getEmergencyContacts } from "@/lib/db";
+import {
+  getAppointments,
+  getMedications,
+  getPhysicians,
+  getMedicalRecords,
+  getVitals,
+  getEmergencyContacts,
+  getReminderSoundPreferences,
+} from "@/lib/db";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
@@ -39,6 +69,19 @@ export default function Dashboard() {
   const { data: records = [] } = useQuery<MedicalRecord[]>({ queryKey: ["medicalRecords", pid], queryFn: () => getMedicalRecords(pid) });
   const { data: vitals = [] } = useQuery<Vital[]>({ queryKey: ["vitals", pid], queryFn: () => getVitals(pid) });
   const { data: contacts = [] } = useQuery<EmergencyContact[]>({ queryKey: ["emergencyContacts", pid], queryFn: () => getEmergencyContacts(pid) });
+  const { data: soundPrefs } = useQuery<ReminderSoundPreferences>({ queryKey: ["reminder-sound-preferences", pid], queryFn: () => getReminderSoundPreferences(pid),
+  });
+
+  const reminderAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const soundFiles = useMemo(
+    () => ({
+      "soft-chime": "/sounds/soft-chime.mp3",
+      "clear-bell": "/sounds/clear-bell.mp3",
+      "urgent-tone": "/sounds/urgent-tone.mp3",
+    }),
+    [],
+  );
 
   const today = new Date().toISOString().split("T")[0];
   const upcoming = appointments.filter(
@@ -56,6 +99,28 @@ export default function Dashboard() {
     if (!a.reminderDate || a.status !== "upcoming") return false;
     return a.reminderDate <= today;
   }).sort((a, b) => a.date.localeCompare(b.date));
+
+    useEffect(() => {
+    if (!soundPrefs || soundPrefs.enabled !== 1 || reminders.length === 0) return;
+
+    const todayReminderKey = `${pid}-${today}-${reminders.map((r) => r.id).join(",")}`;
+    const alreadyPlayedKey = `mrk-played-reminder-sound-${todayReminderKey}`;
+
+    if (sessionStorage.getItem(alreadyPlayedKey) === "1") return;
+
+    const soundValue = soundPrefs.appointmentsSound || "soft-chime";
+    const file = soundFiles[soundValue as keyof typeof soundFiles];
+    if (!file) return;
+
+    const audio = new Audio(file);
+    reminderAudioRef.current = audio;
+
+    audio.play().then(() => {
+      sessionStorage.setItem(alreadyPlayedKey, "1");
+    }).catch(() => {
+      // Ignore autoplay blocks; user can still test sound manually in settings.
+    });
+  }, [pid, reminders, soundPrefs, soundFiles, today]);
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
@@ -139,6 +204,8 @@ export default function Dashboard() {
         </Card>
       )}
 
+      <AlertSoundSettingsCard />
+      
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-3">
