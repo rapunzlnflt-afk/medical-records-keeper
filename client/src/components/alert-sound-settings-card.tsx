@@ -109,25 +109,54 @@ export default function AlertSoundSettingsCard() {
     },
   });
 
+  // Cache decoded audio buffers per file to avoid re-fetching
+  const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  function getAudioContext(): AudioContext | null {
+    if (audioContextRef.current) return audioContextRef.current;
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return null;
+    audioContextRef.current = new Ctx();
+    return audioContextRef.current;
+  }
+
   async function previewSound(soundValue: string, label: string) {
     const file = soundFiles[soundValue];
     if (!file) return;
-    try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+    const ctx = getAudioContext();
+    if (!ctx) {
+      // Fallback: try HTMLAudio
+      try {
+        const audio = new Audio(file);
+        audio.play();
+        setStatusMessage(`Playing ${label}.`);
+      } catch {
+        setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
       }
-      const audio = new Audio(file);
-      audioRef.current = audio;
-      audio.currentTime = 0;
-      await audio.play();
+      return;
+    }
+    try {
+      if (ctx.state === "suspended") await ctx.resume();
+      let buffer = audioBuffersRef.current[soundValue];
+      if (!buffer) {
+        const resp = await fetch(file);
+        const arrayBuf = await resp.arrayBuffer();
+        buffer = await new Promise<AudioBuffer>((resolve, reject) =>
+          ctx.decodeAudioData(arrayBuf, resolve, reject)
+        );
+        audioBuffersRef.current[soundValue] = buffer;
+      }
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
       setStatusMessage(`Playing ${label}.`);
     } catch (error) {
       setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
       console.error(error);
     }
   }
-
   if (!prefs) return null;
 
   return (
