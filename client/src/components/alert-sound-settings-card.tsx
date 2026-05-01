@@ -15,15 +15,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Resolve sound asset URLs against Vite's BASE_URL so they work under
+// the GitHub Pages subpath deployment (e.g. /medical-records-keeper/).
+const BASE = (import.meta as any).env?.BASE_URL ?? "/";
+function soundUrl(name: string) {
+  const base = BASE.endsWith("/") ? BASE : BASE + "/";
+  return `${base}sounds/${name}`;
+}
+
 const SOUND_OPTIONS = [
-    { value: "soft-chime", label: "Soft Chime", file: "./sounds/soft-chime.mp3" },
-    { value: "clear-bell", label: "Clear Bell", file: "./sounds/clear-bell.mp3" },
-    { value: "urgent-tone", label: "Urgent Tone", file: "./sounds/urgent-tone.mp3" },] as const;
+  { value: "soft-chime", label: "Soft Chime", file: soundUrl("soft-chime.mp3") },
+  { value: "clear-bell", label: "Clear Bell", file: soundUrl("clear-bell.mp3") },
+  { value: "urgent-tone", label: "Urgent Tone", file: soundUrl("urgent-tone.mp3") },
+] as const;
 
 // --- Audio unlock helper ----------------------------------------------
-// Browsers (especially iOS Safari) block audio until the user interacts
-// with the page. This installs a one-time listener that resumes/creates
-// an AudioContext on the first tap, so Test sound works on the first click.
 let __audioUnlocked = false;
 function installAudioUnlock() {
   if (typeof window === "undefined" || __audioUnlocked) return;
@@ -63,40 +69,29 @@ const rows: Array<{
   description: string;
   icon: ComponentType<{ className?: string }>;
 }> = [
-  {
-    key: "appointmentsSound",
-    label: "Appointments",
-    description: "Reminder date alerts on the dashboard",
-    icon: Bell,
-  },
-  {
-    key: "medicationsSound",
-    label: "Medications",
-    description: "Future medication and refill reminder alerts",
-    icon: Pill,
-  },
-  {
-    key: "vitalsSound",
-    label: "Vitals",
-    description: "Future check-in and logging reminder alerts",
-    icon: HeartPulse,
-  },
+  { key: "appointmentsSound", label: "Appointments", description: "Reminder date alerts on the dashboard", icon: Bell },
+  { key: "medicationsSound", label: "Medications", description: "Future medication and refill reminder alerts", icon: Pill },
+  { key: "vitalsSound", label: "Vitals", description: "Future check-in and logging reminder alerts", icon: HeartPulse },
 ];
 
 export default function AlertSoundSettingsCard() {
   const { activePatientId } = usePatient();
   const queryClient = useQueryClient();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-    useEffect(() => { installAudioUnlock(); }, []);
 
-  const { data: prefs } = useQuery<ReminderSoundPreferences>({
+  useEffect(() => { installAudioUnlock(); }, []);
+
+  const { data: prefs } = useQuery({
     queryKey: ["reminder-sound-preferences", activePatientId],
     queryFn: () => getReminderSoundPreferences(activePatientId),
   });
 
   const soundFiles: Record<string, string> = useMemo(
-    () => ({ "soft-chime": "/sounds/soft-chime.mp3", "clear-bell": "/sounds/clear-bell.mp3", "urgent-tone": "/sounds/urgent-tone.mp3" }),
+    () => ({
+      "soft-chime": soundUrl("soft-chime.mp3"),
+      "clear-bell": soundUrl("clear-bell.mp3"),
+      "urgent-tone": soundUrl("urgent-tone.mp3"),
+    }),
     [],
   );
 
@@ -108,10 +103,8 @@ export default function AlertSoundSettingsCard() {
     },
   });
 
-  // Cache decoded audio buffers per file to avoid re-fetching
   const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
-
   function getAudioContext(): AudioContext | null {
     if (audioContextRef.current) return audioContextRef.current;
     const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -125,10 +118,9 @@ export default function AlertSoundSettingsCard() {
     if (!file) return;
     const ctx = getAudioContext();
     if (!ctx) {
-      // Fallback: try HTMLAudio
       try {
         const audio = new Audio(file);
-        audio.play();
+        await audio.play();
         setStatusMessage(`Playing ${label}.`);
       } catch {
         setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
@@ -140,6 +132,7 @@ export default function AlertSoundSettingsCard() {
       let buffer = audioBuffersRef.current[soundValue];
       if (!buffer) {
         const resp = await fetch(file);
+        if (!resp.ok) throw new Error(`Failed to load ${file}: ${resp.status}`);
         const arrayBuf = await resp.arrayBuffer();
         buffer = await new Promise<AudioBuffer>((resolve, reject) =>
           ctx.decodeAudioData(arrayBuf, resolve, reject)
@@ -152,31 +145,35 @@ export default function AlertSoundSettingsCard() {
       source.start(0);
       setStatusMessage(`Playing ${label}.`);
     } catch (error) {
-      setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
       console.error(error);
+      try {
+        const audio = new Audio(file);
+        await audio.play();
+        setStatusMessage(`Playing ${label}.`);
+      } catch {
+        setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
+      }
     }
   }
+
   if (!prefs) return null;
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-cyan-500/5 dark:from-primary/10 dark:to-primary/5">
-      <CardHeader className="pb-3">
-        <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-          <Volume2 className="w-4 h-4 text-primary" />
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Volume2 className="h-5 w-5 text-primary" />
           Alert Sounds
         </CardTitle>
-        <p className="text-xs text-muted-foreground font-body">
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
           Choose a saved sound for each reminder type and test it before you rely on it.
         </p>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/15 bg-card/80 p-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Enable alert sounds</p>
-            <p className="text-xs text-muted-foreground">
-              Sound works best after you test it once on this device.
-            </p>
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <p className="font-medium">Enable alert sounds</p>
+            <p className="text-xs text-muted-foreground">Sound works best after you test it once on this device.</p>
           </div>
           <Switch
             checked={prefs.enabled === 1}
@@ -184,74 +181,53 @@ export default function AlertSoundSettingsCard() {
             data-testid="switch-enable-alert-sounds"
           />
         </div>
-
         <div className="space-y-3">
           {rows.map((row) => {
             const Icon = row.icon;
             const selected = prefs[row.key];
-
             return (
-              <div
-                key={row.key}
-                className="rounded-lg border bg-card/90 p-3 shadow-sm"
-                data-testid={`sound-row-${row.key}`}
-              >
+              <div key={row.key} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-4 h-4 text-white" />
+                  <Icon className="mt-0.5 h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium">{row.label}</p>
+                    <p className="text-xs text-muted-foreground">{row.description}</p>
                   </div>
-
-                  <div className="flex-1 min-w-0 space-y-3">
-                    <div>
-                      <p className="text-sm font-semibold">{row.label}</p>
-                      <p className="text-xs text-muted-foreground">{row.description}</p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Select
-                        value={selected}
-                        onValueChange={(value) => mutation.mutate({ [row.key]: value } as Partial<ReminderSoundPreferences>)}
-                      >
-                        <SelectTrigger className="sm:flex-1" data-testid={`select-${row.key}`}>
-                          <SelectValue placeholder="Choose a sound" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SOUND_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Button
-                        type="button"
-                        variant="default"
-                        className="sm:w-auto"
-                        onClick={() => previewSound(selected, row.label)}
-                        data-testid={`button-test-${row.key}`}
-                      >
-                        <Volume2 className="w-4 h-4 mr-2" />
-                        Test sound
-                      </Button>
-                    </div>
-                  </div>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select
+                    value={selected}
+                    onValueChange={(value) => mutation.mutate({ [row.key]: value } as Partial<ReminderSoundPreferences>)}
+                  >
+                    <SelectTrigger className="sm:flex-1" data-testid={`select-${row.key}`}>
+                      <SelectValue placeholder="Choose a sound" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOUND_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => previewSound(selected, row.label)}
+                    data-testid={`button-test-${row.key}`}
+                  >
+                    Test sound
+                  </Button>
                 </div>
               </div>
             );
           })}
         </div>
-
-        <div className="rounded-md bg-secondary/60 px-3 py-2 text-xs text-muted-foreground font-body">
+        <p className="text-xs text-muted-foreground">
           {prefs.enabled === 1 ? (
             statusMessage || "Alert sounds are enabled for this patient profile."
           ) : (
-            <span className="inline-flex items-center gap-1">
-              <VolumeX className="w-3.5 h-3.5" />
-              Alert sounds are currently off.
-            </span>
+            <span className="inline-flex items-center gap-1"><VolumeX className="h-3.5 w-3.5" /> Alert sounds are currently off.</span>
           )}
-        </div>
+        </p>
       </CardContent>
     </Card>
   );
