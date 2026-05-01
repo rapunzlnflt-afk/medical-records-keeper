@@ -94,32 +94,97 @@ export default function Dashboard() {
     return isBefore(refill, addDays(new Date(), 7)) && isAfter(refill, addDays(new Date(), -1));
   });
 
-  const reminders = appointments.filter((a) => {
-    if (!a.reminderDate || a.status !== "upcoming") return false;
-    return a.reminderDate <= today;
-  }).sort((a, b) => a.date.localeCompare(b.date));
+  const now = new Date();
+
+const reminders = appointments.filter((a) => {
+  if (!a.reminderDate || a.status !== "upcoming") return false;
+
+  const reminderDateTime = new Date(
+    `${a.reminderDate}T${a.reminderTime || "09:00"}:00`
+  );
+
+  return reminderDateTime <= now;
+}).sort((a, b) => {
+  const aDateTime = `${a.date}T${a.time || "00:00"}:00`;
+  const bDateTime = `${b.date}T${b.time || "00:00"}:00`;
+  return aDateTime.localeCompare(bDateTime);
+});
 
     useEffect(() => {
-    if (!soundPrefs || soundPrefs.enabled !== 1 || reminders.length === 0) return;
+  if (!soundPrefs || soundPrefs.appointmentsEnabled !== 1 || reminders.length === 0) return;
 
-    const todayReminderKey = `${pid}-${today}-${reminders.map((r) => r.id).join(",")}`;
-    const alreadyPlayedKey = `mrk-played-reminder-sound-${todayReminderKey}`;
+  const now = new Date();
 
-    if (sessionStorage.getItem(alreadyPlayedKey) === "1") return;
+  const dueReminders = reminders.filter((appointment) => {
+    if (!appointment.reminderDate) return false;
 
-    const soundValue = soundPrefs.appointmentsSound || "soft-chime";
-    const file = soundFiles[soundValue as keyof typeof soundFiles];
-    if (!file) return;
+    const reminderDateTime = new Date(
+      `${appointment.reminderDate}T${appointment.reminderTime || "09:00"}:00`
+    );
 
-    const audio = new Audio(file);
-    reminderAudioRef.current = audio;
+    return reminderDateTime <= now;
+  });
 
-    audio.play().then(() => {
-      sessionStorage.setItem(alreadyPlayedKey, "1");
-    }).catch(() => {
+  if (dueReminders.length === 0) return;
+
+  const nextUnplayedReminder = dueReminders.find((appointment) => {
+    const reminderStamp = `${appointment.id}-${appointment.reminderDate}-${appointment.reminderTime || "09:00"}`;
+    const playedKey = `mrk-played-reminder-sound-${pid}-${reminderStamp}`;
+    return sessionStorage.getItem(playedKey) !== "1";
+  });
+
+  if (!nextUnplayedReminder) return;
+
+  const soundValue = soundPrefs.appointmentsSound || "soft-chime";
+  const file = soundFiles[soundValue as keyof typeof soundFiles];
+  if (!file) return;
+
+  const audio = new Audio(file);
+  reminderAudioRef.current = audio;
+
+  const reminderStamp = `${nextUnplayedReminder.id}-${nextUnplayedReminder.reminderDate}-${nextUnplayedReminder.reminderTime || "09:00"}`;
+  const playedKey = `mrk-played-reminder-sound-${pid}-${reminderStamp}`;
+
+  audio
+    .play()
+    .then(() => {
+      sessionStorage.setItem(playedKey, "1");
+    })
+    .catch(() => {
       // Ignore autoplay blocks; user can still test sound manually in settings.
     });
-  }, [pid, reminders, soundPrefs, soundFiles, today]);
+}, [pid, reminders, soundPrefs, soundFiles]);
+
+  const getReminderDateTime = (appointment: Appointment) => {
+  if (!appointment.reminderDate) return null;
+
+  return new Date(
+    `${appointment.reminderDate}T${appointment.reminderTime || "09:00"}:00`
+  );
+};
+
+const getReminderStatusLabel = (appointment: Appointment) => {
+  const reminderDateTime = getReminderDateTime(appointment);
+  if (!reminderDateTime) return null;
+
+  const now = new Date();
+  const diffMs = reminderDateTime.getTime() - now.getTime();
+  const diffMinutes = Math.round(diffMs / (1000 * 60));
+
+  if (diffMinutes > 0) {
+    if (diffMinutes < 60) return `Upcoming in ${diffMinutes} min`;
+    const diffHours = Math.round(diffMinutes / 60);
+    return `Upcoming in ${diffHours} hr`;
+  }
+
+  if (diffMinutes > -60) {
+    return "Due now";
+  }
+
+  const pastHours = Math.round(Math.abs(diffMinutes) / 60);
+  if (pastHours < 1) return "Due now";
+  return `Due since ${pastHours} hr ago`;
+};
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
@@ -179,22 +244,41 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-2">
             {reminders.map((apt) => {
-              const doc = physicians.find((p) => p.id === apt.physicianId);
+              const doc = physicians.find((p) => p.id 
+          === apt.physicianId);
+              const reminderStatus = 
+          getReminderStatusLabel(apt);
+ 
               return (
                 <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-card" data-testid={`reminder-apt-${apt.id}`}>
                   <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0">
                     <Bell className="w-4 h-4 text-white" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{apt.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {format(parseISO(apt.date), "MMM d, yyyy")} at {apt.time}
-                      {doc ? ` · ${doc.name}` : ""}
-                    </p>
-                    {apt.location && (
-                      <p className="text-xs text-muted-foreground truncate">{apt.location}</p>
-                    )}
-                  </div>
+  <div className="flex items-center gap-2 flex-wrap">
+    <p className="text-sm font-semibold truncate">{apt.title}</p>
+    {reminderStatus && (
+      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5">
+        {reminderStatus}
+      </span>
+    )}
+  </div>
+
+  <p className="text-xs text-muted-foreground truncate">
+    {format(parseISO(apt.date), "MMM d, yyyy")} at {apt.time} {doc ? ` · ${doc.name}` : ""}
+  </p>
+
+  {apt.location && (
+    <p className="text-xs text-muted-foreground truncate">{apt.location}</p>
+  )}
+
+  {apt.reminderDate && (
+    <p className="text-xs text-muted-foreground truncate">
+      Alert set for {format(parseISO(apt.reminderDate), "MMM d, yyyy")}
+      {apt.reminderTime ? ` at ${apt.reminderTime}` : " at 9:00 AM"}
+    </p>
+  )}
+</div>
                   <Badge variant="secondary" className="text-xs flex-shrink-0">{apt.type}</Badge>
                 </div>
               );
