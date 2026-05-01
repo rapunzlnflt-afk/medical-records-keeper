@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Pill, HeartPulse, Volume2, VolumeX } from "lucide-react";
 import type { ReminderSoundPreferences } from "@shared/schema";
@@ -20,6 +20,41 @@ const SOUND_OPTIONS = [
   { value: "clear-bell", label: "Clear Bell", file: "/sounds/clear-bell.mp3" },
   { value: "urgent-tone", label: "Urgent Tone", file: "/sounds/urgent-tone.mp3" },
 ] as const;
+
+// --- Audio unlock helper ----------------------------------------------
+// Browsers (especially iOS Safari) block audio until the user interacts
+// with the page. This installs a one-time listener that resumes/creates
+// an AudioContext on the first tap, so Test sound works on the first click.
+let __audioUnlocked = false;
+function installAudioUnlock() {
+  if (typeof window === "undefined" || __audioUnlocked) return;
+  const unlock = () => {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (Ctx) {
+        const ctx = new Ctx();
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+      }
+      document.querySelectorAll("audio").forEach((a) => {
+        const el = a as HTMLAudioElement;
+        el.muted = true;
+        el.play().then(() => { el.pause(); el.muted = false; }).catch(() => {});
+      });
+    } catch {}
+    __audioUnlocked = true;
+    window.removeEventListener("touchstart", unlock);
+    window.removeEventListener("click", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("touchstart", unlock, { once: true, passive: true });
+  window.addEventListener("click", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
 
 type ReminderType = "appointmentsSound" | "medicationsSound" | "vitalsSound";
 
@@ -54,6 +89,7 @@ export default function AlertSoundSettingsCard() {
   const queryClient = useQueryClient();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+    useEffect(() => { installAudioUnlock(); }, []);
 
   const { data: prefs } = useQuery<ReminderSoundPreferences>({
     queryKey: ["reminder-sound-preferences", activePatientId],
