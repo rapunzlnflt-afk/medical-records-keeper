@@ -122,8 +122,10 @@ export interface Pharmacy {
 export interface ReminderSoundPreferences {
   id?: number;
   patientId: number;
-  enabled: number;
+  appointmentsEnabled: number;
   appointmentsSound: string;
+  medicationsEnabled: number;
   medicationsSound: string;
+  vitalsEnabled: number;
   vitalsSound: string;
 }
