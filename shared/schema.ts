@@ -37,6 +37,7 @@ export interface Appointment {
   status: string;
   notes: string | null;
   reminderDate: string | null;
+  reminderTime: string | null;
 }
 
 export interface Medication {
