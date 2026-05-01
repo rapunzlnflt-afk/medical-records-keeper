@@ -272,14 +272,17 @@ const getReminderStatusLabel = (appointment: Appointment) => {
     <p className="text-xs text-muted-foreground truncate">{apt.location}</p>
   )}
 
-  {apt.reminderDate && (
-    <p className="text-xs text-muted-foreground truncate">
-      Alert set for {format(parseISO(apt.reminderDate), "MMM d, yyyy")}
-      {apt.reminderTime ? ` at ${apt.reminderTime}` : " at 9:00 AM"}
-    </p>
-  )}
-</div>
-                  <Badge variant="secondary" className="text-xs flex-shrink-0">{apt.type}</Badge>
+                      {apt.reminderDate && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        Alert set for {format(parseISO(apt.reminderDate), "MMM d, yyyy")}
+                        {apt.reminderTime ? ` at ${apt.reminderTime}` : " at 9:00 AM"}
+                      </p>
+                    )}
+                  </div>
+
+                  <Badge variant="secondary" className="text-xs flex-shrink-0">
+                    {apt.type}
+                  </Badge>
                 </div>
               );
             })}
