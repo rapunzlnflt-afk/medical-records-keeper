@@ -16,10 +16,9 @@ import {
 } from "@/components/ui/select";
 
 const SOUND_OPTIONS = [
-  { value: "soft-chime", label: "Soft Chime", file: "/sounds/soft-chime.mp3" },
-  { value: "clear-bell", label: "Clear Bell", file: "/sounds/clear-bell.mp3" },
-  { value: "urgent-tone", label: "Urgent Tone", file: "/sounds/urgent-tone.mp3" },
-] as const;
+    { value: "soft-chime", label: "Soft Chime", file: "./sounds/soft-chime.mp3" },
+    { value: "clear-bell", label: "Clear Bell", file: "./sounds/clear-bell.mp3" },
+    { value: "urgent-tone", label: "Urgent Tone", file: "./sounds/urgent-tone.mp3" },] as const;
 
 // --- Audio unlock helper ----------------------------------------------
 // Browsers (especially iOS Safari) block audio until the user interacts
