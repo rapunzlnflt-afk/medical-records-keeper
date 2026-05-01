@@ -42,7 +42,7 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
 }) {
   return (
     <Link href={href}>
-      <Card className={`hover-elevate cursor-pointer ${gradient ? "gradient-primary text-white border-none" : ""}`} data-testid={`stat-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+      <Card className={`hover-elevate cursor-pointer ${gradient ? "gradient-primary text-white border-none" : ""}`} data-testid={`stat-${title.toLowerCase().replace(/\\s+/g, "-")}`}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
