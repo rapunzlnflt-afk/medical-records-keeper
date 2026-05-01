@@ -44,7 +44,10 @@ function AppLayout() {
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         {isMobile && (
           <header className="flex items-center gap-2 p-3 border-b bg-card/50 backdrop-blur-sm shrink-0 z-40">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <SidebarTrigger 
+              data-testid="button-sidebar-toggle" 
+              className="h-12 w-12 [&_svg]:!size-7" 
+           />
             <div className="flex-1" />
           </header>
         )}
