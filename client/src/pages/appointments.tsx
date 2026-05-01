@@ -15,8 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer } from "lucide-react";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
-import { AlertSoundControl } from "@/components/alert-sound-control";
-
+import AlertSoundControl from "@/components/alert-sound-control";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
 
