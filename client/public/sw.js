@@ -1,5 +1,4 @@
-const CACHE_NAME = "medical-records-v1";
-
+const CACHE_NAME = "medical-records-v2-synth";
 // Install: cache the app shell
 self.addEventListener("install", (event) => {
   event.waitUntil(
