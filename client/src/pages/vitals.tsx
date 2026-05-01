@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { HeartPulse, Plus, Trash2, Activity, Thermometer, Droplets, Wind } from "lucide-react";
 import type { Vital } from "@shared/schema";
 import { format, parseISO } from "date-fns";
+import { AlertSoundControl } from "@/components/alert-sound-control";
 
 function VitalForm({ onSubmit, onCancel }: {
   onSubmit: (data: any) => void;
@@ -123,6 +124,7 @@ export default function Vitals() {
           </DialogContent>
         </Dialog>
       </div>
+      <AlertSoundControl reminderType="vitalsSound" label="Vitals alert sound" />
 
       {/* Latest Reading Cards */}
       {latest && (
