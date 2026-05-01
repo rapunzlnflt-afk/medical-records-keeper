@@ -109,20 +109,36 @@ export default function AlertSoundSettingsCard() {
     },
   });
 
-  async function previewSound(soundValue: string, label: string) {
-    const file = soundFiles[soundValue];
-    if (!file) return;
-
+   async function previewSound(soundValue: string, label: string) {
     try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) throw new Error("AudioContext not supported");
+      const ctx = new Ctx();
+      if (ctx.state === "suspended") await ctx.resume();
 
-      const audio = new Audio(file);
-      audioRef.current = audio;
-      audio.currentTime = 0;
-      await audio.play();
+      // Tone spec per sound
+      const specs: Record<string, { type: OscillatorType; freq: number; dur: number }> = {
+        "soft-chime": { type: "sine", freq: 880, dur: 0.45 },
+        "clear-bell": { type: "triangle", freq: 1320, dur: 0.5 },
+        "urgent-tone": { type: "square", freq: 660, dur: 0.35 },
+      };
+      const spec = specs[soundValue] || specs["soft-chime"];
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = spec.type;
+      osc.frequency.value = spec.freq;
+      // Quick attack + smooth exponential decay so it sounds like a chime
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.4, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + spec.dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + spec.dur + 0.05);
+      osc.onended = () => { try { ctx.close(); } catch {} };
+
       setStatusMessage(`Playing ${label}.`);
     } catch (error) {
       setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
