@@ -29,6 +29,13 @@ const SOUND_OPTIONS = [
   { value: "urgent-tone", label: "Urgent Tone", file: soundUrl("urgent-tone.mp3") },
 ] as const;
 
+// Per-sound playback duration overrides (in seconds). When set, the playback
+// is stopped early so the user hears only that portion of the file.
+const SOUND_PLAY_FRACTION: Record<string, number> = {
+  // Cut the urgent tone in half so it feels punchier.
+  "urgent-tone": 0.5,
+};
+
 // --- Audio unlock helper ----------------------------------------------
 let __audioUnlocked = false;
 function installAudioUnlock() {
@@ -105,6 +112,7 @@ export default function AlertSoundSettingsCard() {
 
   const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
+  const activeHtmlAudioRef = useRef<HTMLAudioElement | null>(null);
   function getAudioContext(): AudioContext | null {
     if (audioContextRef.current) return audioContextRef.current;
     const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -113,15 +121,35 @@ export default function AlertSoundSettingsCard() {
     return audioContextRef.current;
   }
 
+  function playHtmlAudio(file: string, soundValue: string, label: string) {
+    const audio = new Audio(file);
+    activeHtmlAudioRef.current = audio;
+    const fraction = SOUND_PLAY_FRACTION[soundValue];
+    if (fraction && fraction > 0 && fraction < 1) {
+      const onLoaded = () => {
+        const stopAt = audio.duration * fraction;
+        const onTime = () => {
+          if (audio.currentTime >= stopAt) {
+            audio.pause();
+            audio.removeEventListener("timeupdate", onTime);
+          }
+        };
+        audio.addEventListener("timeupdate", onTime);
+      };
+      audio.addEventListener("loadedmetadata", onLoaded, { once: true });
+    }
+    return audio.play().then(() => {
+      setStatusMessage(`Playing ${label}.`);
+    });
+  }
+
   async function previewSound(soundValue: string, label: string) {
     const file = soundFiles[soundValue];
     if (!file) return;
     const ctx = getAudioContext();
     if (!ctx) {
       try {
-        const audio = new Audio(file);
-        await audio.play();
-        setStatusMessage(`Playing ${label}.`);
+        await playHtmlAudio(file, soundValue, label);
       } catch {
         setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
       }
@@ -143,13 +171,16 @@ export default function AlertSoundSettingsCard() {
       source.buffer = buffer;
       source.connect(ctx.destination);
       source.start(0);
+      const fraction = SOUND_PLAY_FRACTION[soundValue];
+      if (fraction && fraction > 0 && fraction < 1) {
+        // Stop playback early so only the first `fraction` of the clip plays.
+        try { source.stop(ctx.currentTime + buffer.duration * fraction); } catch {}
+      }
       setStatusMessage(`Playing ${label}.`);
     } catch (error) {
       console.error(error);
       try {
-        const audio = new Audio(file);
-        await audio.play();
-        setStatusMessage(`Playing ${label}.`);
+        await playHtmlAudio(file, soundValue, label);
       } catch {
         setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
       }
