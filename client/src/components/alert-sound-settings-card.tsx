@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Pill, HeartPulse, Volume2, VolumeX } from "lucide-react";
-import type { ReminderSoundPreferences } from "@shared/schema";
-import { getReminderSoundPreferences, updateReminderSoundPreferences } from "@/lib/db";
-import { usePatient } from "@/lib/patient-context";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bell, HeartPulse, Pill, Volume2, VolumeX } from "lucide-react";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -14,236 +12,234 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
+import type { ReminderSoundPreferences } from "@shared/schema";
 
-// Resolve sound asset URLs against Vite's BASE_URL so they work under
-// the GitHub Pages subpath deployment (e.g. /medical-records-keeper/).
-const BASE = (import.meta as any).env?.BASE_URL ?? "/";
-function soundUrl(name: string) {
-  const base = BASE.endsWith("/") ? BASE : BASE + "/";
-  return `${base}sounds/${name}`;
-}
-
-const SOUND_OPTIONS = [
-  { value: "soft-chime", label: "Soft Chime", file: soundUrl("soft-chime.mp3") },
-  { value: "clear-bell", label: "Clear Bell", file: soundUrl("clear-bell.mp3") },
-  { value: "urgent-tone", label: "Urgent Tone", file: soundUrl("urgent-tone.mp3") },
-] as const;
-
-// Per-sound playback duration overrides (in seconds). When set, the playback
-// is stopped early so the user hears only that portion of the file.
-const SOUND_PLAY_FRACTION: Record<string, number> = {
-  // Cut the urgent tone in half so it feels punchier.
-  "urgent-tone": 0.5,
+type AlertSoundSettingsCardProps = {
+  patientId: number;
+  className?: string;
 };
 
-// --- Audio unlock helper ----------------------------------------------
-let __audioUnlocked = false;
-function installAudioUnlock() {
-  if (typeof window === "undefined" || __audioUnlocked) return;
-  const unlock = () => {
-    try {
-      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (Ctx) {
-        const ctx = new Ctx();
-        if (ctx.state === "suspended") ctx.resume().catch(() => {});
-        const buf = ctx.createBuffer(1, 1, 22050);
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-        src.connect(ctx.destination);
-        src.start(0);
-      }
-      document.querySelectorAll("audio").forEach((a) => {
-        const el = a as HTMLAudioElement;
-        el.muted = true;
-        el.play().then(() => { el.pause(); el.muted = false; }).catch(() => {});
-      });
-    } catch {}
-    __audioUnlocked = true;
-    window.removeEventListener("touchstart", unlock);
-    window.removeEventListener("click", unlock);
-    window.removeEventListener("keydown", unlock);
-  };
-  window.addEventListener("touchstart", unlock, { once: true, passive: true });
-  window.addEventListener("click", unlock, { once: true });
-  window.addEventListener("keydown", unlock, { once: true });
-}
+const SOUND_OPTIONS = [
+  { value: "chime", label: "Chime" },
+  { value: "ding", label: "Ding" },
+  { value: "soft-bell", label: "Soft Bell" },
+  { value: "pulse", label: "Pulse" },
+] as const;
 
-type ReminderType = "appointmentsSound" | "medicationsSound" | "vitalsSound";
+type ReminderSoundKey = "appointmentsSound" | "medicationsSound" | "vitalsSound";
+type ReminderEnabledKey = "appointmentsEnabled" | "medicationsEnabled" | "vitalsEnabled";
 
 const rows: Array<{
-  key: ReminderType;
+  soundKey: ReminderSoundKey;
+  enabledKey: ReminderEnabledKey;
   label: string;
   description: string;
   icon: ComponentType<{ className?: string }>;
 }> = [
-  { key: "appointmentsSound", label: "Appointments", description: "Reminder date alerts on the dashboard", icon: Bell },
-  { key: "medicationsSound", label: "Medications", description: "Future medication and refill reminder alerts", icon: Pill },
-  { key: "vitalsSound", label: "Vitals", description: "Future check-in and logging reminder alerts", icon: HeartPulse },
+  {
+    soundKey: "appointmentsSound",
+    enabledKey: "appointmentsEnabled",
+    label: "Appointments",
+    description: "Reminder date alerts on the dashboard",
+    icon: Bell,
+  },
+  {
+    soundKey: "medicationsSound",
+    enabledKey: "medicationsEnabled",
+    label: "Medications",
+    description: "Future medication and refill reminder alerts",
+    icon: Pill,
+  },
+  {
+    soundKey: "vitalsSound",
+    enabledKey: "vitalsEnabled",
+    label: "Vitals",
+    description: "Future check-in and logging reminder alerts",
+    icon: HeartPulse,
+  },
 ];
 
-export default function AlertSoundSettingsCard() {
-  const { activePatientId } = usePatient();
+const DEFAULT_PREFERENCES: ReminderSoundPreferences = {
+  patientId: 0,
+  appointmentsEnabled: 0,
+  appointmentsSound: "chime",
+  medicationsEnabled: 0,
+  medicationsSound: "ding",
+  vitalsEnabled: 0,
+  vitalsSound: "soft-bell",
+};
+
+function playPreviewSound(_sound: string) {
+  const audio = new Audio("/sounds/notification.mp3");
+  audio.volume = 0.7;
+  audio.play().catch(() => {});
+}
+
+export function AlertSoundSettingsCard({
+  patientId,
+  className,
+}: AlertSoundSettingsCardProps) {
   const queryClient = useQueryClient();
   const [statusMessage, setStatusMessage] = useState("");
+  const statusTimeoutRef = useRef<number | null>(null);
 
-  useEffect(() => { installAudioUnlock(); }, []);
+  const { data } = useQuery<ReminderSoundPreferences>({
+    queryKey: ["/api/patients", patientId, "reminder-sound-preferences"],
+    queryFn: async () => {
+      const res = await fetch(`/api/patients/${patientId}/reminder-sound-preferences`, {
+        credentials: "include",
+      });
 
-  const { data: prefs } = useQuery({
-    queryKey: ["reminder-sound-preferences", activePatientId],
-    queryFn: () => getReminderSoundPreferences(activePatientId),
-  });
+      if (!res.ok) {
+        return {
+          ...DEFAULT_PREFERENCES,
+          patientId,
+        };
+      }
 
-  const soundFiles: Record<string, string> = useMemo(
-    () => ({
-      "soft-chime": soundUrl("soft-chime.mp3"),
-      "clear-bell": soundUrl("clear-bell.mp3"),
-      "urgent-tone": soundUrl("urgent-tone.mp3"),
-    }),
-    [],
-  );
-
-  const mutation = useMutation({
-    mutationFn: (updates: Partial<ReminderSoundPreferences>) =>
-      updateReminderSoundPreferences(activePatientId, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reminder-sound-preferences", activePatientId] });
+      const json = await res.json();
+      return {
+        ...DEFAULT_PREFERENCES,
+        ...json,
+        patientId,
+      };
     },
   });
 
-  const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const activeHtmlAudioRef = useRef<HTMLAudioElement | null>(null);
-  function getAudioContext(): AudioContext | null {
-    if (audioContextRef.current) return audioContextRef.current;
-    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (!Ctx) return null;
-    audioContextRef.current = new Ctx();
-    return audioContextRef.current;
-  }
+  const prefs = useMemo(
+    () => ({
+      ...DEFAULT_PREFERENCES,
+      ...data,
+      patientId,
+    }),
+    [data, patientId],
+  );
 
-  function playHtmlAudio(file: string, soundValue: string, label: string) {
-    const audio = new Audio(file);
-    activeHtmlAudioRef.current = audio;
-    const fraction = SOUND_PLAY_FRACTION[soundValue];
-    if (fraction && fraction > 0 && fraction < 1) {
-      const onLoaded = () => {
-        const stopAt = audio.duration * fraction;
-        const onTime = () => {
-          if (audio.currentTime >= stopAt) {
-            audio.pause();
-            audio.removeEventListener("timeupdate", onTime);
-          }
-        };
-        audio.addEventListener("timeupdate", onTime);
-      };
-      audio.addEventListener("loadedmetadata", onLoaded, { once: true });
-    }
-    return audio.play().then(() => {
-      setStatusMessage(`Playing ${label}.`);
-    });
-  }
+  const mutation = useMutation({
+    mutationFn: async (updates: Partial<ReminderSoundPreferences>) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/patients/${patientId}/reminder-sound-preferences`,
+        updates,
+      );
+      return response.json();
+    },
+    onSuccess: (updated: ReminderSoundPreferences) => {
+      queryClient.setQueryData(
+        ["/api/patients", patientId, "reminder-sound-preferences"],
+        updated,
+      );
+      setStatusMessage("Alert sound settings saved.");
+    },
+  });
 
-  async function previewSound(soundValue: string, label: string) {
-    const file = soundFiles[soundValue];
-    if (!file) return;
-    const ctx = getAudioContext();
-    if (!ctx) {
-      try {
-        await playHtmlAudio(file, soundValue, label);
-      } catch {
-        setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
-      }
-      return;
-    }
-    try {
-      if (ctx.state === "suspended") await ctx.resume();
-      let buffer = audioBuffersRef.current[soundValue];
-      if (!buffer) {
-        const resp = await fetch(file);
-        if (!resp.ok) throw new Error(`Failed to load ${file}: ${resp.status}`);
-        const arrayBuf = await resp.arrayBuffer();
-        buffer = await new Promise<AudioBuffer>((resolve, reject) =>
-          ctx.decodeAudioData(arrayBuf, resolve, reject)
-        );
-        audioBuffersRef.current[soundValue] = buffer;
-      }
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-      const fraction = SOUND_PLAY_FRACTION[soundValue];
-      if (fraction && fraction > 0 && fraction < 1) {
-        // Stop playback early so only the first `fraction` of the clip plays.
-        try { source.stop(ctx.currentTime + buffer.duration * fraction); } catch {}
-      }
-      setStatusMessage(`Playing ${label}.`);
-    } catch (error) {
-      console.error(error);
-      try {
-        await playHtmlAudio(file, soundValue, label);
-      } catch {
-        setStatusMessage("Sound preview was blocked. Tap the button again after interacting with the app.");
-      }
-    }
-  }
+  useEffect(() => {
+    if (!statusMessage) return;
 
-  if (!prefs) return null;
+    if (statusTimeoutRef.current) {
+      window.clearTimeout(statusTimeoutRef.current);
+    }
+
+    statusTimeoutRef.current = window.setTimeout(() => {
+      setStatusMessage("");
+      statusTimeoutRef.current = null;
+    }, 2500);
+
+    return () => {
+      if (statusTimeoutRef.current) {
+        window.clearTimeout(statusTimeoutRef.current);
+        statusTimeoutRef.current = null;
+      }
+    };
+  }, [statusMessage]);
+
+  const previewSound = (sound: string, label: string) => {
+    playPreviewSound(sound);
+    setStatusMessage(`Previewing ${label.toLowerCase()} sound.`);
+  };
+
+  const enabledCount = rows.filter((row) => prefs[row.enabledKey] === 1).length;
+  const totalCount = rows.length;
 
   return (
-    <Card>
+    <Card className={cn(className)}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Volume2 className="h-5 w-5 text-primary" />
-          Alert Sounds
+          {enabledCount > 0 ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          Alert sounds
         </CardTitle>
+        <CardDescription>
+          Choose which reminder types play sounds for this patient profile.
+        </CardDescription>
       </CardHeader>
+
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Choose a saved sound for each reminder type and test it before you rely on it.
-        </p>
-        <div className="flex items-center justify-between rounded-md border p-3">
-          <div>
-            <p className="font-medium">Enable alert sounds</p>
-            <p className="text-xs text-muted-foreground">Sound works best after you test it once on this device.</p>
-          </div>
-          <Switch
-            checked={prefs.enabled === 1}
-            onCheckedChange={(checked) => mutation.mutate({ enabled: checked ? 1 : 0 })}
-            data-testid="switch-enable-alert-sounds"
-          />
-        </div>
         <div className="space-y-3">
           {rows.map((row) => {
             const Icon = row.icon;
-            const selected = prefs[row.key];
+            const selected = prefs[row.soundKey];
+            const isEnabled = prefs[row.enabledKey] === 1;
+
             return (
-              <div key={row.key} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <Icon className="mt-0.5 h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium">{row.label}</p>
-                    <p className="text-xs text-muted-foreground">{row.description}</p>
+              <div key={row.soundKey} className="rounded-md border p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <Icon className="mt-0.5 h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium">{row.label}</p>
+                      <p className="text-xs text-muted-foreground">{row.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {isEnabled ? "On" : "Off"}
+                    </span>
+                    <Switch
+                      checked={isEnabled}
+                      onCheckedChange={(checked) =>
+                        mutation.mutate({
+                          [row.enabledKey]: checked ? 1 : 0,
+                        } as Partial<ReminderSoundPreferences>)
+                      }
+                      data-testid={`switch-${row.enabledKey}`}
+                    />
                   </div>
                 </div>
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Select
                     value={selected}
-                    onValueChange={(value) => mutation.mutate({ [row.key]: value } as Partial<ReminderSoundPreferences>)}
+                    onValueChange={(value) =>
+                      mutation.mutate({
+                        [row.soundKey]: value,
+                      } as Partial<ReminderSoundPreferences>)
+                    }
+                    disabled={!isEnabled}
                   >
-                    <SelectTrigger className="sm:flex-1" data-testid={`select-${row.key}`}>
+                    <SelectTrigger
+                      className="sm:flex-1"
+                      data-testid={`select-${row.soundKey}`}
+                    >
                       <SelectValue placeholder="Choose a sound" />
                     </SelectTrigger>
                     <SelectContent>
                       {SOUND_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={!isEnabled}
                     onClick={() => previewSound(selected, row.label)}
-                    data-testid={`button-test-${row.key}`}
+                    data-testid={`button-test-${row.soundKey}`}
                   >
                     Test sound
                   </Button>
@@ -252,11 +248,17 @@ export default function AlertSoundSettingsCard() {
             );
           })}
         </div>
+
         <p className="text-xs text-muted-foreground">
-          {prefs.enabled === 1 ? (
-            statusMessage || "Alert sounds are enabled for this patient profile."
-          ) : (
-            <span className="inline-flex items-center gap-1"><VolumeX className="h-3.5 w-3.5" /> Alert sounds are currently off.</span>
+          {statusMessage || (
+            enabledCount > 0 ? (
+              `Alert sounds are enabled for ${enabledCount} of ${totalCount} reminder types.`
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                <VolumeX className="h-3.5 w-3.5" />
+                Alert sounds are currently off for all reminder types.
+              </span>
+            )
           )}
         </p>
       </CardContent>
