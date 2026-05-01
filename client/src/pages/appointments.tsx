@@ -26,16 +26,23 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
   onCancel: () => void;
 }) {
   const [form, setForm] = useState({
-    title: initial?.title || "",
-    physicianId: initial?.physicianId || null,
-    date: initial?.date || "",
-    time: initial?.time || "",
-    location: initial?.location || "",
-    type: initial?.type || "checkup",
-    status: initial?.status || "upcoming",
-    notes: initial?.notes || "",
-    reminderDate: initial?.reminderDate || "",
-  });
+  title: initial?.title || "",
+  physicianId: initial?.physicianId || null,
+  date: initial?.date || "",
+  time: initial?.time || "",
+  location: initial?.location || "",
+  type: initial?.type || "checkup",
+  status: initial?.status || "upcoming",
+  notes: initial?.notes || "",
+  reminderDate: initial?.reminderDate || "",
+  reminderTime: initial?.reminderTime || "",
+});
+
+const [showReminderOptions, 
+setShowReminderOptions] = useState(
+  Boolean(initial?.reminderDate || 
+initial?.reminderTime)
+);
 
   return (
     <div className="space-y-4">
@@ -95,10 +102,72 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
           <Input value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="123 Medical Pkwy" data-testid="input-apt-location" />
         </div>
         <div>
-          <Label className="text-xs font-body">Remind Me On</Label>
-          <Input type="date" value={form.reminderDate || ""} onChange={(e) => setForm({ ...form, reminderDate: e.target.value })} data-testid="input-apt-reminder" />
-          <p className="text-xs text-muted-foreground mt-1">Pick a date to see a reminder on the Dashboard</p>
-        </div>
+         <div className="sm:col-span-2 rounded-md border p-3 space-y-3">
+  <div className="flex items-center justify-between gap-3">
+    <div>
+      <Label className="text-xs font-body">Appointment Alert</Label>
+      <p className="text-xs text-muted-foreground mt-1">
+        Choose when this appointment should appear as a reminder.
+      </p>
+    </div>
+
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => setShowReminderOptions((prev) => !prev)}
+    >
+      {showReminderOptions ? "Hide" : form.reminderDate || form.reminderTime ? "Edit" : "Set alert"}
+    </Button>
+  </div>
+
+  {showReminderOptions && (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div>
+        <Label className="text-xs font-body">Alert Date</Label>
+        <Input
+          type="date"
+          value={form.reminderDate || ""}
+          onChange={(e) => setForm({ ...form, reminderDate: e.target.value })}
+          data-testid="input-apt-reminder"
+        />
+      </div>
+
+      <div>
+        <Label className="text-xs font-body">Alert Time</Label>
+        <Input
+          type="time"
+          value={form.reminderTime || ""}
+          onChange={(e) => setForm({ ...form, reminderTime: e.target.value })}
+          data-testid="input-apt-reminder-time"
+        />
+      </div>
+
+      <div className="sm:col-span-2 flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Set both a date and time so reminders do not default to midnight.
+        </p>
+
+        {(form.reminderDate || form.reminderTime) && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setForm({
+                ...form,
+                reminderDate: "",
+                reminderTime: "",
+              })
+            }
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+    </div>
+  )}
+</div>
       </div>
       <div>
         <Label className="text-xs font-body">Notes</Label>
