@@ -18,8 +18,7 @@ import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, S
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 import { useLocation } from "wouter";
-import { AlertSoundControl } from "@/components/alert-sound-control";
-
+import AlertSoundControl from "@/components/alert-sound-control";
 const MED_TYPES = ["prescription", "otc", "supplement", "vitamin"];
 const FREQUENCIES = ["daily", "twice-daily", "three-times-daily", "weekly", "bi-weekly", "monthly", "as-needed"];
 const TIMES_OF_DAY = ["morning", "afternoon", "evening", "bedtime"];
