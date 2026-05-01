@@ -271,22 +271,22 @@ function SidebarTrigger({
   const { toggleSidebar } = useSidebar()
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-11 w-11 p-2", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <Menu />
-      <span className="sr-only">Menu</span>
-    </Button>
-  )
+  <Button
+    data-sidebar="trigger"
+    data-slot="sidebar-trigger"
+    variant="ghost"
+    size="icon"
+    className={cn("h-11 w-11 p-2 [&>svg]:size-6", className)}
+    onClick={(event) => {
+      onClick?.(event)
+      toggleSidebar()
+    }}
+    {...props}
+  >
+    <Menu />
+    <span className="sr-only">Menu</span>
+  </Button>
+)
 }
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
