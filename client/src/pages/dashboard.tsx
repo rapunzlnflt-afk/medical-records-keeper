@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import AlertSoundSettingsCard from "@/components/alert-sound-settings-card";
 import {
   CalendarDays,
   Pill,
@@ -204,7 +203,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <AlertSoundSettingsCard />
       
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
