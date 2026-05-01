@@ -283,7 +283,7 @@ function SidebarTrigger({
     }}
     {...props}
   >
-    <Menu size={28} />
+    <Menu className="size-7" />
     <span className="sr-only">Menu</span>
   </Button>
 )
