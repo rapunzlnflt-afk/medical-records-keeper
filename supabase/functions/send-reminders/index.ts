@@ -64,11 +64,27 @@ async function deliverOne(reminder: ReminderRow): Promise<{ ok: boolean; error?:
     return { ok: false, error: "no devices for user" };
   }
 
+  // Title leads with the action category ("Appointment" / "Refill") so the
+  // OS banner — which truncates after a few words and may also stack the
+  // installed-app label above the title on iOS — never reads as just the
+  // patient placeholder ("My Records"). Patient name is moved into the body.
+  const isAppointment = reminder.source === "appointment";
+  const actionLabel = isAppointment ? "Appointment" : "Refill";
+  const detailTitle = reminder.title?.trim() ?? "";
+  const composedTitle = detailTitle
+    ? `${actionLabel}: ${detailTitle}`
+    : isAppointment
+      ? "Appointment reminder"
+      : "Medication refill";
+  const bodyParts = [reminder.patient_name?.trim(), reminder.body?.trim()].filter(
+    (s): s is string => Boolean(s && s.length > 0),
+  );
+
   const payload = JSON.stringify({
-    title: reminder.patient_name ? `${reminder.patient_name}: ${reminder.title}` : reminder.title,
-    body: reminder.body ?? "",
+    title: composedTitle,
+    body: bodyParts.join(" · "),
     tag: `${reminder.source}-${reminder.source_id}`,
-    url: reminder.source === "appointment" ? "./#/appointments" : "./#/medications",
+    url: isAppointment ? "./#/appointments" : "./#/medications",
     source: reminder.source,
     sourceId: reminder.source_id,
   });
