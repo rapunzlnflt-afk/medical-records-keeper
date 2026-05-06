@@ -20,9 +20,45 @@
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
     <script>
+      // Register the service worker with updateViaCache: "none" so the SW
+      // script itself is never served from the HTTP cache. iOS Home Screen
+      // PWAs are particularly prone to pinning an old SW for hours/days,
+      // which keeps the old hashed app shell alive even after a deploy.
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        window.addEventListener("load", async () => {
+          try {
+            const reg = await navigator.serviceWorker.register("./sw.js", {
+              updateViaCache: "none",
+            });
+            // Explicit update check on every load so the user never has to
+            // wait the default 24h for the browser to notice a new SW.
+            try { await reg.update(); } catch (_) {}
+            // When a waiting SW is detected, tell it to skipWaiting so the
+            // active page picks up the new app shell on next navigation.
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: "SKIP_WAITING" });
+            }
+            reg.addEventListener("updatefound", () => {
+              const next = reg.installing;
+              if (!next) return;
+              next.addEventListener("statechange", () => {
+                if (next.state === "installed" && navigator.serviceWorker.controller) {
+                  next.postMessage({ type: "SKIP_WAITING" });
+                }
+              });
+            });
+            // When a new SW takes control, reload once so the page is
+            // running against the new app shell. Guarded so we don't loop.
+            let reloaded = false;
+            navigator.serviceWorker.addEventListener("controllerchange", () => {
+              if (reloaded) return;
+              reloaded = true;
+              window.location.reload();
+            });
+          } catch (_) {
+            // Registration failures (e.g., insecure context in dev) shouldn't
+            // break the app — just skip the SW path.
+          }
         });
       }
     </script>

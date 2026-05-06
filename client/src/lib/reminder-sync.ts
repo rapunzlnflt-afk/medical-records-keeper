@@ -1,5 +1,6 @@
 import type { Appointment, Medication, Patient } from "@shared/schema";
 import { getSupabase, isSupabaseConfigured, VAPID_PUBLIC_KEY } from "./supabase";
+import { BUILD_COMMIT, BUILD_TIME } from "./build-info";
 
 export type PhoneReminderState =
   | { status: "unsupported"; reason: string }
@@ -144,6 +145,11 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
     return rec;
   };
 
+  // Record entry into the handler before doing any async work so that, even
+  // if the user is on a stale bundle that aborts later, "Last device sync"
+  // proves the click reached this function in *this* build.
+  stamp(true, `enable handler invoked (build ${BUILD_COMMIT})`, "started");
+
   try {
     const initial = detectPhoneReminderState();
     if (initial.status === "unsupported" || initial.status === "not-configured") {
@@ -219,6 +225,10 @@ export interface PhoneReminderDiagnostics {
   authedUserId: string | null;
   lastDeviceSync: SyncStatusRecord | null;
   lastReminderSync: SyncStatusRecord | null;
+  buildCommit: string;
+  buildTime: string;
+  serviceWorkerScriptUrl: string | null;
+  serviceWorkerState: string | null;
 }
 
 export async function collectPhoneReminderDiagnostics(): Promise<PhoneReminderDiagnostics> {
@@ -233,17 +243,35 @@ export async function collectPhoneReminderDiagnostics(): Promise<PhoneReminderDi
   } catch {
     authedUserId = null;
   }
+
+  let serviceWorkerScriptUrl: string | null = null;
+  let serviceWorkerState: string | null = null;
+  try {
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const worker = reg?.active || reg?.waiting || reg?.installing || null;
+      if (worker) {
+        serviceWorkerScriptUrl = worker.scriptURL;
+        serviceWorkerState = worker.state;
+      }
+    }
+  } catch {
+    // ignore — diagnostics best-effort
+  }
+
   return {
     ...base,
     authedUserId,
     lastDeviceSync: getLastDeviceSyncStatus(),
     lastReminderSync: getLastReminderSyncStatus(),
+    serviceWorkerScriptUrl,
+    serviceWorkerState,
   };
 }
 
 function collectStaticDiagnostics(): Omit<
   PhoneReminderDiagnostics,
-  "authedUserId" | "lastDeviceSync" | "lastReminderSync"
+  "authedUserId" | "lastDeviceSync" | "lastReminderSync" | "serviceWorkerScriptUrl" | "serviceWorkerState"
 > {
   if (typeof window === "undefined") {
     return {
@@ -264,6 +292,8 @@ function collectStaticDiagnostics(): Omit<
       isSafari: false,
       userAgent: "",
       deviceId: "",
+      buildCommit: BUILD_COMMIT,
+      buildTime: BUILD_TIME,
     };
   }
 
@@ -303,6 +333,8 @@ function collectStaticDiagnostics(): Omit<
     isSafari,
     userAgent: ua,
     deviceId,
+    buildCommit: BUILD_COMMIT,
+    buildTime: BUILD_TIME,
   };
 }
 

@@ -33,6 +33,10 @@ function DiagnosticsPanel({ diagnostics }: { diagnostics: PhoneReminderDiagnosti
   const [open, setOpen] = useState(false);
 
   const rows: Array<[string, string]> = [
+    ["Build commit", diagnostics.buildCommit],
+    ["Build time", diagnostics.buildTime],
+    ["Service worker script", diagnostics.serviceWorkerScriptUrl ?? "(none)"],
+    ["Service worker state", diagnostics.serviceWorkerState ?? "(none)"],
     ["Notification.permission", String(diagnostics.notificationPermission)],
     ["Service worker support", String(diagnostics.serviceWorkerSupported)],
     ["PushManager support", String(diagnostics.pushManagerSupported)],
@@ -106,6 +110,10 @@ const EMPTY_DIAGNOSTICS: PhoneReminderDiagnostics = {
   authedUserId: null,
   lastDeviceSync: null,
   lastReminderSync: null,
+  buildCommit: "unknown",
+  buildTime: "unknown",
+  serviceWorkerScriptUrl: null,
+  serviceWorkerState: null,
 };
 
 export function PhoneRemindersCard() {
