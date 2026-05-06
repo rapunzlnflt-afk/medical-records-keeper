@@ -12,6 +12,7 @@ import {
   getCurrentPhoneReminderState,
   syncRemindersToSupabase,
   collectPhoneReminderDiagnostics,
+  requestRemindersSync,
   type PhoneReminderState,
   type PhoneReminderDiagnostics,
   type SyncStatusRecord,
@@ -141,6 +142,21 @@ export function PhoneRemindersCard() {
     };
   }, [refreshDiagnostics]);
 
+  // Reflect background sync results (triggered from other pages) live in the
+  // diagnostics panel and the inline "Last sync" message.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as SyncStatusRecord | undefined;
+      if (detail) {
+        const tail = typeof detail.count === "number" ? ` (${detail.count})` : "";
+        setSyncMessage(`${detail.ok ? "Synced" : "Sync error"}${tail}: ${detail.message}`);
+      }
+      void refreshDiagnostics();
+    };
+    window.addEventListener("mrk-reminder-sync-status", handler);
+    return () => window.removeEventListener("mrk-reminder-sync-status", handler);
+  }, [refreshDiagnostics]);
+
   const subscribed = state.status === "subscribed";
 
   // Pull *all* upcoming reminders across patients so we sync regardless of
@@ -201,18 +217,14 @@ export function PhoneRemindersCard() {
   );
 
   // React to upstream changes: any time the underlying queries refresh after
-  // an appointment/medication mutation, push the new set up to Supabase.
+  // an appointment/medication mutation, push the new set up to Supabase. We
+  // route through the coalesced helper so this never races with mutation-
+  // initiated syncs from other pages.
   useEffect(() => {
     if (!subscribed) return;
-    let cancelled = false;
-    (async () => {
-      if (cancelled) return;
-      await runSync(appointments, medications, patients);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [subscribed, appointments, medications, patients, runSync]);
+    if (appointments.length === 0 && medications.length === 0 && patients.length === 0) return;
+    requestRemindersSync();
+  }, [subscribed, appointments, medications, patients]);
 
   const handleEnable = async () => {
     setBusy(true);

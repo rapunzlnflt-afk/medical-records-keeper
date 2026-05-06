@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getAppointments, createAppointment, updateAppointment, deleteAppointment, getPhysicians } from "@/lib/db";
+import { requestRemindersSync } from "@/lib/reminder-sync";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -197,6 +198,9 @@ export default function Appointments() {
   const invalidateAppointments = () => {
     queryClient.invalidateQueries({ queryKey: ["appointments", pid] });
     queryClient.invalidateQueries({ queryKey: ["all-appointments-for-sync"] });
+    // Push the new reminder set up to Supabase right away — independent of
+    // whether the dashboard is mounted to observe the cache change.
+    requestRemindersSync();
   };
   const createMut = useMutation({
     mutationFn: (data: any) => createAppointment({ ...data, patientId: pid }),

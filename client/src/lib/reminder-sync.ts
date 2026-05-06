@@ -1,6 +1,7 @@
 import type { Appointment, Medication, Patient } from "@shared/schema";
 import { getSupabase, isSupabaseConfigured, VAPID_PUBLIC_KEY } from "./supabase";
 import { BUILD_COMMIT, BUILD_TIME } from "./build-info";
+import { getAppointments, getMedications, getPatients } from "./db";
 
 export type PhoneReminderState =
   | { status: "unsupported"; reason: string }
@@ -416,7 +417,7 @@ export async function syncRemindersToSupabase(opts: {
   patients: Patient[];
 }): Promise<{ synced: number } | { skipped: string }> {
   const stamp = (ok: boolean, message: string, count?: number, stage?: string) => {
-    writeStatus(REMINDER_SYNC_KEY, {
+    stampReminderStatus({
       ts: new Date().toISOString(),
       ok,
       message,
@@ -499,4 +500,106 @@ export async function syncRemindersToSupabase(opts: {
   const count = inserted?.length ?? rows.length;
   stamp(true, `synced ${count} reminder${count === 1 ? "" : "s"}`, count, "insert");
   return { synced: count };
+}
+
+// ---------------------------------------------------------------------------
+// Centralised sync trigger. Pages call this from mutation onSuccess so that
+// adding/changing/deleting an appointment or medication immediately rewrites
+// the pending reminders in Supabase — without depending on the dashboard
+// (which owns the previous useEffect-based sync) being mounted.
+//
+// Calls are coalesced: while one sync is in flight, additional requests fold
+// into a single follow-up sync that runs after the current one completes.
+// ---------------------------------------------------------------------------
+
+let inFlight: Promise<void> | null = null;
+let pending = false;
+
+async function loadAllRemindersData() {
+  const patients = await getPatients();
+  const appointments: Appointment[] = [];
+  const medications: Medication[] = [];
+  for (const p of patients) {
+    if (p.id == null) continue;
+    appointments.push(...(await getAppointments(p.id)));
+    medications.push(...(await getMedications(p.id)));
+  }
+  return { patients, appointments, medications };
+}
+
+function stampReminderStatus(record: SyncStatusRecord): void {
+  writeStatus(REMINDER_SYNC_KEY, record);
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("mrk-reminder-sync-status", { detail: record }));
+    } catch {
+      // ignore — event broadcast is best-effort
+    }
+  }
+}
+
+async function runSyncOnce(): Promise<void> {
+  stampReminderStatus({
+    ts: new Date().toISOString(),
+    ok: true,
+    message: "queued sync after mutation",
+    stage: "queued",
+  });
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    stampReminderStatus({
+      ts: new Date().toISOString(),
+      ok: false,
+      message: "supabase not configured",
+      stage: "config",
+    });
+    return;
+  }
+
+  const state = await getCurrentPhoneReminderState();
+  if (state.status !== "subscribed") {
+    stampReminderStatus({
+      ts: new Date().toISOString(),
+      ok: false,
+      message: `not subscribed (${state.status})`,
+      stage: "state",
+    });
+    return;
+  }
+
+  try {
+    const { patients, appointments, medications } = await loadAllRemindersData();
+    await syncRemindersToSupabase({ patients, appointments, medications });
+  } catch (err: any) {
+    stampReminderStatus({
+      ts: new Date().toISOString(),
+      ok: false,
+      message: err?.message ?? String(err),
+      stage: "mutation-sync",
+    });
+  }
+}
+
+/**
+ * Trigger a phone-reminder sync now. Safe to call from any mutation
+ * onSuccess — it is a no-op when phone reminders aren't subscribed, and
+ * concurrent calls are coalesced into one follow-up run.
+ */
+export function requestRemindersSync(): void {
+  if (inFlight) {
+    pending = true;
+    return;
+  }
+  inFlight = (async () => {
+    try {
+      await runSyncOnce();
+      while (pending) {
+        pending = false;
+        await runSyncOnce();
+      }
+    } finally {
+      inFlight = null;
+    }
+  })();
 }
