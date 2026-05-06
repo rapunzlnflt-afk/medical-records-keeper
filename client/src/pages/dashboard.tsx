@@ -232,7 +232,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         <StatCard title="Appointments" value={appointments.filter(a => a.status === "upcoming").length} icon={CalendarDays} href="/appointments" gradient />
         <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
         <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
-        <StatCard title="Records" value={records.length} icon={FileText} href="/records" />
+        <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
       </div>
 
       <PhoneRemindersCard />
@@ -384,10 +384,9 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatCard title="Vitals Logged" value={vitals.length} icon={HeartPulse} href="/vitals" />
         <StatCard title="Emergency Contacts" value={contacts.length} icon={Phone} href="/emergency" />
-        <StatCard title="Total Records" value={records.length} icon={FileText} href="/records" />
       </div>
     </div>
   );
