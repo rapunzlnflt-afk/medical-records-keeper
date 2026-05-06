@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BellRing, AlertTriangle, Loader2, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { BellRing, AlertTriangle, Loader2, ChevronDown, ChevronRight, RefreshCw, CheckCircle2 } from "lucide-react";
 import {
   detectPhoneReminderState,
   enablePhoneReminders,
@@ -30,9 +30,7 @@ function formatStatus(record: SyncStatusRecord | null | undefined): string {
   return `${record.ok ? "ok" : "error"}${stage} · ${rel}${tail} — ${record.message}`;
 }
 
-function DiagnosticsPanel({ diagnostics }: { diagnostics: PhoneReminderDiagnostics }) {
-  const [open, setOpen] = useState(false);
-
+function DiagnosticsDetails({ diagnostics }: { diagnostics: PhoneReminderDiagnostics }) {
   const rows: Array<[string, string]> = [
     ["Build commit", diagnostics.buildCommit],
     ["Build time", diagnostics.buildTime],
@@ -61,32 +59,17 @@ function DiagnosticsPanel({ diagnostics }: { diagnostics: PhoneReminderDiagnosti
   ];
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
-          data-testid="button-toggle-phone-reminders-diagnostics"
-        >
-          {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          Diagnostics
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div
-          className="mt-2 rounded-md bg-muted/50 p-2 text-[10.5px] leading-relaxed font-mono space-y-0.5 break-all"
-          data-testid="text-phone-reminders-diagnostics"
-        >
-          {rows.map(([label, value]) => (
-            <div key={label} className="flex gap-2">
-              <span className="text-muted-foreground flex-shrink-0">{label}:</span>
-              <span className="text-foreground">{value}</span>
-            </div>
-          ))}
+    <div
+      className="mt-2 rounded-md bg-muted/50 p-2 text-[10.5px] leading-relaxed font-mono space-y-0.5 break-all"
+      data-testid="text-phone-reminders-diagnostics"
+    >
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex gap-2">
+          <span className="text-muted-foreground flex-shrink-0">{label}:</span>
+          <span className="text-foreground">{value}</span>
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+      ))}
+    </div>
   );
 }
 
@@ -121,7 +104,8 @@ export function PhoneRemindersCard() {
   const [state, setState] = useState<PhoneReminderState>(() => detectPhoneReminderState());
   const [diagnostics, setDiagnostics] = useState<PhoneReminderDiagnostics>(EMPTY_DIAGNOSTICS);
   const [busy, setBusy] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const refreshDiagnostics = useCallback(async () => {
@@ -142,14 +126,16 @@ export function PhoneRemindersCard() {
     };
   }, [refreshDiagnostics]);
 
-  // Reflect background sync results (triggered from other pages) live in the
-  // diagnostics panel and the inline "Last sync" message.
+  // Reflect background sync results from anywhere in the app. We only surface a
+  // user-visible message when something *failed*; successful syncs are silent
+  // — they're still recorded in diagnostics for support.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as SyncStatusRecord | undefined;
-      if (detail) {
-        const tail = typeof detail.count === "number" ? ` (${detail.count})` : "";
-        setSyncMessage(`${detail.ok ? "Synced" : "Sync error"}${tail}: ${detail.message}`);
+      if (detail && !detail.ok) {
+        setSyncError(detail.message);
+      } else if (detail && detail.ok) {
+        setSyncError(null);
       }
       void refreshDiagnostics();
     };
@@ -193,22 +179,17 @@ export function PhoneRemindersCard() {
     queryFn: getPatients,
   });
 
-  const runSync = useCallback(
+  const runInitialSync = useCallback(
     async (apps: any[], meds: any[], pats: any[]) => {
-      setSyncMessage("Syncing…");
       try {
-        const res = await syncRemindersToSupabase({
+        await syncRemindersToSupabase({
           appointments: apps,
           medications: meds,
           patients: pats,
         });
-        if ("synced" in res) {
-          setSyncMessage(`Synced ${res.synced} reminder${res.synced === 1 ? "" : "s"}`);
-        } else {
-          setSyncMessage(`Skipped: ${res.skipped}`);
-        }
+        setSyncError(null);
       } catch (err: any) {
-        setSyncMessage(`Sync failed: ${err?.message ?? err}`);
+        setSyncError(err?.message ?? String(err));
       } finally {
         await refreshDiagnostics();
       }
@@ -217,9 +198,7 @@ export function PhoneRemindersCard() {
   );
 
   // React to upstream changes: any time the underlying queries refresh after
-  // an appointment/medication mutation, push the new set up to Supabase. We
-  // route through the coalesced helper so this never races with mutation-
-  // initiated syncs from other pages.
+  // an appointment/medication mutation, push the new set up to Supabase.
   useEffect(() => {
     if (!subscribed) return;
     if (appointments.length === 0 && medications.length === 0 && patients.length === 0) return;
@@ -228,13 +207,12 @@ export function PhoneRemindersCard() {
 
   const handleEnable = async () => {
     setBusy(true);
-    setSyncMessage(null);
+    setSyncError(null);
     try {
       const next = await enablePhoneReminders();
       setState(next);
       await refreshDiagnostics();
       if (next.status === "subscribed") {
-        // Force a fresh fetch + sync rather than waiting for query cache.
         await queryClient.invalidateQueries({ queryKey: ["all-appointments-for-sync"] });
         await queryClient.invalidateQueries({ queryKey: ["all-medications-for-sync"] });
         await queryClient.invalidateQueries({ queryKey: ["all-patients-for-sync"] });
@@ -260,7 +238,7 @@ export function PhoneRemindersCard() {
             return out;
           })(),
         ]);
-        await runSync(allApps, allMeds, pats);
+        await runInitialSync(allApps, allMeds, pats);
       }
     } finally {
       setBusy(false);
@@ -269,7 +247,7 @@ export function PhoneRemindersCard() {
 
   const handleDisable = async () => {
     setBusy(true);
-    setSyncMessage(null);
+    setSyncError(null);
     await disablePhoneReminders();
     setState(await getCurrentPhoneReminderState());
     await refreshDiagnostics();
@@ -284,12 +262,18 @@ export function PhoneRemindersCard() {
   };
 
   if (state.status === "unsupported") {
-    // Even when unsupported we render a small diagnostic card on iOS so the
-    // user can see *why* (e.g., not yet added to Home Screen).
+    // Even when unsupported we render a small card on iOS so the user can see
+    // *why* (e.g., not yet added to Home Screen).
     if (!diagnostics.isIOS) return null;
   }
 
   const iosNeedsHomeScreen = diagnostics.isIOS && !diagnostics.isStandalone;
+  const isErrorState =
+    state.status === "error" ||
+    state.status === "permission-denied" ||
+    state.status === "unsupported" ||
+    state.status === "not-configured" ||
+    !!syncError;
 
   return (
     <Card data-testid="card-phone-reminders">
@@ -309,7 +293,7 @@ export function PhoneRemindersCard() {
           <div className="flex items-start gap-2 text-xs text-muted-foreground">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <p>
-              Push notifications aren't available in this browser context.
+              Push notifications aren't available in this browser.
               {iosNeedsHomeScreen && (
                 <>
                   {" "}On iPhone, tap the Share button in Safari and choose
@@ -323,9 +307,7 @@ export function PhoneRemindersCard() {
 
         {state.status === "not-configured" && (
           <p className="text-xs text-muted-foreground">
-            Phone reminders are not configured for this build. See{" "}
-            <code className="text-[11px] bg-muted px-1 py-0.5 rounded">REMINDERS_SETUP.md</code>{" "}
-            to add Supabase + VAPID keys.
+            Phone reminders aren't configured for this build yet.
           </p>
         )}
 
@@ -337,25 +319,20 @@ export function PhoneRemindersCard() {
               {diagnostics.isIOS ? (
                 <ul className="list-disc pl-4 space-y-1 text-foreground/80">
                   <li>
-                    iOS only delivers web push from a <strong>Home Screen web app</strong>.
-                    If you don't see Safari or this app under
-                    <em> Settings &rsaquo; Notifications</em>, this site has never
-                    been granted permission as an installed web app on this device.
+                    On iPhone, web push only works from a{" "}
+                    <strong>Home Screen web app</strong>. Open the app from its
+                    Home Screen icon (not Safari) and try Enable again.
                   </li>
                   <li>
-                    Remove the existing Home Screen icon, open the site in Safari,
-                    tap Share &rsaquo; <strong>Add to Home Screen</strong>, then
-                    launch from the new icon and tap <em>Enable</em> again.
-                  </li>
-                  <li>
-                    Preview URLs change between deployments — permission is tied
-                    to the exact origin shown below, so a new origin starts
-                    permission fresh.
+                    If you don't see this app under{" "}
+                    <em>Settings &rsaquo; Notifications</em>, remove the existing
+                    Home Screen icon, open the site in Safari, tap Share &rsaquo;{" "}
+                    <strong>Add to Home Screen</strong>, then launch from the new icon.
                   </li>
                 </ul>
               ) : (
                 <p className="text-foreground/80">
-                  Open your browser site settings for this origin and reset
+                  Open your browser's site settings for this page and reset
                   notification permission to <em>Ask</em> or <em>Allow</em>, then
                   reload and try again.
                 </p>
@@ -374,8 +351,8 @@ export function PhoneRemindersCard() {
               <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/50 rounded p-2">
                 <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                 <p>
-                  On iPhone, push notifications only work after you
-                  <strong> Add to Home Screen</strong> (Safari Share menu) and
+                  On iPhone, push notifications only work after you{" "}
+                  <strong>Add to Home Screen</strong> (Safari Share menu) and
                   open the app from the Home Screen icon.
                 </p>
               </div>
@@ -394,21 +371,36 @@ export function PhoneRemindersCard() {
 
         {state.status === "subscribing" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Subscribing this device…
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Setting up this device…
           </div>
         )}
 
         {state.status === "subscribed" && (
           <>
-            <p className="text-xs text-muted-foreground">
-              This device will receive a push notification when a reminder is due.
-              Add or change reminders inside Appointments / Medications and they'll
-              sync automatically.
-            </p>
-            {syncMessage && (
-              <p className="text-[11px] text-muted-foreground" data-testid="text-phone-reminders-sync">
-                {syncMessage}
-              </p>
+            <div className="flex items-start gap-2 text-xs">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+              <div className="space-y-1">
+                <p className="text-foreground font-medium">
+                  Phone reminders are on for this device.
+                </p>
+                <p className="text-muted-foreground">
+                  You'll get a push notification for upcoming appointments and
+                  medication refills, even when the app is closed. Add or change
+                  reminders in Appointments and Medications and they'll sync
+                  automatically.
+                </p>
+              </div>
+            </div>
+            {syncError && (
+              <div className="flex items-start gap-2 text-[11px] text-destructive bg-destructive/5 rounded p-2">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <p>
+                  We couldn't save your latest reminders to the reminder service.
+                  They're saved on this device, and we'll retry next time the app
+                  is open. If this keeps happening, open the troubleshooting
+                  details below.
+                </p>
+              </div>
             )}
             <Button
               variant="outline"
@@ -426,9 +418,12 @@ export function PhoneRemindersCard() {
         {state.status === "error" && (
           <div className="flex items-start gap-2 text-xs text-destructive">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p>
-                <strong>{state.stage ? `[${state.stage}] ` : ""}</strong>
+                We couldn't finish setting up phone reminders on this device.
+              </p>
+              <p className="text-foreground/80">
+                {state.stage ? `Step: ${state.stage}. ` : ""}
                 {state.message}
               </p>
               <Button
@@ -445,24 +440,45 @@ export function PhoneRemindersCard() {
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-1 border-t border-border/40">
-          <DiagnosticsPanel diagnostics={diagnostics} />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRecheck}
-            disabled={busy}
-            className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
-            data-testid="button-recheck-phone-reminders"
-          >
-            {busy ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3 h-3" />
+        <Collapsible
+          open={advancedOpen}
+          onOpenChange={setAdvancedOpen}
+          className="pt-1 border-t border-border/40"
+        >
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
+                data-testid="button-toggle-phone-reminders-diagnostics"
+              >
+                {advancedOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                {isErrorState ? "Troubleshooting details" : "Show technical details"}
+              </Button>
+            </CollapsibleTrigger>
+            {advancedOpen && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRecheck}
+                disabled={busy}
+                className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
+                data-testid="button-recheck-phone-reminders"
+              >
+                {busy ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
+                Re-check
+              </Button>
             )}
-            Re-check
-          </Button>
-        </div>
+          </div>
+          <CollapsibleContent>
+            <DiagnosticsDetails diagnostics={diagnostics} />
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );
