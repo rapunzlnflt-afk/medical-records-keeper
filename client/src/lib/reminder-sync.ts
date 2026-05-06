@@ -110,6 +110,78 @@ export async function disablePhoneReminders(): Promise<void> {
   }
 }
 
+export interface PhoneReminderDiagnostics {
+  notificationPermission: NotificationPermission | "unavailable";
+  serviceWorkerSupported: boolean;
+  pushManagerSupported: boolean;
+  notificationApiSupported: boolean;
+  isStandalone: boolean;
+  displayMode: string;
+  origin: string;
+  hostname: string;
+  protocol: string;
+  isSecureContext: boolean;
+  supabaseConfigured: boolean;
+  vapidConfigured: boolean;
+  platform: string;
+  isIOS: boolean;
+  isSafari: boolean;
+  userAgent: string;
+}
+
+export function collectPhoneReminderDiagnostics(): PhoneReminderDiagnostics {
+  if (typeof window === "undefined") {
+    return {
+      notificationPermission: "unavailable",
+      serviceWorkerSupported: false,
+      pushManagerSupported: false,
+      notificationApiSupported: false,
+      isStandalone: false,
+      displayMode: "unknown",
+      origin: "",
+      hostname: "",
+      protocol: "",
+      isSecureContext: false,
+      supabaseConfigured: false,
+      vapidConfigured: false,
+      platform: "",
+      isIOS: false,
+      isSafari: false,
+      userAgent: "",
+    };
+  }
+
+  const ua = navigator.userAgent || "";
+  const platform = (navigator as any).platform || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+    (platform === "MacIntel" && (navigator as any).maxTouchPoints > 1);
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+
+  const displayModes = ["standalone", "fullscreen", "minimal-ui", "browser"];
+  const displayMode = displayModes.find((m) => window.matchMedia(`(display-mode: ${m})`).matches) ?? "unknown";
+  const isStandalone = displayMode === "standalone" ||
+    (typeof (navigator as any).standalone === "boolean" && (navigator as any).standalone === true);
+
+  return {
+    notificationPermission: "Notification" in window ? Notification.permission : "unavailable",
+    serviceWorkerSupported: "serviceWorker" in navigator,
+    pushManagerSupported: "PushManager" in window,
+    notificationApiSupported: "Notification" in window,
+    isStandalone,
+    displayMode,
+    origin: window.location.origin,
+    hostname: window.location.hostname,
+    protocol: window.location.protocol,
+    isSecureContext: typeof window.isSecureContext === "boolean" ? window.isSecureContext : false,
+    supabaseConfigured: isSupabaseConfigured(),
+    vapidConfigured: Boolean(VAPID_PUBLIC_KEY),
+    platform,
+    isIOS,
+    isSafari,
+    userAgent: ua,
+  };
+}
+
 export async function getCurrentPhoneReminderState(): Promise<PhoneReminderState> {
   const base = detectPhoneReminderState();
   if (base.status !== "permission-default") return base;
