@@ -8,14 +8,52 @@ export type PhoneReminderState =
   | { status: "permission-default" }
   | { status: "subscribing" }
   | { status: "subscribed"; endpoint: string }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; stage?: string };
 
 const DEVICE_ID_KEY = "mrk-device-id";
+const DEVICE_SYNC_KEY = "mrk-device-sync-status";
+const REMINDER_SYNC_KEY = "mrk-reminder-sync-status";
+
+export interface SyncStatusRecord {
+  ts: string; // ISO
+  ok: boolean;
+  message: string;
+  count?: number;
+  stage?: string;
+}
+
+function readStatus(key: string): SyncStatusRecord | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as SyncStatusRecord;
+  } catch {
+    return null;
+  }
+}
+
+function writeStatus(key: string, value: SyncStatusRecord): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures (private mode, quota).
+  }
+}
+
+export function getLastDeviceSyncStatus(): SyncStatusRecord | null {
+  return readStatus(DEVICE_SYNC_KEY);
+}
+
+export function getLastReminderSyncStatus(): SyncStatusRecord | null {
+  return readStatus(REMINDER_SYNC_KEY);
+}
 
 function getOrCreateDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     localStorage.setItem(DEVICE_ID_KEY, id);
   }
   return id;
@@ -39,61 +77,110 @@ export function detectPhoneReminderState(): PhoneReminderState {
     return { status: "not-configured", reason: "Supabase or VAPID not configured" };
   }
   if (Notification.permission === "denied") return { status: "permission-denied" };
-  if (Notification.permission === "default") return { status: "permission-default" };
   return { status: "permission-default" }; // caller should refresh once subscribed
 }
 
 async function ensureAnonAuth(): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+  if (sessErr) throw new Error(`get session failed: ${sessErr.message}`);
   if (sessionData.session?.user) return sessionData.session.user.id;
-  // Anonymous sign-in (must be enabled in Supabase Auth settings).
   const { data, error } = await supabase.auth.signInAnonymously();
-  if (error || !data.user) throw new Error(`Anonymous sign-in failed: ${error?.message ?? "unknown"}`);
+  if (error) {
+    const hint = /anonymous/i.test(error.message)
+      ? " (enable Anonymous sign-ins in Supabase Auth settings)"
+      : "";
+    throw new Error(`Anonymous sign-in failed: ${error.message}${hint}`);
+  }
+  if (!data.user) throw new Error("Anonymous sign-in returned no user");
   return data.user.id;
 }
 
+async function upsertDevice(): Promise<{ userId: string; endpoint: string }> {
+  const userId = await ensureAnonAuth();
+
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  const supabase = getSupabase()!;
+  const deviceId = getOrCreateDeviceId();
+  const json = sub.toJSON();
+  const row = {
+    user_id: userId,
+    device_id: deviceId,
+    endpoint: sub.endpoint,
+    p256dh: json.keys?.p256dh ?? null,
+    auth: json.keys?.auth ?? null,
+    user_agent: navigator.userAgent,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+
+  const { data, error } = await supabase
+    .from("devices")
+    .upsert(row, { onConflict: "user_id,device_id" })
+    .select("id");
+  if (error) throw new Error(`device upsert failed: ${error.message}`);
+  if (!data || data.length === 0) {
+    throw new Error("device upsert returned no rows (RLS may have hidden it from select)");
+  }
+  return { userId, endpoint: sub.endpoint };
+}
+
 export async function enablePhoneReminders(): Promise<PhoneReminderState> {
+  const stamp = (
+    ok: boolean,
+    message: string,
+    stage?: string,
+  ): SyncStatusRecord => {
+    const rec: SyncStatusRecord = { ts: new Date().toISOString(), ok, message, stage };
+    writeStatus(DEVICE_SYNC_KEY, rec);
+    return rec;
+  };
+
   try {
     const initial = detectPhoneReminderState();
-    if (initial.status === "unsupported" || initial.status === "not-configured") return initial;
-
-    const permission = await Notification.requestPermission();
-    if (permission === "denied") return { status: "permission-denied" };
-    if (permission !== "granted") return { status: "permission-default" };
-
-    const userId = await ensureAnonAuth();
-
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+    if (initial.status === "unsupported" || initial.status === "not-configured") {
+      stamp(false, initial.status === "unsupported" ? initial.reason : initial.reason, initial.status);
+      return initial;
     }
 
-    const supabase = getSupabase()!;
-    const deviceId = getOrCreateDeviceId();
-    const json = sub.toJSON();
-    const { error } = await supabase.from("devices").upsert(
-      {
-        user_id: userId,
-        device_id: deviceId,
-        endpoint: sub.endpoint,
-        p256dh: json.keys?.p256dh ?? null,
-        auth: json.keys?.auth ?? null,
-        user_agent: navigator.userAgent,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-      { onConflict: "user_id,device_id" },
-    );
-    if (error) return { status: "error", message: error.message };
+    let permission: NotificationPermission;
+    try {
+      permission = await Notification.requestPermission();
+    } catch (err: any) {
+      stamp(false, err?.message ?? String(err), "request-permission");
+      return { status: "error", message: err?.message ?? String(err), stage: "request-permission" };
+    }
+    if (permission === "denied") {
+      stamp(false, "permission denied", "permission");
+      return { status: "permission-denied" };
+    }
+    if (permission !== "granted") {
+      stamp(false, "permission not granted", "permission");
+      return { status: "permission-default" };
+    }
 
-    return { status: "subscribed", endpoint: sub.endpoint };
+    const result = await upsertDevice();
+    stamp(true, "device registered", "device-upsert");
+    return { status: "subscribed", endpoint: result.endpoint };
   } catch (err: any) {
-    return { status: "error", message: err?.message ?? String(err) };
+    const message = err?.message ?? String(err);
+    const stage = /sign-in|session/i.test(message)
+      ? "auth"
+      : /push|subscribe/i.test(message)
+        ? "push-subscribe"
+        : /device upsert/i.test(message)
+          ? "device-upsert"
+          : "unknown";
+    stamp(false, message, stage);
+    return { status: "error", message, stage };
   }
 }
 
@@ -128,9 +215,36 @@ export interface PhoneReminderDiagnostics {
   isIOS: boolean;
   isSafari: boolean;
   userAgent: string;
+  deviceId: string;
+  authedUserId: string | null;
+  lastDeviceSync: SyncStatusRecord | null;
+  lastReminderSync: SyncStatusRecord | null;
 }
 
-export function collectPhoneReminderDiagnostics(): PhoneReminderDiagnostics {
+export async function collectPhoneReminderDiagnostics(): Promise<PhoneReminderDiagnostics> {
+  const base = collectStaticDiagnostics();
+  let authedUserId: string | null = null;
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      authedUserId = data.session?.user?.id ?? null;
+    }
+  } catch {
+    authedUserId = null;
+  }
+  return {
+    ...base,
+    authedUserId,
+    lastDeviceSync: getLastDeviceSyncStatus(),
+    lastReminderSync: getLastReminderSyncStatus(),
+  };
+}
+
+function collectStaticDiagnostics(): Omit<
+  PhoneReminderDiagnostics,
+  "authedUserId" | "lastDeviceSync" | "lastReminderSync"
+> {
   if (typeof window === "undefined") {
     return {
       notificationPermission: "unavailable",
@@ -149,6 +263,7 @@ export function collectPhoneReminderDiagnostics(): PhoneReminderDiagnostics {
       isIOS: false,
       isSafari: false,
       userAgent: "",
+      deviceId: "",
     };
   }
 
@@ -162,6 +277,13 @@ export function collectPhoneReminderDiagnostics(): PhoneReminderDiagnostics {
   const displayMode = displayModes.find((m) => window.matchMedia(`(display-mode: ${m})`).matches) ?? "unknown";
   const isStandalone = displayMode === "standalone" ||
     (typeof (navigator as any).standalone === "boolean" && (navigator as any).standalone === true);
+
+  let deviceId = "";
+  try {
+    deviceId = localStorage.getItem(DEVICE_ID_KEY) ?? "";
+  } catch {
+    deviceId = "";
+  }
 
   return {
     notificationPermission: "Notification" in window ? Notification.permission : "unavailable",
@@ -180,6 +302,7 @@ export function collectPhoneReminderDiagnostics(): PhoneReminderDiagnostics {
     isIOS,
     isSafari,
     userAgent: ua,
+    deviceId,
   };
 }
 
@@ -260,11 +383,43 @@ export async function syncRemindersToSupabase(opts: {
   medications: Medication[];
   patients: Patient[];
 }): Promise<{ synced: number } | { skipped: string }> {
+  const stamp = (ok: boolean, message: string, count?: number, stage?: string) => {
+    writeStatus(REMINDER_SYNC_KEY, {
+      ts: new Date().toISOString(),
+      ok,
+      message,
+      count,
+      stage,
+    });
+  };
+
   const supabase = getSupabase();
-  if (!supabase) return { skipped: "supabase-not-configured" };
+  if (!supabase) {
+    stamp(false, "supabase not configured", 0, "config");
+    return { skipped: "supabase-not-configured" };
+  }
 
   const state = await getCurrentPhoneReminderState();
-  if (state.status !== "subscribed") return { skipped: state.status };
+  if (state.status !== "subscribed") {
+    stamp(false, `not subscribed (${state.status})`, 0, "state");
+    return { skipped: state.status };
+  }
+
+  // Make sure we still have a session — anonymous sessions can be evicted on
+  // iOS storage cleanup.
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) {
+      const { error: anonErr } = await supabase.auth.signInAnonymously();
+      if (anonErr) {
+        stamp(false, `re-auth failed: ${anonErr.message}`, 0, "auth");
+        throw new Error(`re-auth failed: ${anonErr.message}`);
+      }
+    }
+  } catch (err: any) {
+    stamp(false, err?.message ?? String(err), 0, "auth");
+    throw err;
+  }
 
   const patientMap = new Map(opts.patients.map((p) => [p.id!, p]));
   const all = [
@@ -274,17 +429,20 @@ export async function syncRemindersToSupabase(opts: {
 
   const deviceId = getOrCreateDeviceId();
 
-  // Replace this device's pending reminders atomically: delete then insert.
-  // Past reminders the function has already delivered are kept untouched
-  // because they have delivered_at != null (Edge Function sets it).
   const { error: delErr } = await supabase
     .from("reminders")
     .delete()
     .eq("device_id", deviceId)
     .is("delivered_at", null);
-  if (delErr) throw new Error(`reminder delete failed: ${delErr.message}`);
+  if (delErr) {
+    stamp(false, `reminder delete failed: ${delErr.message}`, 0, "delete");
+    throw new Error(`reminder delete failed: ${delErr.message}`);
+  }
 
-  if (all.length === 0) return { synced: 0 };
+  if (all.length === 0) {
+    stamp(true, "no upcoming reminders", 0, "empty");
+    return { synced: 0 };
+  }
 
   const rows = all.map((r) => ({
     device_id: deviceId,
@@ -297,8 +455,16 @@ export async function syncRemindersToSupabase(opts: {
     sound: r.sound,
   }));
 
-  const { error: insErr } = await supabase.from("reminders").insert(rows);
-  if (insErr) throw new Error(`reminder insert failed: ${insErr.message}`);
+  const { data: inserted, error: insErr } = await supabase
+    .from("reminders")
+    .insert(rows)
+    .select("id");
+  if (insErr) {
+    stamp(false, `reminder insert failed: ${insErr.message}`, 0, "insert");
+    throw new Error(`reminder insert failed: ${insErr.message}`);
+  }
 
-  return { synced: rows.length };
+  const count = inserted?.length ?? rows.length;
+  stamp(true, `synced ${count} reminder${count === 1 ? "" : "s"}`, count, "insert");
+  return { synced: count };
 }

@@ -175,17 +175,21 @@ export default function Medications() {
     queryFn: () => getPhysicians(pid),
   });
 
+  const invalidateMeds = () => {
+    queryClient.invalidateQueries({ queryKey: ["medications", pid] });
+    queryClient.invalidateQueries({ queryKey: ["all-medications-for-sync"] });
+  };
   const createMut = useMutation({
     mutationFn: (data: any) => createMedication({ ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); setOpen(false); toast({ title: "Medication added" }); },
+    onSuccess: () => { invalidateMeds(); setOpen(false); toast({ title: "Medication added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateMedication(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); setEditing(null); toast({ title: "Medication updated" }); },
+    onSuccess: () => { invalidateMeds(); setEditing(null); toast({ title: "Medication updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => deleteMedication(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); toast({ title: "Medication deleted" }); },
+    onSuccess: () => { invalidateMeds(); toast({ title: "Medication deleted" }); },
   });
   const logMut = useMutation({
     mutationFn: (data: any) => createMedicationLog(data),

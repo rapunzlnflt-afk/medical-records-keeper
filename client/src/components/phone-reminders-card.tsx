@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +14,20 @@ import {
   collectPhoneReminderDiagnostics,
   type PhoneReminderState,
   type PhoneReminderDiagnostics,
+  type SyncStatusRecord,
 } from "@/lib/reminder-sync";
 import { getAppointments, getMedications, getPatients } from "@/lib/db";
+
+function formatStatus(record: SyncStatusRecord | null | undefined): string {
+  if (!record) return "never";
+  const when = new Date(record.ts);
+  const ago = Date.now() - when.getTime();
+  const minutes = Math.round(ago / 60000);
+  const rel = minutes < 1 ? "just now" : minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`;
+  const stage = record.stage ? ` [${record.stage}]` : "";
+  const tail = typeof record.count === "number" ? ` · ${record.count}` : "";
+  return `${record.ok ? "ok" : "error"}${stage} · ${rel}${tail} — ${record.message}`;
+}
 
 function DiagnosticsPanel({ diagnostics }: { diagnostics: PhoneReminderDiagnostics }) {
   const [open, setOpen] = useState(false);
@@ -33,6 +45,10 @@ function DiagnosticsPanel({ diagnostics }: { diagnostics: PhoneReminderDiagnosti
     ["Secure context", String(diagnostics.isSecureContext)],
     ["Supabase configured", String(diagnostics.supabaseConfigured)],
     ["VAPID public key configured", String(diagnostics.vapidConfigured)],
+    ["Device id", diagnostics.deviceId || "(none)"],
+    ["Authed user id", diagnostics.authedUserId ?? "(none)"],
+    ["Last device sync", formatStatus(diagnostics.lastDeviceSync)],
+    ["Last reminder sync", formatStatus(diagnostics.lastReminderSync)],
     ["Platform", diagnostics.platform || "(unknown)"],
     ["iOS detected", String(diagnostics.isIOS)],
     ["Safari detected", String(diagnostics.isSafari)],
@@ -69,26 +85,53 @@ function DiagnosticsPanel({ diagnostics }: { diagnostics: PhoneReminderDiagnosti
   );
 }
 
+const EMPTY_DIAGNOSTICS: PhoneReminderDiagnostics = {
+  notificationPermission: "unavailable",
+  serviceWorkerSupported: false,
+  pushManagerSupported: false,
+  notificationApiSupported: false,
+  isStandalone: false,
+  displayMode: "unknown",
+  origin: "",
+  hostname: "",
+  protocol: "",
+  isSecureContext: false,
+  supabaseConfigured: false,
+  vapidConfigured: false,
+  platform: "",
+  isIOS: false,
+  isSafari: false,
+  userAgent: "",
+  deviceId: "",
+  authedUserId: null,
+  lastDeviceSync: null,
+  lastReminderSync: null,
+};
+
 export function PhoneRemindersCard() {
   const [state, setState] = useState<PhoneReminderState>(() => detectPhoneReminderState());
-  const [diagnostics, setDiagnostics] = useState<PhoneReminderDiagnostics>(() =>
-    collectPhoneReminderDiagnostics(),
-  );
+  const [diagnostics, setDiagnostics] = useState<PhoneReminderDiagnostics>(EMPTY_DIAGNOSTICS);
   const [busy, setBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const refreshDiagnostics = useCallback(async () => {
+    const d = await collectPhoneReminderDiagnostics();
+    setDiagnostics(d);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    getCurrentPhoneReminderState().then((s) => {
-      if (!cancelled) {
-        setState(s);
-        setDiagnostics(collectPhoneReminderDiagnostics());
-      }
-    });
+    (async () => {
+      const s = await getCurrentPhoneReminderState();
+      if (cancelled) return;
+      setState(s);
+      await refreshDiagnostics();
+    })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshDiagnostics]);
 
   const subscribed = state.status === "subscribed";
 
@@ -121,37 +164,87 @@ export function PhoneRemindersCard() {
     },
   });
   const { data: patients = [] } = useQuery({
-    queryKey: ["all-patients"],
+    queryKey: ["all-patients-for-sync"],
     enabled: subscribed,
     queryFn: getPatients,
   });
 
+  const runSync = useCallback(
+    async (apps: any[], meds: any[], pats: any[]) => {
+      setSyncMessage("Syncing…");
+      try {
+        const res = await syncRemindersToSupabase({
+          appointments: apps,
+          medications: meds,
+          patients: pats,
+        });
+        if ("synced" in res) {
+          setSyncMessage(`Synced ${res.synced} reminder${res.synced === 1 ? "" : "s"}`);
+        } else {
+          setSyncMessage(`Skipped: ${res.skipped}`);
+        }
+      } catch (err: any) {
+        setSyncMessage(`Sync failed: ${err?.message ?? err}`);
+      } finally {
+        await refreshDiagnostics();
+      }
+    },
+    [refreshDiagnostics],
+  );
+
+  // React to upstream changes: any time the underlying queries refresh after
+  // an appointment/medication mutation, push the new set up to Supabase.
   useEffect(() => {
     if (!subscribed) return;
-    if (!appointments.length && !medications.length) return;
     let cancelled = false;
-    setSyncMessage("Syncing…");
-    syncRemindersToSupabase({ appointments, medications, patients })
-      .then((res) => {
-        if (cancelled) return;
-        if ("synced" in res) setSyncMessage(`Synced ${res.synced} reminder${res.synced === 1 ? "" : "s"}`);
-        else setSyncMessage(null);
-      })
-      .catch((err) => {
-        if (!cancelled) setSyncMessage(`Sync failed: ${err.message ?? err}`);
-      });
+    (async () => {
+      if (cancelled) return;
+      await runSync(appointments, medications, patients);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [subscribed, appointments, medications, patients]);
+  }, [subscribed, appointments, medications, patients, runSync]);
 
   const handleEnable = async () => {
     setBusy(true);
     setSyncMessage(null);
-    const next = await enablePhoneReminders();
-    setState(next);
-    setDiagnostics(collectPhoneReminderDiagnostics());
-    setBusy(false);
+    try {
+      const next = await enablePhoneReminders();
+      setState(next);
+      await refreshDiagnostics();
+      if (next.status === "subscribed") {
+        // Force a fresh fetch + sync rather than waiting for query cache.
+        await queryClient.invalidateQueries({ queryKey: ["all-appointments-for-sync"] });
+        await queryClient.invalidateQueries({ queryKey: ["all-medications-for-sync"] });
+        await queryClient.invalidateQueries({ queryKey: ["all-patients-for-sync"] });
+
+        const [pats, allApps, allMeds] = await Promise.all([
+          getPatients(),
+          (async () => {
+            const ps = await getPatients();
+            const out: any[] = [];
+            for (const p of ps) {
+              if (p.id == null) continue;
+              out.push(...(await getAppointments(p.id)));
+            }
+            return out;
+          })(),
+          (async () => {
+            const ps = await getPatients();
+            const out: any[] = [];
+            for (const p of ps) {
+              if (p.id == null) continue;
+              out.push(...(await getMedications(p.id)));
+            }
+            return out;
+          })(),
+        ]);
+        await runSync(allApps, allMeds, pats);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDisable = async () => {
@@ -159,14 +252,14 @@ export function PhoneRemindersCard() {
     setSyncMessage(null);
     await disablePhoneReminders();
     setState(await getCurrentPhoneReminderState());
-    setDiagnostics(collectPhoneReminderDiagnostics());
+    await refreshDiagnostics();
     setBusy(false);
   };
 
   const handleRecheck = async () => {
     setBusy(true);
     setState(await getCurrentPhoneReminderState());
-    setDiagnostics(collectPhoneReminderDiagnostics());
+    await refreshDiagnostics();
     setBusy(false);
   };
 
@@ -313,7 +406,22 @@ export function PhoneRemindersCard() {
         {state.status === "error" && (
           <div className="flex items-start gap-2 text-xs text-destructive">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <p>{state.message}</p>
+            <div className="space-y-1">
+              <p>
+                <strong>{state.stage ? `[${state.stage}] ` : ""}</strong>
+                {state.message}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEnable}
+                disabled={busy}
+                data-testid="button-retry-phone-reminders"
+              >
+                {busy ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : null}
+                Try again
+              </Button>
+            </div>
           </div>
         )}
 
