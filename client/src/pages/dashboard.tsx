@@ -36,6 +36,7 @@ import {
   getReminderSoundPreferences,
 } from "@/lib/db";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
+import { PhoneRemindersCard } from "@/components/phone-reminders-card";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
   title: string; value: number; icon: any; href: string; gradient?: boolean;
@@ -233,6 +234,8 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
         <StatCard title="Records" value={records.length} icon={FileText} href="/records" />
       </div>
+
+      <PhoneRemindersCard />
 
       {reminders.length > 0 && (
         <Card className="border-primary/30 bg-primary/5 dark:bg-primary/10">
