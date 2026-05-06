@@ -1,6 +1,6 @@
 {
   "name": "Medical Records Keeper",
-  "short_name": "MedRecords",
+  "short_name": "MedRecords App",
   "description": "Keep track of doctors, medications, appointments, vitals, and medical records for your whole family.",
   "start_url": "./",
   "scope": "./",
