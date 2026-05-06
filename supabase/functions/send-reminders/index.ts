@@ -67,22 +67,30 @@ async function deliverOne(reminder: ReminderRow): Promise<{ ok: boolean; error?:
   // Title leads with the action category ("Appointment" / "Refill") so the
   // OS banner — which truncates after a few words and may also stack the
   // installed-app label above the title on iOS — never reads as just the
-  // patient placeholder ("My Records"). Patient name is moved into the body.
+  // patient placeholder ("My Records"). The client already pre-renders the
+  // body with the appointment time and location in the user's local
+  // timezone; we deliberately do NOT re-format dates server-side, since
+  // server locales default to year-first. Patient name is appended only for
+  // disambiguation (multi-patient households).
   const isAppointment = reminder.source === "appointment";
-  const actionLabel = isAppointment ? "Appointment" : "Refill";
   const detailTitle = reminder.title?.trim() ?? "";
+  const titleAlreadyPrefixed = /^(appointment|refill)\b/i.test(detailTitle);
+  const actionLabel = isAppointment ? "Appointment" : "Refill";
   const composedTitle = detailTitle
-    ? `${actionLabel}: ${detailTitle}`
+    ? (titleAlreadyPrefixed ? detailTitle : `${actionLabel}: ${detailTitle}`)
     : isAppointment
       ? "Appointment reminder"
       : "Medication refill";
-  const bodyParts = [reminder.patient_name?.trim(), reminder.body?.trim()].filter(
-    (s): s is string => Boolean(s && s.length > 0),
-  );
+
+  const body = reminder.body?.trim() ?? "";
+  const patientName = reminder.patient_name?.trim() ?? "";
+  const composedBody = body && patientName
+    ? `${body} · for ${patientName}`
+    : body || patientName;
 
   const payload = JSON.stringify({
     title: composedTitle,
-    body: bodyParts.join(" · "),
+    body: composedBody,
     tag: `${reminder.source}-${reminder.source_id}`,
     url: isAppointment ? "./#/appointments" : "./#/medications",
     source: reminder.source,

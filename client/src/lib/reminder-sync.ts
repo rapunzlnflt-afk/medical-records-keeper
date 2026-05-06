@@ -1,4 +1,5 @@
 import type { Appointment, Medication, Patient } from "@shared/schema";
+import { format, parseISO } from "date-fns";
 import { getSupabase, isSupabaseConfigured, VAPID_PUBLIC_KEY } from "./supabase";
 import { BUILD_COMMIT, BUILD_TIME } from "./build-info";
 import { getAppointments, getMedications, getPatients } from "./db";
@@ -367,6 +368,44 @@ export interface SyncedReminder {
   sound: string | null;
 }
 
+// Notification body formatting helpers. The body is pre-rendered in the
+// user's local timezone at sync time and stored as a static string in
+// Supabase — the Edge Function does not re-format. Keeping this client-side
+// avoids server-side year-first locale defaults and lets us say "Today" /
+// "Tomorrow" relative to when the notification will fire.
+function formatTime12Hour(time: string): string {
+  // time arrives as HH:MM (24h) from <input type="time">.
+  const [hStr, mStr] = time.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return time;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = ((h + 11) % 12) + 1;
+  const mm = String(m).padStart(2, "0");
+  return `${hour12}:${mm} ${period}`;
+}
+
+function describeAppointmentWhen(appointmentDate: string, appointmentTime: string, fireAt: Date): string {
+  // Both dates are in the user's local timezone. Compare by Y-M-D so DST
+  // shifts don't bump the bucket.
+  const appt = parseISO(`${appointmentDate}T${appointmentTime || "00:00"}:00`);
+  if (Number.isNaN(appt.getTime())) {
+    return appointmentTime ? formatTime12Hour(appointmentTime) : appointmentDate;
+  }
+  const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const fireKey = dayKey(fireAt);
+  const apptKey = dayKey(appt);
+  const tomorrow = new Date(fireAt);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = dayKey(tomorrow);
+  const timePart = appointmentTime ? formatTime12Hour(appointmentTime) : "";
+  let datePart: string;
+  if (apptKey === fireKey) datePart = "Today";
+  else if (apptKey === tomorrowKey) datePart = "Tomorrow";
+  else datePart = format(appt, "MMM d");
+  return timePart ? `${datePart} at ${timePart}` : datePart;
+}
+
 function appointmentReminders(appointments: Appointment[], patients: Map<number, Patient>): SyncedReminder[] {
   const out: SyncedReminder[] = [];
   for (const a of appointments) {
@@ -375,12 +414,17 @@ function appointmentReminders(appointments: Appointment[], patients: Map<number,
     const when = new Date(`${a.reminderDate}T${time}:00`);
     if (Number.isNaN(when.getTime())) continue;
     const patient = patients.get(a.patientId);
+    // Body leads with the appointment time (the thing the user actually needs
+    // to see at a glance), then optional location. Patient name is metadata
+    // for the Edge Function to use only when disambiguation is needed.
+    const whenText = describeAppointmentWhen(a.date, a.time || "", when);
+    const body = a.location ? `${whenText} · ${a.location}` : whenText;
     out.push({
       source: "appointment",
       source_id: a.id ?? -1,
       patient_name: patient?.name ?? "",
-      title: a.title || "Appointment reminder",
-      body: a.location ? `${a.date} · ${a.location}` : a.date,
+      title: a.title || "Appointment",
+      body,
       fire_at: when.toISOString(),
       sound: null,
     });
@@ -398,12 +442,22 @@ function medicationReminders(medications: Medication[], patients: Map<number, Pa
     const when = new Date(`${m.refillDate}T09:00:00`);
     if (Number.isNaN(when.getTime())) continue;
     const patient = patients.get(m.patientId);
+    const refillDateText = (() => {
+      const d = parseISO(`${m.refillDate}T09:00:00`);
+      return Number.isNaN(d.getTime()) ? m.refillDate : format(d, "MMM d");
+    })();
+    const detailParts = [m.dosage?.trim(), m.frequency?.trim()].filter(
+      (s): s is string => Boolean(s && s.length > 0),
+    );
+    const body = detailParts.length > 0
+      ? `Refill due ${refillDateText} · ${detailParts.join(" · ")}`
+      : `Refill due ${refillDateText}`;
     out.push({
       source: "medication",
       source_id: m.id ?? -1,
       patient_name: patient?.name ?? "",
-      title: `Refill ${m.name}`,
-      body: m.dosage ? `${m.dosage} · ${m.frequency || ""}`.trim() : null,
+      title: `Refill: ${m.name}`,
+      body,
       fire_at: when.toISOString(),
       sound: null,
     });
