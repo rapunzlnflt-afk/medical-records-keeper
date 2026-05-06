@@ -63,7 +63,7 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
     if (permission === "denied") return { status: "permission-denied" };
     if (permission !== "granted") return { status: "permission-default" };
 
-    await ensureAnonAuth();
+    const userId = await ensureAnonAuth();
 
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
@@ -79,6 +79,7 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
     const json = sub.toJSON();
     const { error } = await supabase.from("devices").upsert(
       {
+        user_id: userId,
         device_id: deviceId,
         endpoint: sub.endpoint,
         p256dh: json.keys?.p256dh ?? null,
@@ -86,7 +87,7 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
         user_agent: navigator.userAgent,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      { onConflict: "device_id" },
+      { onConflict: "user_id,device_id" },
     );
     if (error) return { status: "error", message: error.message };
 
