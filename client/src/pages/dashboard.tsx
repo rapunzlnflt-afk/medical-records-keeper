@@ -237,63 +237,6 @@ const getReminderStatusLabel = (appointment: Appointment) => {
 
       <PhoneRemindersCard />
 
-      {reminders.length > 0 && (
-        <Card className="border-primary/30 bg-primary/5 dark:bg-primary/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <Bell className="w-4 h-4 text-primary" />
-              Appointment Reminders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {reminders.map((apt) => {
-              const doc = physicians.find((p) => p.id 
-          === apt.physicianId);
-              const reminderStatus = 
-          getReminderStatusLabel(apt);
- 
-              return (
-                <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-card" data-testid={`reminder-apt-${apt.id}`}>
-                  <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0">
-                    <Bell className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-  <div className="flex items-center gap-2 flex-wrap">
-    <p className="text-sm font-semibold truncate">{apt.title}</p>
-    {reminderStatus && (
-      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5">
-        {reminderStatus}
-      </span>
-    )}
-  </div>
-
-  <p className="text-xs text-muted-foreground truncate">
-    {format(parseISO(apt.date), "MMM d, yyyy")} at {apt.time} {doc ? ` · ${doc.name}` : ""}
-  </p>
-
-  {apt.location && (
-    <p className="text-xs text-muted-foreground truncate">{apt.location}</p>
-  )}
-
-                      {apt.reminderDate && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        Alert set for {format(parseISO(apt.reminderDate), "MMM d, yyyy")}
-                        {apt.reminderTime ? ` at ${apt.reminderTime}` : " at 9:00 AM"}
-                      </p>
-                    )}
-                  </div>
-
-                  <Badge variant="secondary" className="text-xs flex-shrink-0">
-                    {apt.type}
-                  </Badge>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-3">
@@ -314,15 +257,29 @@ const getReminderStatusLabel = (appointment: Appointment) => {
             ) : (
               upcoming.map((apt) => {
                 const doc = physicians.find((p) => p.id === apt.physicianId);
+                const hasFiredReminder = reminders.some((r) => r.id === apt.id);
+                const reminderStatus = hasFiredReminder ? getReminderStatusLabel(apt) : null;
                 return (
                   <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-secondary/50" data-testid={`upcoming-apt-${apt.id}`}>
-                    <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0 relative">
                       <span className="text-white text-xs font-heading font-bold">
                         {format(parseISO(apt.date), "dd")}
                       </span>
+                      {hasFiredReminder && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary border-2 border-background flex items-center justify-center">
+                          <Bell className="w-2 h-2 text-white" />
+                        </span>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">{apt.title}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate">{apt.title}</p>
+                        {reminderStatus && (
+                          <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5">
+                            {reminderStatus}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground truncate">
                         {format(parseISO(apt.date), "MMM d")} at {apt.time}
                         {doc ? ` · ${doc.name}` : ""}
