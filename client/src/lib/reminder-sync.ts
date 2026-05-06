@@ -361,7 +361,11 @@ export async function getCurrentPhoneReminderState(): Promise<PhoneReminderState
 export interface SyncedReminder {
   source: "appointment" | "medication";
   source_id: number;
-  patient_name: string;
+  // Always synced as null. The currently deployed Edge Function prepends
+  // `${patient_name}: ` to the notification title when this is non-empty,
+  // which surfaces as e.g. "My Records: Checkup" — the default-patient name
+  // is meaningless metadata here. Title and body are already self-descriptive.
+  patient_name: null;
   title: string;
   body: string | null;
   fire_at: string; // ISO UTC
@@ -406,24 +410,26 @@ function describeAppointmentWhen(appointmentDate: string, appointmentTime: strin
   return timePart ? `${datePart} at ${timePart}` : datePart;
 }
 
-function appointmentReminders(appointments: Appointment[], patients: Map<number, Patient>): SyncedReminder[] {
+function appointmentReminders(appointments: Appointment[], _patients: Map<number, Patient>): SyncedReminder[] {
   const out: SyncedReminder[] = [];
   for (const a of appointments) {
     if (!a.reminderDate || a.status !== "upcoming") continue;
     const time = a.reminderTime || "09:00";
     const when = new Date(`${a.reminderDate}T${time}:00`);
     if (Number.isNaN(when.getTime())) continue;
-    const patient = patients.get(a.patientId);
     // Body leads with the appointment time (the thing the user actually needs
-    // to see at a glance), then optional location. Patient name is metadata
-    // for the Edge Function to use only when disambiguation is needed.
+    // to see at a glance), then optional location. Title carries the action
+    // category so the notification reads as "Appointment" or the custom
+    // appointment title — never prefixed with the default patient name.
     const whenText = describeAppointmentWhen(a.date, a.time || "", when);
     const body = a.location ? `${whenText} · ${a.location}` : whenText;
+    const rawTitle = (a.title || "").trim();
+    const title = rawTitle ? `Appointment: ${rawTitle}` : "Appointment";
     out.push({
       source: "appointment",
       source_id: a.id ?? -1,
-      patient_name: patient?.name ?? "",
-      title: a.title || "Appointment",
+      patient_name: null,
+      title,
       body,
       fire_at: when.toISOString(),
       sound: null,
@@ -432,7 +438,7 @@ function appointmentReminders(appointments: Appointment[], patients: Map<number,
   return out.filter((r) => r.source_id > 0);
 }
 
-function medicationReminders(medications: Medication[], patients: Map<number, Patient>): SyncedReminder[] {
+function medicationReminders(medications: Medication[], _patients: Map<number, Patient>): SyncedReminder[] {
   // Only refill-date reminders are scheduled centrally; recurring time-of-day
   // dosing is local-only because expanding it server-side would replicate too
   // much patient context. Refill date is a single occurrence.
@@ -441,7 +447,6 @@ function medicationReminders(medications: Medication[], patients: Map<number, Pa
     if (!m.refillDate || m.active !== 1) continue;
     const when = new Date(`${m.refillDate}T09:00:00`);
     if (Number.isNaN(when.getTime())) continue;
-    const patient = patients.get(m.patientId);
     const refillDateText = (() => {
       const d = parseISO(`${m.refillDate}T09:00:00`);
       return Number.isNaN(d.getTime()) ? m.refillDate : format(d, "MMM d");
@@ -455,7 +460,7 @@ function medicationReminders(medications: Medication[], patients: Map<number, Pa
     out.push({
       source: "medication",
       source_id: m.id ?? -1,
-      patient_name: patient?.name ?? "",
+      patient_name: null,
       title: `Refill: ${m.name}`,
       body,
       fire_at: when.toISOString(),
