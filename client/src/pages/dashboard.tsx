@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   CalendarDays,
   Pill,
@@ -14,6 +15,7 @@ import {
   Bell,
   Sparkles,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { Link } from "wouter";
 import type {
@@ -36,6 +38,7 @@ import {
   getReminderSoundPreferences,
 } from "@/lib/db";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
+import { PhoneRemindersCard } from "@/components/phone-reminders-card";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
   title: string; value: number; icon: any; href: string; gradient?: boolean;
@@ -93,6 +96,8 @@ export default function Dashboard() {
     const refill = parseISO(m.refillDate);
     return isBefore(refill, addDays(new Date(), 7)) && isAfter(refill, addDays(new Date(), -1));
   });
+
+  const [medSummaryOpen, setMedSummaryOpen] = useState(false);
 
   const now = new Date();
 
@@ -231,67 +236,10 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         <StatCard title="Appointments" value={appointments.filter(a => a.status === "upcoming").length} icon={CalendarDays} href="/appointments" gradient />
         <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
         <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
-        <StatCard title="Records" value={records.length} icon={FileText} href="/records" />
+        <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
       </div>
 
-      {reminders.length > 0 && (
-        <Card className="border-primary/30 bg-primary/5 dark:bg-primary/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <Bell className="w-4 h-4 text-primary" />
-              Appointment Reminders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {reminders.map((apt) => {
-              const doc = physicians.find((p) => p.id 
-          === apt.physicianId);
-              const reminderStatus = 
-          getReminderStatusLabel(apt);
- 
-              return (
-                <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-card" data-testid={`reminder-apt-${apt.id}`}>
-                  <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0">
-                    <Bell className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-  <div className="flex items-center gap-2 flex-wrap">
-    <p className="text-sm font-semibold truncate">{apt.title}</p>
-    {reminderStatus && (
-      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5">
-        {reminderStatus}
-      </span>
-    )}
-  </div>
-
-  <p className="text-xs text-muted-foreground truncate">
-    {format(parseISO(apt.date), "MMM d, yyyy")} at {apt.time} {doc ? ` · ${doc.name}` : ""}
-  </p>
-
-  {apt.location && (
-    <p className="text-xs text-muted-foreground truncate">{apt.location}</p>
-  )}
-
-                      {apt.reminderDate && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        Alert set for {format(parseISO(apt.reminderDate), "MMM d, yyyy")}
-                        {apt.reminderTime ? ` at ${apt.reminderTime}` : " at 9:00 AM"}
-                      </p>
-                    )}
-                  </div>
-
-                  <Badge variant="secondary" className="text-xs flex-shrink-0">
-                    {apt.type}
-                  </Badge>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-4 items-start">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
@@ -311,15 +259,29 @@ const getReminderStatusLabel = (appointment: Appointment) => {
             ) : (
               upcoming.map((apt) => {
                 const doc = physicians.find((p) => p.id === apt.physicianId);
+                const hasFiredReminder = reminders.some((r) => r.id === apt.id);
+                const reminderStatus = hasFiredReminder ? getReminderStatusLabel(apt) : null;
                 return (
                   <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-secondary/50" data-testid={`upcoming-apt-${apt.id}`}>
-                    <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0 relative">
                       <span className="text-white text-xs font-heading font-bold">
                         {format(parseISO(apt.date), "dd")}
                       </span>
+                      {hasFiredReminder && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary border-2 border-background flex items-center justify-center">
+                          <Bell className="w-2 h-2 text-white" />
+                        </span>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">{apt.title}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate">{apt.title}</p>
+                        {reminderStatus && (
+                          <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5">
+                            {reminderStatus}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground truncate">
                         {format(parseISO(apt.date), "MMM d")} at {apt.time}
                         {doc ? ` · ${doc.name}` : ""}
@@ -334,58 +296,91 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <Pill className="w-4 h-4 text-primary" />
-              Medication Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {refillSoon.length > 0 && (
-              <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 mb-3">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <p className="text-xs font-semibold">Refills Needed Soon</p>
-                </div>
-                {refillSoon.map((m) => (
-                  <p key={m.id} className="text-xs text-amber-600 dark:text-amber-400/80 mt-1 ml-6">
-                    {m.name} — refill by {format(parseISO(m.refillDate!), "MMM d")}
-                  </p>
-                ))}
-              </div>
-            )}
-            {activeMeds.length === 0 ? (
-              <div className="text-center py-6">
-                <Pill className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                <p className="text-sm text-muted-foreground">No active medications</p>
-                <Link href="/medications" className="text-xs text-primary hover:underline mt-1 inline-block">
-                  Add medication
-                </Link>
-              </div>
-            ) : (
-              activeMeds.slice(0, 5).map((med) => (
-                <div key={med.id} className="flex items-center gap-3 p-2 rounded-md bg-secondary/50" data-testid={`med-summary-${med.id}`}>
-                  <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
-                    <Pill className="w-4 h-4 text-white" />
+          <Collapsible open={medSummaryOpen} onOpenChange={setMedSummaryOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="w-full text-left hover-elevate rounded-t-md"
+                aria-label={medSummaryOpen ? "Hide Medication Summary" : "Show Medication Summary"}
+                data-testid="button-toggle-medication-summary"
+              >
+                <CardHeader className="pb-3">
+                  <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
+                    <Pill className="w-4 h-4 text-primary" />
+                    <span>Medication Summary</span>
+                    <Badge variant="secondary" className="text-[10px] font-medium">
+                      {activeMeds.length}
+                    </Badge>
+                    {!medSummaryOpen && refillSoon.length > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[10px] font-medium px-2 py-0.5"
+                        data-testid="badge-refill-alert"
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        {refillSoon.length} refill{refillSoon.length === 1 ? "" : "s"} due
+                      </span>
+                    )}
+                    <span className="ml-auto text-muted-foreground">
+                      {medSummaryOpen ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-2">
+                {refillSoon.length > 0 && (
+                  <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 mb-3">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <p className="text-xs font-semibold">Refills Needed Soon</p>
+                    </div>
+                    {refillSoon.map((m) => (
+                      <p key={m.id} className="text-xs text-amber-600 dark:text-amber-400/80 mt-1 ml-6">
+                        {m.name} — refill by {format(parseISO(m.refillDate!), "MMM d")}
+                      </p>
+                    ))}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{med.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {med.dosage} · {med.frequency}
-                    </p>
+                )}
+                {activeMeds.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Pill className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="text-sm text-muted-foreground">No active medications</p>
+                    <Link href="/medications" className="text-xs text-primary hover:underline mt-1 inline-block">
+                      Add medication
+                    </Link>
                   </div>
-                </div>
-              ))
-            )}
-          </CardContent>
+                ) : (
+                  activeMeds.slice(0, 5).map((med) => (
+                    <div key={med.id} className="flex items-center gap-3 p-2 rounded-md bg-secondary/50" data-testid={`med-summary-${med.id}`}>
+                      <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
+                        <Pill className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate">{med.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {med.dosage} · {med.frequency}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatCard title="Vitals Logged" value={vitals.length} icon={HeartPulse} href="/vitals" />
         <StatCard title="Emergency Contacts" value={contacts.length} icon={Phone} href="/emergency" />
-        <StatCard title="Total Records" value={records.length} icon={FileText} href="/records" />
       </div>
+
+      <PhoneRemindersCard />
     </div>
   );
 }

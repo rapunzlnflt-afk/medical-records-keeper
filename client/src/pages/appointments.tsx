@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getAppointments, createAppointment, updateAppointment, deleteAppointment, getPhysicians } from "@/lib/db";
+import { requestRemindersSync } from "@/lib/reminder-sync";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -194,17 +195,24 @@ export default function Appointments() {
     queryFn: () => getPhysicians(pid),
   });
 
+  const invalidateAppointments = () => {
+    queryClient.invalidateQueries({ queryKey: ["appointments", pid] });
+    queryClient.invalidateQueries({ queryKey: ["all-appointments-for-sync"] });
+    // Push the new reminder set up to Supabase right away — independent of
+    // whether the dashboard is mounted to observe the cache change.
+    requestRemindersSync();
+  };
   const createMut = useMutation({
     mutationFn: (data: any) => createAppointment({ ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments", pid] }); setOpen(false); toast({ title: "Appointment added" }); },
+    onSuccess: () => { invalidateAppointments(); setOpen(false); toast({ title: "Appointment added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateAppointment(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments", pid] }); setEditing(null); toast({ title: "Appointment updated" }); },
+    onSuccess: () => { invalidateAppointments(); setEditing(null); toast({ title: "Appointment updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => deleteAppointment(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments", pid] }); toast({ title: "Appointment deleted" }); },
+    onSuccess: () => { invalidateAppointments(); toast({ title: "Appointment deleted" }); },
   });
 
   const today = new Date().toISOString().split("T")[0];

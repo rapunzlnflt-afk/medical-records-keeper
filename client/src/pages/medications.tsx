@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getMedications, createMedication, updateMedication, deleteMedication, getMedicationLogs, createMedicationLog, getPhysicians } from "@/lib/db";
+import { requestRemindersSync } from "@/lib/reminder-sync";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -175,17 +176,24 @@ export default function Medications() {
     queryFn: () => getPhysicians(pid),
   });
 
+  const invalidateMeds = () => {
+    queryClient.invalidateQueries({ queryKey: ["medications", pid] });
+    queryClient.invalidateQueries({ queryKey: ["all-medications-for-sync"] });
+    // Push refill reminders up to Supabase right away — independent of
+    // whether the dashboard is mounted to observe the cache change.
+    requestRemindersSync();
+  };
   const createMut = useMutation({
     mutationFn: (data: any) => createMedication({ ...data, patientId: pid }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); setOpen(false); toast({ title: "Medication added" }); },
+    onSuccess: () => { invalidateMeds(); setOpen(false); toast({ title: "Medication added" }); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateMedication(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); setEditing(null); toast({ title: "Medication updated" }); },
+    onSuccess: () => { invalidateMeds(); setEditing(null); toast({ title: "Medication updated" }); },
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => deleteMedication(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medications", pid] }); toast({ title: "Medication deleted" }); },
+    onSuccess: () => { invalidateMeds(); toast({ title: "Medication deleted" }); },
   });
   const logMut = useMutation({
     mutationFn: (data: any) => createMedicationLog(data),
