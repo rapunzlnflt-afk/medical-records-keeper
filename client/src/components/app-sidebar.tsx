@@ -19,6 +19,7 @@ import { useTheme } from "@/lib/theme";
 import { queryClient } from "@/lib/queryClient";
 import { usePatient } from "@/lib/patient-context";
 import { useToast } from "@/hooks/use-toast";
+import { recordBackupExport } from "@/components/backup-reminder-card";
 import { useMutation } from "@tanstack/react-query";
 import {
   createPatient, updatePatient, deletePatient as deletePatientDb,
@@ -286,6 +287,7 @@ export function AppSidebar() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      recordBackupExport();
       toast({ title: "Data Saved", description: "Your backup file has been downloaded." });
     } catch {
       toast({ title: "Error", description: "Could not save data. Please try again.", variant: "destructive" });

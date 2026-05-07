@@ -39,6 +39,7 @@ import {
 } from "@/lib/db";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { PhoneRemindersCard } from "@/components/phone-reminders-card";
+import { BackupReminderCard, FirstVisitNoticeCard } from "@/components/backup-reminder-card";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
   title: string; value: number; icon: any; href: string; gradient?: boolean;
@@ -199,6 +200,9 @@ const getReminderStatusLabel = (appointment: Appointment) => {
           {activePatient ? `${activePatient.name.endsWith('s') ? activePatient.name + "'" : activePatient.name + "'s"} health overview` : "Your health overview at a glance"}
         </p>
       </div>
+
+      <FirstVisitNoticeCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
+      <BackupReminderCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
 
       {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
