@@ -470,8 +470,13 @@ export default function MedicalRecords() {
                 To protect your data:
               </p>
               <ol className="text-xs text-muted-foreground mt-1 font-body leading-relaxed list-decimal list-inside space-y-1">
-                <li>Tap <span className="font-semibold">Save My Data</span> in the sidebar regularly to download a backup file.</li>
-                <li>Keep the backup file in a safe place (email it to yourself, save to a USB drive, etc.).</li>
+                <li>Tap <span className="font-semibold">Save My Data</span> in the sidebar regularly to back up your records.</li>
+                <li>
+                  <span className="font-semibold">On iPhone or iPad:</span> the share sheet opens — choose
+                  {" "}<span className="font-semibold">Save to Files</span> (recommended) or email it to yourself.
+                  On other devices a <span className="font-semibold">.json</span> file downloads automatically.
+                </li>
+                <li>The backup file is named <span className="font-semibold">medical-records-backup-YYYY-MM-DD.json</span>. Keep it somewhere safe.</li>
                 <li>If your data is ever erased, open the app and tap <span className="font-semibold">Load My Data</span>, then select your backup file to restore everything.</li>
               </ol>
             </div>

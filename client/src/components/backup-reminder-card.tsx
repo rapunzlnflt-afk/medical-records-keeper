@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { exportAllData } from "@/lib/db";
+import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
 import { Save, X, ShieldAlert, Info } from "lucide-react";
 
 const LAST_EXPORT_KEY = "mrkLastExport";
@@ -88,19 +89,32 @@ export function BackupReminderCard({ hasData }: { hasData: boolean }) {
     setSaving(true);
     try {
       const data = await exportAllData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `medical-records-backup-${todayISO()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      localStorage.setItem(LAST_EXPORT_KEY, todayISO());
-      localStorage.removeItem(SNOOZED_KEY);
-      setState(computeState(hasData));
-      toast({ title: "Backup saved", description: "Your records have been downloaded." });
+      const filename = `medical-records-backup-${todayISO()}.json`;
+      const outcome = await saveJsonBackup({
+        filename,
+        json: JSON.stringify(data, null, 2),
+        shareTitle: "Medical Records Backup",
+        shareText: "My Medical Records Keeper backup file.",
+      });
+      if (outcome.kind === "shared" || outcome.kind === "downloaded") {
+        localStorage.setItem(LAST_EXPORT_KEY, todayISO());
+        localStorage.removeItem(SNOOZED_KEY);
+        setState(computeState(hasData));
+      }
+      if (outcome.kind === "shared") {
+        toast({
+          title: "Backup ready",
+          description: isIosLike()
+            ? "Choose Save to Files (or Mail it to yourself) to keep it safe."
+            : "Choose where to save your backup file.",
+        });
+      } else if (outcome.kind === "downloaded") {
+        toast({ title: "Backup saved", description: `Downloaded ${filename}.` });
+      } else if (outcome.kind === "cancelled") {
+        toast({ title: "Save cancelled", description: "Your data is unchanged." });
+      } else {
+        toast({ title: "Error", description: "Could not save backup. Please try again.", variant: "destructive" });
+      }
     } catch {
       toast({ title: "Error", description: "Could not save backup. Please try again.", variant: "destructive" });
     } finally {
