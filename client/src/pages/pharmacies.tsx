@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getPharmacies, createPharmacy, updatePharmacy, deletePharmacy } from "@/lib/db";
@@ -10,16 +10,71 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Trash2, Edit2, Phone, MapPin, Clock, Globe, Star, Printer } from "lucide-react";
+import {
+  Building2,
+  Plus,
+  Trash2,
+  Edit2,
+  Phone,
+  MapPin,
+  Clock,
+  Globe,
+  Star,
+  Printer,
+  FileText,
+} from "lucide-react";
 import type { Pharmacy } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
 
-function PharmacyForm({ initial, onSubmit, onCancel }: {
+const pharmLabelClass = "text-base font-body font-semibold text-foreground";
+const pharmControlClass = "h-12 text-base";
+
+const PHARM_DIALOG_CLASS =
+  "p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
+  "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(640px,calc(100vw-2rem))] sm:max-w-[640px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
+  "overflow-hidden flex flex-col";
+
+function PharmFieldSection({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card shadow-sm">
+      <header className="flex items-start gap-3 px-4 sm:px-5 pt-4 pb-2">
+        <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-heading text-base font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        </div>
+      </header>
+      <div className="px-4 sm:px-5 pb-5 pt-2 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
   initial?: Partial<Pharmacy>;
   onSubmit: (data: any) => void;
   onCancel: () => void;
+  isEdit: boolean;
 }) {
   const [form, setForm] = useState({
     name: initial?.name || "",
@@ -34,55 +89,177 @@ function PharmacyForm({ initial, onSubmit, onCancel }: {
     isPrimary: initial?.isPrimary ?? 0,
   });
 
+  const canSubmit = Boolean(form.name);
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Pharmacy Name</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="CVS Pharmacy" data-testid="input-pharm-name" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Phone</Label>
-          <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} placeholder="(817) 555-0123" data-testid="input-pharm-phone" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Website</Label>
-          <Input value={form.website || ""} onChange={(e) => setForm({ ...form, website: e.target.value })} placeholder="https://www.cvs.com" data-testid="input-pharm-website" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Address</Label>
-          <Input value={form.address || ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="123 Main St" data-testid="input-pharm-address" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">City</Label>
-          <Input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Fort Worth" data-testid="input-pharm-city" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">State</Label>
-          <Input value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="TX" data-testid="input-pharm-state" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">ZIP</Label>
-          <Input value={form.zip || ""} onChange={(e) => setForm({ ...form, zip: e.target.value })} placeholder="76109" data-testid="input-pharm-zip" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Hours</Label>
-          <Input value={form.hours || ""} onChange={(e) => setForm({ ...form, hours: e.target.value })} placeholder="Mon-Fri 8am-9pm" data-testid="input-pharm-hours" />
-        </div>
-        <div className="flex items-center gap-2 pt-5">
-          <Switch checked={form.isPrimary === 1} onCheckedChange={(c) => setForm({ ...form, isPrimary: c ? 1 : 0 })} data-testid="switch-pharm-primary" />
-          <Label className="text-xs font-body">Preferred Pharmacy</Label>
-        </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
+        <PharmFieldSection
+          icon={Building2}
+          title="Pharmacy Details"
+          description="The pharmacy's name and how often you use it."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="pharm-name" className={pharmLabelClass}>Pharmacy Name</Label>
+            <Input
+              id="pharm-name"
+              className={pharmControlClass}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="CVS Pharmacy"
+              data-testid="input-pharm-name"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
+            <div className="min-w-0">
+              <p className={pharmLabelClass}>Preferred Pharmacy</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Mark this as the one you use most often.</p>
+            </div>
+            <Switch
+              checked={form.isPrimary === 1}
+              onCheckedChange={(c) => setForm({ ...form, isPrimary: c ? 1 : 0 })}
+              data-testid="switch-pharm-primary"
+            />
+          </div>
+        </PharmFieldSection>
+
+        <PharmFieldSection
+          icon={Phone}
+          title="Contact & Hours"
+          description="How and when to reach this pharmacy."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pharm-phone" className={pharmLabelClass}>Phone</Label>
+              <Input
+                id="pharm-phone"
+                className={pharmControlClass}
+                inputMode="tel"
+                value={form.phone || ""}
+                onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                placeholder="(817) 555-0123"
+                data-testid="input-pharm-phone"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pharm-hours" className={pharmLabelClass}>Hours</Label>
+              <Input
+                id="pharm-hours"
+                className={pharmControlClass}
+                value={form.hours || ""}
+                onChange={(e) => setForm({ ...form, hours: e.target.value })}
+                placeholder="Mon-Fri 8am-9pm"
+                data-testid="input-pharm-hours"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pharm-website" className={pharmLabelClass}>Website</Label>
+            <Input
+              id="pharm-website"
+              className={pharmControlClass}
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={form.website || ""}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+              placeholder="https://www.cvs.com"
+              data-testid="input-pharm-website"
+            />
+          </div>
+        </PharmFieldSection>
+
+        <PharmFieldSection
+          icon={MapPin}
+          title="Address"
+          description="The physical location of this pharmacy."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="pharm-address" className={pharmLabelClass}>Street Address</Label>
+            <Input
+              id="pharm-address"
+              className={pharmControlClass}
+              value={form.address || ""}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="123 Main St"
+              data-testid="input-pharm-address"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pharm-city" className={pharmLabelClass}>City</Label>
+            <Input
+              id="pharm-city"
+              className={pharmControlClass}
+              value={form.city || ""}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+              placeholder="Fort Worth"
+              data-testid="input-pharm-city"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pharm-state" className={pharmLabelClass}>State</Label>
+              <Input
+                id="pharm-state"
+                className={pharmControlClass}
+                value={form.state || ""}
+                onChange={(e) => setForm({ ...form, state: e.target.value })}
+                placeholder="TX"
+                data-testid="input-pharm-state"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pharm-zip" className={pharmLabelClass}>ZIP</Label>
+              <Input
+                id="pharm-zip"
+                className={pharmControlClass}
+                inputMode="numeric"
+                value={form.zip || ""}
+                onChange={(e) => setForm({ ...form, zip: e.target.value })}
+                placeholder="76109"
+                data-testid="input-pharm-zip"
+              />
+            </div>
+          </div>
+        </PharmFieldSection>
+
+        <PharmFieldSection
+          icon={FileText}
+          title="Notes"
+          description="Drive-through, parking, anything worth remembering."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="pharm-notes" className={pharmLabelClass}>Notes</Label>
+            <Textarea
+              id="pharm-notes"
+              className="text-base min-h-[110px]"
+              value={form.notes || ""}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={4}
+              placeholder="Drive-through available, free parking..."
+              data-testid="input-pharm-notes"
+            />
+          </div>
+        </PharmFieldSection>
       </div>
-      <div>
-        <Label className="text-xs font-body">Notes</Label>
-        <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Drive-through available..." data-testid="input-pharm-notes" />
-      </div>
-      <div className="flex gap-2 justify-end">
-        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSubmit(form)} disabled={!form.name}
-          className="gradient-primary text-white border-none" data-testid="button-pharm-save">
-          {initial?.id ? "Update" : "Add"} Pharmacy
+
+      <div
+        className="sticky bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur px-4 sm:px-6 py-3 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+      >
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          className="h-12 text-base w-full sm:w-auto sm:min-w-[140px]"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={() => onSubmit(form)}
+          disabled={!canSubmit}
+          className="gradient-primary text-white border-none h-12 text-base font-semibold w-full sm:w-auto sm:min-w-[200px]"
+          data-testid="button-pharm-save"
+        >
+          {isEdit ? "Update Pharmacy" : "Add Pharmacy"}
         </Button>
       </div>
     </div>
@@ -118,11 +295,11 @@ export default function Pharmacies() {
   const sorted = [...pharmacyList].sort((a, b) => (b.isPrimary ?? 0) - (a.isPrimary ?? 0));
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="font-heading text-xl font-bold">Preferred Pharmacies</h1>
-          <p className="text-sm text-muted-foreground font-body mt-1">Manage your pharmacy locations</p>
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
+        <div className="min-w-0">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Preferred Pharmacies</h1>
+          <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Manage your pharmacy locations</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -167,9 +344,20 @@ export default function Pharmacies() {
               <Plus className="w-4 h-4" /> Add Pharmacy
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle className="font-heading">New Pharmacy</DialogTitle></DialogHeader>
-            <PharmacyForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
+          <DialogContent className={PHARM_DIALOG_CLASS}>
+            <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+              <DialogTitle className="font-heading text-2xl font-bold text-white">
+                New Pharmacy
+              </DialogTitle>
+              <DialogDescription className="text-white/85 text-sm">
+                Save a pharmacy you use. Only the name is required — phone, address, and notes are optional.
+              </DialogDescription>
+            </DialogHeader>
+            <PharmacyForm
+              isEdit={false}
+              onSubmit={(data) => createMut.mutate(data)}
+              onCancel={() => setOpen(false)}
+            />
           </DialogContent>
         </Dialog>
         </div>
@@ -182,47 +370,47 @@ export default function Pharmacies() {
           <Card>
             <CardContent className="py-12 text-center">
               <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">No pharmacies added yet</p>
+              <p className="text-base text-muted-foreground">No pharmacies added yet</p>
             </CardContent>
           </Card>
         ) : (
           sorted.map((pharm) => (
             <Card key={pharm.id} className="hover-elevate" data-testid={`pharmacy-${pharm.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
                     <Building2 className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-heading text-sm font-semibold">{pharm.name}</h3>
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <h3 className="font-heading text-base font-semibold break-words min-w-0">{pharm.name}</h3>
                       {pharm.isPrimary === 1 && (
-                        <Badge className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        <Badge className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 flex-shrink-0">
                           <Star className="w-3 h-3 mr-1" />Preferred
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                    <div className="flex items-center gap-3 mt-1 text-sm text-foreground/75 flex-wrap min-w-0">
                       {pharm.phone && (
-                        <a href={`tel:${pharm.phone}`} className="flex items-center gap-1 hover:text-primary">
-                          <Phone className="w-3 h-3" />{pharm.phone}
+                        <a href={`tel:${pharm.phone}`} className="flex items-center gap-1 hover:text-primary min-w-0 truncate">
+                          <Phone className="w-3.5 h-3.5 flex-shrink-0" />{pharm.phone}
                         </a>
                       )}
-                      {pharm.hours && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{pharm.hours}</span>}
+                      {pharm.hours && <span className="flex items-center gap-1 min-w-0 truncate"><Clock className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{pharm.hours}</span></span>}
                     </div>
                     {(pharm.address || pharm.city) && (
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 flex-shrink-0" />
-                        {[pharm.address, pharm.city, pharm.state, pharm.zip].filter(Boolean).join(", ")}
+                      <p className="text-sm text-foreground/75 mt-1 flex items-start gap-1 min-w-0">
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        <span className="break-words min-w-0">{[pharm.address, pharm.city, pharm.state, pharm.zip].filter(Boolean).join(", ")}</span>
                       </p>
                     )}
                     {pharm.website && (
                       <a href={pharm.website.startsWith("http") ? pharm.website : `https://${pharm.website}`} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline flex items-center gap-1 mt-1">
-                        <Globe className="w-3 h-3" />{pharm.website}
+                        className="text-sm text-primary hover:underline flex items-center gap-1 mt-1 min-w-0 truncate">
+                        <Globe className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{pharm.website}</span>
                       </a>
                     )}
-                    {pharm.notes && <p className="text-xs text-muted-foreground mt-1">{pharm.notes}</p>}
+                    {pharm.notes && <p className="text-sm text-foreground/70 mt-1 break-words">{pharm.notes}</p>}
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
                     <Dialog open={editing?.id === pharm.id} onOpenChange={(o) => !o && setEditing(null)}>
@@ -231,9 +419,21 @@ export default function Pharmacies() {
                           <Edit2 className="w-4 h-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-lg">
-                        <DialogHeader><DialogTitle className="font-heading">Edit Pharmacy</DialogTitle></DialogHeader>
-                        <PharmacyForm initial={pharm} onSubmit={(data) => updateMut.mutate({ id: pharm.id!, data })} onCancel={() => setEditing(null)} />
+                      <DialogContent className={PHARM_DIALOG_CLASS}>
+                        <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                          <DialogTitle className="font-heading text-2xl font-bold text-white">
+                            Edit Pharmacy
+                          </DialogTitle>
+                          <DialogDescription className="text-white/85 text-sm">
+                            Update this pharmacy's details. Changes save when you press Update.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <PharmacyForm
+                          initial={pharm}
+                          isEdit={true}
+                          onSubmit={(data) => updateMut.mutate({ id: pharm.id!, data })}
+                          onCancel={() => setEditing(null)}
+                        />
                       </DialogContent>
                     </Dialog>
                     <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(pharm.id!)} data-testid={`button-delete-pharm-${pharm.id}`}>
