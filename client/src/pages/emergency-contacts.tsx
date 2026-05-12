@@ -21,6 +21,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Phone, Plus, Trash2, Edit2, Mail, Star, User, Users } from "lucide-react";
 import type { EmergencyContact } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
+import { formatPersonName } from "@/lib/format-name";
+
+function normalizeEmergencyContactFields<T extends Partial<EmergencyContact>>(data: T): T {
+  return {
+    ...data,
+    name: data.name ? formatPersonName(data.name) : data.name,
+    relationship: data.relationship ? formatPersonName(data.relationship) : data.relationship,
+  };
+}
 
 const ecLabelClass = "text-base font-body font-semibold text-foreground";
 const ecControlClass = "h-12 text-base";
@@ -200,11 +209,11 @@ export default function EmergencyContacts() {
   });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => createEmergencyContact({ ...data, patientId: pid }),
+    mutationFn: (data: any) => createEmergencyContact({ ...normalizeEmergencyContactFields(data), patientId: pid }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["emergency-contacts", pid] }); setOpen(false); toast({ title: "Contact added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => updateEmergencyContact(id, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateEmergencyContact(id, normalizeEmergencyContactFields(data)),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["emergency-contacts", pid] }); setEditing(null); toast({ title: "Contact updated" }); },
   });
   const deleteMut = useMutation({

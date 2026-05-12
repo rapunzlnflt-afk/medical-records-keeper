@@ -34,6 +34,17 @@ import {
 } from "lucide-react";
 import type { Pharmacy } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
+import { formatPersonName, formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
+
+function normalizePharmacyFields<T extends Partial<Pharmacy>>(data: T): T {
+  return {
+    ...data,
+    name: data.name ? formatPersonName(data.name) : data.name,
+    address: data.address ? formatStreetAddress(data.address) : data.address,
+    city: data.city ? formatCity(data.city) : data.city,
+    state: data.state ? formatState(data.state) : data.state,
+  };
+}
 
 const pharmLabelClass = "text-base font-body font-semibold text-foreground";
 const pharmControlClass = "h-12 text-base";
@@ -279,11 +290,11 @@ export default function Pharmacies() {
   });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => createPharmacy({ ...data, patientId: pid }),
+    mutationFn: (data: any) => createPharmacy({ ...normalizePharmacyFields(data), patientId: pid }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pharmacies", pid] }); setOpen(false); toast({ title: "Pharmacy added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => updatePharmacy(id, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePharmacy(id, normalizePharmacyFields(data)),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pharmacies", pid] }); setEditing(null); toast({ title: "Pharmacy updated" }); },
   });
   const deleteMut = useMutation({
