@@ -341,8 +341,27 @@ const APT_DIALOG_CLASS =
 // Considered "past" when its scheduled date+time has already gone by.
 // Uses end-of-day if no time is set so all-day items don't expire at midnight.
 function hasAppointmentPassed(a: Appointment): boolean {
-  const startIso = a.time ? `${a.date}T${a.time}:00` : `${a.date}T23:59:59`;
-  return new Date(startIso).getTime() < Date.now();
+  return appointmentStartMs(a) < Date.now();
+}
+
+// Numeric sort key for appointments — same wall-clock interpretation the
+// dashboard uses so both pages order "next-one-first" identically. Tolerates
+// loose time strings ("9:30", " 9:30 ", "") that may exist in legacy data;
+// returns +Infinity for unparseable dates so they sink to the bottom rather
+// than landing at the top.
+function appointmentStartMs(a: Appointment): number {
+  const date = (a.date || "").trim();
+  if (!date) return Number.POSITIVE_INFINITY;
+  const raw = (a.time || "").trim();
+  let hh = 23, mm = 59;
+  const m = raw.match(/^(\d{1,2}):(\d{1,2})/);
+  if (m) {
+    hh = Math.min(23, Math.max(0, Number(m[1])));
+    mm = Math.min(59, Math.max(0, Number(m[2])));
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ms = new Date(`${date}T${pad(hh)}:${pad(mm)}:00`).getTime();
+  return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
 }
 
 export default function Appointments() {
@@ -386,14 +405,12 @@ export default function Appointments() {
   // Active = anything still on the schedule (not yet passed, not cancelled).
   // History = everything else: explicitly completed, explicitly cancelled, or
   // simply in the past.
-  const sortAscByDateTime = (a: Appointment, b: Appointment) => {
-    const aKey = `${a.date}T${a.time || "00:00"}`;
-    const bKey = `${b.date}T${b.time || "00:00"}`;
-    return aKey.localeCompare(bKey);
-  };
+  const sortAscByDateTime = (a: Appointment, b: Appointment) =>
+    appointmentStartMs(a) - appointmentStartMs(b);
   const activeList = appointments
     .filter((a) => a.status !== "cancelled" && a.status !== "completed" && !hasAppointmentPassed(a))
     .sort(sortAscByDateTime);
+  // History stays reverse-chronological: most recent past first.
   const historyList = appointments
     .filter((a) => a.status === "cancelled" || a.status === "completed" || hasAppointmentPassed(a))
     .sort((a, b) => -sortAscByDateTime(a, b));

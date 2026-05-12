@@ -86,24 +86,33 @@ export default function Dashboard() {
     [],
   );
 
-  // Treat an appointment as "still upcoming" when its scheduled start has not
-  // yet passed in wall-clock time. Use date + time when time is set; fall back
-  // to end-of-day if only a date exists so all-day items don't disappear at
-  // midnight local. Cancelled items are always excluded.
+  // Numeric "start time" for an appointment so the dashboard can both filter
+  // out past items and sort the remaining ones next-first using one consistent
+  // wall-clock interpretation. End-of-day fallback for missing time keeps
+  // all-day items visible until midnight local.
+  const appointmentStartMs = (a: Appointment): number => {
+    const date = (a.date || "").trim();
+    if (!date) return Number.POSITIVE_INFINITY;
+    const raw = (a.time || "").trim();
+    let hh = 23, mm = 59;
+    const m = raw.match(/^(\d{1,2}):(\d{1,2})/);
+    if (m) {
+      hh = Math.min(23, Math.max(0, Number(m[1])));
+      mm = Math.min(59, Math.max(0, Number(m[2])));
+    }
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const ms = new Date(`${date}T${pad(hh)}:${pad(mm)}:00`).getTime();
+    return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+  };
   const isUpcoming = (a: Appointment) => {
     if (a.status === "cancelled") return false;
     if (a.status === "completed") return false;
-    const startIso = a.time ? `${a.date}T${a.time}:00` : `${a.date}T23:59:59`;
-    return new Date(startIso).getTime() >= Date.now();
+    return appointmentStartMs(a) >= Date.now();
   };
   const upcomingAll = appointments.filter(isUpcoming);
   const upcoming = upcomingAll
     .slice()
-    .sort((a, b) => {
-      const aKey = `${a.date}T${a.time || "00:00"}`;
-      const bKey = `${b.date}T${b.time || "00:00"}`;
-      return aKey.localeCompare(bKey);
-    })
+    .sort((a, b) => appointmentStartMs(a) - appointmentStartMs(b))
     .slice(0, 5);
 
   const activeMeds = medications.filter((m) => m.active === 1);
