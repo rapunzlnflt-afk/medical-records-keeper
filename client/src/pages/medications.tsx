@@ -11,11 +11,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar } from "lucide-react";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 import { useLocation } from "wouter";
@@ -31,11 +42,47 @@ const timeIcon = (t: string | null) => {
   return <Clock className="w-3 h-3" />;
 };
 
-function MedicationForm({ initial, onSubmit, onCancel, physicians }: {
+const medLabelClass = "text-base font-body font-semibold text-foreground";
+const medControlClass = "h-12 text-base";
+
+function MedFieldSection({
+  icon: Icon, title, description, children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card shadow-sm">
+      <header className="flex items-start gap-3 px-4 sm:px-5 pt-4 pb-2">
+        <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-heading text-base font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        </div>
+      </header>
+      <div className="px-4 sm:px-5 pb-5 pt-2 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+// Shared Tailwind classes for the New/Edit Medication dialog so it behaves as
+// a full-screen sheet on mobile and a roomy centered dialog on desktop —
+// mirrors the appointment modal pattern.
+const MED_DIALOG_CLASS =
+  "p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
+  "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(640px,calc(100vw-2rem))] sm:max-w-[640px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
+  "overflow-hidden flex flex-col";
+
+function MedicationForm({ initial, onSubmit, onCancel, physicians, isEdit }: {
   initial?: Partial<Medication>;
   onSubmit: (data: any) => void;
   onCancel: () => void;
   physicians: Physician[];
+  isEdit: boolean;
 }) {
   const [, navigate] = useLocation();
   const [form, setForm] = useState({
@@ -55,100 +102,234 @@ function MedicationForm({ initial, onSubmit, onCancel, physicians }: {
     active: initial?.active ?? 1,
   });
 
+  const canSubmit = Boolean(form.name && form.dosage);
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs font-body">Medication Name</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Lisinopril" data-testid="input-med-name" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Type</Label>
-          <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-            <SelectTrigger data-testid="select-med-type"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MED_TYPES.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-body">Dosage</Label>
-          <Input value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} placeholder="10mg" data-testid="input-med-dosage" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Frequency</Label>
-          <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-            <SelectTrigger data-testid="select-med-freq"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{f.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-body">Time of Day</Label>
-          <Select value={form.timeOfDay || "none"} onValueChange={(v) => setForm({ ...form, timeOfDay: v === "none" ? "" : v })}>
-            <SelectTrigger data-testid="select-med-time"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Not specified</SelectItem>
-              {TIMES_OF_DAY.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-body">Prescribed By</Label>
-          <Select value={form.prescribedBy || "none"} onValueChange={(v) => {
-            if (v === "__add_physician__") {
-              navigate("/physicians");
-              return;
-            }
-            setForm({ ...form, prescribedBy: v === "none" ? "" : v });
-          }}>
-            <SelectTrigger data-testid="select-med-prescribed"><SelectValue placeholder="Select physician" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Not specified</SelectItem>
-              {physicians.map((p) => <SelectItem key={p.id} value={p.name}>{p.name} — {p.specialty}</SelectItem>)}
-              <SelectItem value="__add_physician__" className="text-primary font-semibold">+ Add Physician</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-body">Pharmacy</Label>
-          <Input value={form.pharmacy || ""} onChange={(e) => setForm({ ...form, pharmacy: e.target.value })} placeholder="CVS Main St" data-testid="input-med-pharmacy" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Purpose</Label>
-          <Input value={form.purpose || ""} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="Blood pressure" data-testid="input-med-purpose" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Start Date</Label>
-          <Input type="date" value={form.startDate || ""} onChange={(e) => setForm({ ...form, startDate: e.target.value })} data-testid="input-med-start" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">End Date</Label>
-          <Input type="date" value={form.endDate || ""} onChange={(e) => setForm({ ...form, endDate: e.target.value })} data-testid="input-med-end" />
-        </div>
-        <div>
-          <Label className="text-xs font-body">Refill Date</Label>
-          <Input type="date" value={form.refillDate || ""} onChange={(e) => setForm({ ...form, refillDate: e.target.value })} data-testid="input-med-refill" />
-        </div>
-        <div className="flex items-center gap-2 pt-5">
-          <Switch checked={form.active === 1} onCheckedChange={(c) => setForm({ ...form, active: c ? 1 : 0 })} data-testid="switch-med-active" />
-          <Label className="text-xs font-body">Active</Label>
-        </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
+        <MedFieldSection
+          icon={Pill}
+          title="Medication Details"
+          description="What you're taking, how strong, and how often."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="med-name" className={medLabelClass}>Medication Name</Label>
+            <Input
+              id="med-name"
+              className={medControlClass}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Lisinopril"
+              data-testid="input-med-name"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className={medLabelClass}>Type</Label>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                <SelectTrigger className={medControlClass} data-testid="select-med-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MED_TYPES.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="med-dosage" className={medLabelClass}>Dosage</Label>
+              <Input
+                id="med-dosage"
+                className={medControlClass}
+                value={form.dosage}
+                onChange={(e) => setForm({ ...form, dosage: e.target.value })}
+                placeholder="10mg"
+                data-testid="input-med-dosage"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="med-purpose" className={medLabelClass}>Purpose</Label>
+            <Input
+              id="med-purpose"
+              className={medControlClass}
+              value={form.purpose || ""}
+              onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+              placeholder="Blood pressure"
+              data-testid="input-med-purpose"
+            />
+          </div>
+        </MedFieldSection>
+
+        <MedFieldSection
+          icon={Clock}
+          title="Schedule"
+          description="How often you take it and which part of the day."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className={medLabelClass}>Frequency</Label>
+              <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
+                <SelectTrigger className={medControlClass} data-testid="select-med-freq"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{f.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className={medLabelClass}>Time of Day</Label>
+              <Select value={form.timeOfDay || "none"} onValueChange={(v) => setForm({ ...form, timeOfDay: v === "none" ? "" : v })}>
+                <SelectTrigger className={medControlClass} data-testid="select-med-time"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  {TIMES_OF_DAY.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {isEdit && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+              <div className="min-w-0">
+                <Label className={medLabelClass}>Active</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Turn off to keep this medication in history without dose prompts.
+                </p>
+              </div>
+              <Switch
+                checked={form.active === 1}
+                onCheckedChange={(c) => setForm({ ...form, active: c ? 1 : 0 })}
+                data-testid="switch-med-active"
+              />
+            </div>
+          )}
+        </MedFieldSection>
+
+        <MedFieldSection
+          icon={Stethoscope}
+          title="Provider & Pharmacy"
+          description="Optional — helpful for refills and questions."
+        >
+          <div className="space-y-2">
+            <Label className={medLabelClass}>Prescribed By</Label>
+            <Select value={form.prescribedBy || "none"} onValueChange={(v) => {
+              if (v === "__add_physician__") {
+                navigate("/physicians");
+                return;
+              }
+              setForm({ ...form, prescribedBy: v === "none" ? "" : v });
+            }}>
+              <SelectTrigger className={medControlClass} data-testid="select-med-prescribed">
+                <SelectValue placeholder="Select physician" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="none">Not specified</SelectItem>
+                {physicians.map((p) => <SelectItem key={p.id} value={p.name}>{p.name} — {p.specialty}</SelectItem>)}
+                <SelectItem value="__add_physician__" className="text-primary font-semibold">+ Add Physician</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="med-pharmacy" className={medLabelClass}>Pharmacy</Label>
+            <Input
+              id="med-pharmacy"
+              className={medControlClass}
+              value={form.pharmacy || ""}
+              onChange={(e) => setForm({ ...form, pharmacy: e.target.value })}
+              placeholder="CVS Main St"
+              data-testid="input-med-pharmacy"
+            />
+          </div>
+        </MedFieldSection>
+
+        <MedFieldSection
+          icon={Calendar}
+          title="Important Dates"
+          description="Track when you started, when to stop, and your next refill."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="med-start" className={medLabelClass}>Start Date</Label>
+              <Input
+                id="med-start"
+                type="date"
+                className={medControlClass}
+                value={form.startDate || ""}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                data-testid="input-med-start"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="med-end" className={medLabelClass}>End Date</Label>
+              <Input
+                id="med-end"
+                type="date"
+                className={medControlClass}
+                value={form.endDate || ""}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                data-testid="input-med-end"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="med-refill" className={medLabelClass}>Refill Date</Label>
+            <Input
+              id="med-refill"
+              type="date"
+              className={medControlClass}
+              value={form.refillDate || ""}
+              onChange={(e) => setForm({ ...form, refillDate: e.target.value })}
+              data-testid="input-med-refill"
+            />
+          </div>
+        </MedFieldSection>
+
+        <MedFieldSection
+          icon={FileText}
+          title="Notes & Side Effects"
+          description="Anything to remember about this medication."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="med-side" className={medLabelClass}>Side Effects</Label>
+            <Input
+              id="med-side"
+              className={medControlClass}
+              value={form.sideEffects || ""}
+              onChange={(e) => setForm({ ...form, sideEffects: e.target.value })}
+              placeholder="Dizziness, cough..."
+              data-testid="input-med-side"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="med-notes" className={medLabelClass}>Notes</Label>
+            <Textarea
+              id="med-notes"
+              className="text-base min-h-[110px]"
+              value={form.notes || ""}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={4}
+              placeholder="Take with food..."
+              data-testid="input-med-notes"
+            />
+          </div>
+        </MedFieldSection>
       </div>
-      <div>
-        <Label className="text-xs font-body">Side Effects</Label>
-        <Input value={form.sideEffects || ""} onChange={(e) => setForm({ ...form, sideEffects: e.target.value })} placeholder="Dizziness, cough..." data-testid="input-med-side" />
-      </div>
-      <div>
-        <Label className="text-xs font-body">Notes</Label>
-        <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} data-testid="input-med-notes" />
-      </div>
-      <div className="flex gap-2 justify-end">
-        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSubmit(form)} disabled={!form.name || !form.dosage}
-          className="gradient-primary text-white border-none" data-testid="button-med-save">
-          {initial?.id ? "Update" : "Add"} Medication
+
+      {/* Sticky action bar */}
+      <div
+        className="sticky bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur px-4 sm:px-6 py-3 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+      >
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          className="h-12 text-base w-full sm:w-auto sm:min-w-[140px]"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={() => onSubmit(form)}
+          disabled={!canSubmit}
+          className="gradient-primary text-white border-none h-12 text-base font-semibold w-full sm:w-auto sm:min-w-[200px]"
+          data-testid="button-med-save"
+        >
+          {isEdit ? "Update Medication" : "Add Medication"}
         </Button>
       </div>
     </div>
@@ -269,14 +450,64 @@ export default function Medications() {
                       <Edit2 className="w-4 h-4" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-lg">
-                    <DialogHeader><DialogTitle className="font-heading">Edit Medication</DialogTitle></DialogHeader>
-                    <MedicationForm physicians={physicians} initial={med} onSubmit={(data) => updateMut.mutate({ id: med.id!, data })} onCancel={() => setEditing(null)} />
+                  <DialogContent className={MED_DIALOG_CLASS}>
+                    <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                      <DialogTitle className="font-heading text-2xl font-bold text-white">
+                        Edit Medication
+                      </DialogTitle>
+                      <DialogDescription className="text-white/85 text-sm">
+                        Update the medication details. Changes save when you press Update.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <MedicationForm
+                      physicians={physicians}
+                      initial={med}
+                      isEdit={true}
+                      onSubmit={(data) => updateMut.mutate({ id: med.id!, data })}
+                      onCancel={() => setEditing(null)}
+                    />
                   </DialogContent>
                 </Dialog>
-                <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(med.id!)} data-testid={`button-delete-med-${med.id}`}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      data-testid={`button-delete-med-${med.id}`}
+                      aria-label={`Delete medication ${med.name}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="max-w-md">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-heading flex items-center gap-2">
+                        <Trash2 className="w-5 h-5 text-destructive" />
+                        Delete medication?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        <span className="font-medium text-foreground">{med.name}</span>
+                        {med.dosage ? ` (${med.dosage})` : ""}
+                        {" "}will be permanently removed, along with its dose history. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:gap-2">
+                      <AlertDialogCancel
+                        className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                        data-testid={`button-delete-med-cancel-${med.id}`}
+                      >
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteMut.mutate(med.id!)}
+                        className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+                        data-testid={`button-delete-med-confirm-${med.id}`}
+                      >
+                        Delete medication
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           </div>
@@ -331,10 +562,22 @@ export default function Medications() {
                 <Plus className="w-4 h-4" /> Add Medication
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle className="font-heading">New Medication</DialogTitle></DialogHeader>
-            <MedicationForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
-          </DialogContent>
+            <DialogContent className={MED_DIALOG_CLASS}>
+              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                <DialogTitle className="font-heading text-2xl font-bold text-white">
+                  New Medication
+                </DialogTitle>
+                <DialogDescription className="text-white/85 text-sm">
+                  Fill in the basics — name and dosage are required. The rest you can come back to.
+                </DialogDescription>
+              </DialogHeader>
+              <MedicationForm
+                physicians={physicians}
+                isEdit={false}
+                onSubmit={(data) => createMut.mutate(data)}
+                onCancel={() => setOpen(false)}
+              />
+            </DialogContent>
           </Dialog>
         </div>
       </div>
