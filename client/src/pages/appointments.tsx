@@ -436,11 +436,11 @@ export default function Appointments() {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
+        <div className="min-w-0">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Appointments</h1>
-          <p className="text-base text-muted-foreground font-body mt-1.5">Manage your doctor visits and procedures</p>
+          <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Manage your doctor visits and procedures</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-1.5 h-10 print-button-area" onClick={() => {
@@ -643,14 +643,14 @@ function AppointmentCard({
   return (
     <Card className={`hover-elevate shadow-sm ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
       <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start gap-4">
-          <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
-            <span className={`text-[11px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
-            <span className={`text-2xl font-heading font-bold leading-none mt-1 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
+        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
+            <span className={`text-[10px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
+            <span className={`text-xl sm:text-2xl font-heading font-bold leading-none mt-1 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight">{apt.title}</h3>
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
               <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
               <Badge className={`text-xs font-medium ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
                 {apt.status === "completed" && <CheckCircle2 className="w-3 h-3 mr-1" />}
@@ -658,12 +658,12 @@ function AppointmentCard({
                 {apt.status}
               </Badge>
             </div>
-            <div className="flex items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{apt.time}</span>
-              {doc && <span className="flex items-center gap-1.5"><Stethoscope className="w-3.5 h-3.5" />{doc.name}</span>}
-              {apt.location && <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{apt.location}</span>}
+            <div className="flex items-center gap-x-3 sm:gap-x-4 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
+              <span className="flex items-center gap-1.5 min-w-0"><Clock className="w-3.5 h-3.5 flex-shrink-0" />{apt.time}</span>
+              {doc && <span className="flex items-center gap-1.5 min-w-0 truncate"><Stethoscope className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{doc.name}</span></span>}
+              {apt.location && <span className="flex items-center gap-1.5 min-w-0 truncate"><MapPin className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{apt.location}</span></span>}
             </div>
-            {apt.notes && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">{apt.notes}</p>}
+            {apt.notes && <p className="text-sm text-foreground/70 mt-1.5 line-clamp-2 break-words">{apt.notes}</p>}
           </div>
           <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
             <Dialog open={editingId === apt.id} onOpenChange={(o) => !o && setEditing(null)}>

@@ -24,6 +24,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText, Contact, Building2, IdCard } from "lucide-react";
 import type { Physician } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
+import { formatPersonName, formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
+
+function normalizePhysicianFields<T extends Partial<Physician>>(data: T): T {
+  return {
+    ...data,
+    name: data.name ? formatPersonName(data.name) : data.name,
+    specialty: data.specialty ? formatPersonName(data.specialty) : data.specialty,
+    address: data.address ? formatStreetAddress(data.address) : data.address,
+    city: data.city ? formatCity(data.city) : data.city,
+    state: data.state ? formatState(data.state) : data.state,
+  };
+}
 
 /* ---- Contact import helpers ---- */
 
@@ -412,11 +424,11 @@ export default function Physicians() {
   });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => createPhysician({ ...data, patientId: pid }),
+    mutationFn: (data: any) => createPhysician({ ...normalizePhysicianFields(data), patientId: pid }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["physicians", pid] }); setOpen(false); toast({ title: "Physician added" }); },
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => updatePhysician(id, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePhysician(id, normalizePhysicianFields(data)),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["physicians", pid] }); setEditing(null); toast({ title: "Physician updated" }); },
   });
   const deleteMut = useMutation({

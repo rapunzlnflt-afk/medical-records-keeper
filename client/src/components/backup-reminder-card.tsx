@@ -139,7 +139,7 @@ export function BackupReminderCard({ hasData }: { hasData: boolean }) {
           <div className={`w-10 h-10 rounded-lg ${styles.iconBg} flex items-center justify-center flex-shrink-0`}>
             <Icon className={`w-5 h-5 ${styles.iconText}`} />
           </div>
-          <div className="flex-1 min-w-[180px]">
+          <div className="flex-1 min-w-0 basis-full sm:basis-auto">
             <p className="font-heading text-sm font-bold">{state.title}</p>
             <p className="font-body text-xs text-muted-foreground mt-0.5 leading-relaxed">{state.body}</p>
           </div>

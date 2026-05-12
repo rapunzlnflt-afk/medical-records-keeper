@@ -51,7 +51,7 @@ function AppLayout() {
             <div className="flex-1" />
           </header>
         )}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
           <AppRouter />
         </main>
       </div>

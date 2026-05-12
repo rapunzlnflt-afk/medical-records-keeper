@@ -26,7 +26,16 @@ import {
   exportAllData, importAllData, getPatients,
 } from "@/lib/db";
 import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
+import { formatPersonName } from "@/lib/format-name";
 import type { Patient } from "@shared/schema";
+
+function normalizePatientFields<T extends Partial<Patient>>(data: T): T {
+  return {
+    ...data,
+    name: data.name ? formatPersonName(data.name) : data.name,
+    relationship: data.relationship ? formatPersonName(data.relationship) : data.relationship,
+  };
+}
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -75,7 +84,7 @@ function PatientSwitcher() {
     mutationFn: async (data: any) => {
       const existing = await getPatients();
       if (existing.length >= 6) throw new Error("Maximum of 6 family members allowed");
-      return createPatient(data);
+      return createPatient(normalizePatientFields(data));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
@@ -90,7 +99,7 @@ function PatientSwitcher() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => updatePatient(id, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => updatePatient(id, normalizePatientFields(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       setEditingId(null);
