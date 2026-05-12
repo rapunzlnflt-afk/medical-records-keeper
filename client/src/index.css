@@ -21,7 +21,7 @@
     --secondary-foreground: 215 33% 21%;
 
     --muted: 210 18% 91%;
-    --muted-foreground: 215 16% 37%;
+    --muted-foreground: 215 22% 30%;
 
     --accent: 224 76% 48%;
     --accent-foreground: 0 0% 100%;
@@ -71,7 +71,7 @@
     --secondary-foreground: 210 20% 92%;
 
     --muted: 215 25% 20%;
-    --muted-foreground: 210 14% 65%;
+    --muted-foreground: 210 18% 75%;
 
     --accent: 213 80% 65%;
     --accent-foreground: 216 40% 8%;
@@ -109,6 +109,19 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Slightly relaxed line-height + antialiasing for easier reading at
+       smaller text sizes throughout the app. */
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  /* Bump the truly-tiny utility text up to ~12.5px so meta lines on
+     cards (dates, location, etc.) stay readable. Tailwind's text-xs is
+     12px out of the box, and most of the app's secondary text uses it. */
+  .text-xs {
+    font-size: 0.78rem;
+    line-height: 1.45;
   }
 }
 

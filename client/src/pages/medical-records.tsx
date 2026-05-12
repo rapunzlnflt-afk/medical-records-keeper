@@ -11,6 +11,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe,
@@ -395,9 +406,46 @@ export default function MedicalRecords() {
                           <RecordForm physicians={physicians} initial={rec} onSubmit={(data) => updateMut.mutate({ id: rec.id!, data })} onCancel={() => setEditing(null)} />
                         </DialogContent>
                       </Dialog>
-                      <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(rec.id!)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            data-testid={`button-delete-rec-${rec.id}`}
+                            aria-label={`Delete medical record ${rec.title}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="max-w-md">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="font-heading flex items-center gap-2">
+                              <Trash2 className="w-5 h-5 text-destructive" />
+                              Delete medical record?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <span className="font-medium text-foreground">{rec.title}</span>
+                              {rec.category ? ` (${rec.category})` : ""}
+                              {" "}will be permanently removed, including any attached file or image. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="gap-2 sm:gap-2">
+                            <AlertDialogCancel
+                              className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                              data-testid={`button-delete-rec-cancel-${rec.id}`}
+                            >
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMut.mutate(rec.id!)}
+                              className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+                              data-testid={`button-delete-rec-confirm-${rec.id}`}
+                            >
+                              Delete record
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </CardContent>
