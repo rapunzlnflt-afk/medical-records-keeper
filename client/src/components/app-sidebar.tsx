@@ -25,6 +25,7 @@ import {
   createPatient, updatePatient, deletePatient as deletePatientDb,
   exportAllData, importAllData, getPatients,
 } from "@/lib/db";
+import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
 import type { Patient } from "@shared/schema";
 
 const navItems = [
@@ -278,17 +279,30 @@ export function AppSidebar() {
     setSaving(true);
     try {
       const data = await exportAllData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `medical-records-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      recordBackupExport();
-      toast({ title: "Data Saved", description: "Your backup file has been downloaded." });
+      const filename = `medical-records-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const outcome = await saveJsonBackup({
+        filename,
+        json: JSON.stringify(data, null, 2),
+        shareTitle: "Medical Records Backup",
+        shareText: "My Medical Records Keeper backup file.",
+      });
+      if (outcome.kind === "shared" || outcome.kind === "downloaded") {
+        recordBackupExport();
+      }
+      if (outcome.kind === "shared") {
+        toast({
+          title: "Backup ready",
+          description: isIosLike()
+            ? "Choose Save to Files (or Mail it to yourself) to keep it safe."
+            : "Choose where to save your backup file.",
+        });
+      } else if (outcome.kind === "downloaded") {
+        toast({ title: "Data Saved", description: `Downloaded ${filename}.` });
+      } else if (outcome.kind === "cancelled") {
+        toast({ title: "Save cancelled", description: "Your data is unchanged." });
+      } else {
+        toast({ title: "Error", description: "Could not save data. Please try again.", variant: "destructive" });
+      }
     } catch {
       toast({ title: "Error", description: "Could not save data. Please try again.", variant: "destructive" });
     } finally {
