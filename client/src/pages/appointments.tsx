@@ -19,6 +19,35 @@ import { format, parseISO, isAfter, isBefore } from "date-fns";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
 
+// 15-minute interval time options (00:00 through 23:45) with 12-hour display labels.
+const TIME_OPTIONS: { value: string; label: string }[] = (() => {
+  const opts: { value: string; label: string }[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const period = h < 12 ? "AM" : "PM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      const label = `${h12}:${String(m).padStart(2, "0")} ${period}`;
+      opts.push({ value, label });
+    }
+  }
+  return opts;
+})();
+
+// Snap an arbitrary "HH:MM" string to the nearest 15-minute slot so existing
+// records load cleanly into the new selector.
+function snapTo15(time: string): string {
+  if (!time || !/^\d{1,2}:\d{2}/.test(time)) return "";
+  const [hStr, mStr] = time.split(":");
+  let h = Number(hStr);
+  let m = Math.round(Number(mStr) / 15) * 15;
+  if (m === 60) { m = 0; h = (h + 1) % 24; }
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+const labelClass = "text-sm font-body font-medium text-foreground";
+const inputClass = "h-11 text-base";
+
 function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
   physicians: Physician[];
   initial?: Partial<Appointment>;
@@ -26,33 +55,37 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel }: {
   onCancel: () => void;
 }) {
   const [form, setForm] = useState({
-  title: initial?.title || "",
-  physicianId: initial?.physicianId || null,
-  date: initial?.date || "",
-  time: initial?.time || "",
-  location: initial?.location || "",
-  type: initial?.type || "checkup",
-  status: initial?.status || "upcoming",
-  notes: initial?.notes || "",
-  reminderDate: initial?.reminderDate || "",
-  reminderTime: initial?.reminderTime || "",
-});
+    title: initial?.title || "",
+    physicianId: initial?.physicianId || null,
+    date: initial?.date || "",
+    time: snapTo15(initial?.time || ""),
+    location: initial?.location || "",
+    type: initial?.type || "checkup",
+    status: initial?.status || "upcoming",
+    notes: initial?.notes || "",
+    reminderDate: initial?.reminderDate || "",
+    reminderTime: snapTo15(initial?.reminderTime || ""),
+  });
 
-const [showReminderOptions, 
-setShowReminderOptions] = useState(
-  Boolean(initial?.reminderDate || 
-initial?.reminderTime)
-);
+  const [showReminderOptions, setShowReminderOptions] = useState(
+    Boolean(initial?.reminderDate || initial?.reminderTime)
+  );
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs font-body">Title</Label>
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Annual checkup" data-testid="input-apt-title" />
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2 space-y-1.5">
+          <Label className={labelClass}>Title</Label>
+          <Input
+            className={inputClass}
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            placeholder="Annual checkup"
+            data-testid="input-apt-title"
+          />
         </div>
-        <div>
-          <Label className="text-xs font-body">Physician</Label>
+        <div className="sm:col-span-2 space-y-1.5">
+          <Label className={labelClass}>Physician</Label>
           <Select value={form.physicianId?.toString() || "none"} onValueChange={(v) => {
             const selectedId = v === "none" ? null : Number(v);
             const doc = physicians.find((p) => p.id === selectedId);
@@ -60,51 +93,71 @@ initial?.reminderTime)
             setForm(prev => ({
               ...prev,
               physicianId: selectedId,
-              // Auto-fill location from physician address if location is empty
               location: prev.location || docAddress,
             }));
           }}>
-            <SelectTrigger data-testid="select-apt-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
+            <SelectTrigger className={inputClass} data-testid="select-apt-physician"><SelectValue placeholder="Select physician" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
               {physicians.map((p) => <SelectItem key={p.id} value={p.id!.toString()}>{p.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <Label className="text-xs font-body">Date</Label>
-          <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="input-apt-date" />
+        <div className="space-y-1.5">
+          <Label className={labelClass}>Date</Label>
+          <Input
+            type="date"
+            className={inputClass}
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+            data-testid="input-apt-date"
+          />
         </div>
-        <div>
-          <Label className="text-xs font-body">Time</Label>
-          <Input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} data-testid="input-apt-time" />
+        <div className="space-y-1.5">
+          <Label className={labelClass}>Time</Label>
+          <Select value={form.time} onValueChange={(v) => setForm({ ...form, time: v })}>
+            <SelectTrigger className={inputClass} data-testid="select-apt-time">
+              <SelectValue placeholder="Select time" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {TIME_OPTIONS.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div>
-          <Label className="text-xs font-body">Type</Label>
+        <div className="space-y-1.5">
+          <Label className={labelClass}>Type</Label>
           <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-            <SelectTrigger data-testid="select-apt-type"><SelectValue /></SelectTrigger>
+            <SelectTrigger className={inputClass} data-testid="select-apt-type"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TYPES.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <Label className="text-xs font-body">Status</Label>
+        <div className="space-y-1.5">
+          <Label className={labelClass}>Status</Label>
           <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-            <SelectTrigger data-testid="select-apt-status"><SelectValue /></SelectTrigger>
+            <SelectTrigger className={inputClass} data-testid="select-apt-status"><SelectValue /></SelectTrigger>
             <SelectContent>
               {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-                <div className="sm:col-span-2">
-          <Label className="text-xs font-body">Location</Label>
-          <Input value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="123 Medical Pkwy" data-testid="input-apt-location" />
+        <div className="sm:col-span-2 space-y-1.5">
+          <Label className={labelClass}>Location</Label>
+          <Input
+            className={inputClass}
+            value={form.location || ""}
+            onChange={(e) => setForm({ ...form, location: e.target.value })}
+            placeholder="123 Medical Pkwy"
+            data-testid="input-apt-location"
+          />
         </div>
-        <div className="sm:col-span-2 rounded-md border p-3 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <Label className="text-xs font-body">Appointment Alert</Label>
+        <div className="sm:col-span-2 rounded-lg border p-4 space-y-3 bg-muted/30">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-[160px]">
+              <Label className={labelClass}>Appointment Alert</Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Choose when this appointment should appear as a reminder.
               </p>
@@ -113,6 +166,7 @@ initial?.reminderTime)
               type="button"
               variant="outline"
               size="sm"
+              className="h-9"
               onClick={() => setShowReminderOptions((prev) => !prev)}
             >
               {showReminderOptions ? "Hide" : (form.reminderDate || form.reminderTime) ? "Edit" : "Set alert"}
@@ -121,25 +175,33 @@ initial?.reminderTime)
 
           {showReminderOptions && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label className="text-xs font-body">Alert Date</Label>
+              <div className="space-y-1.5">
+                <Label className={labelClass}>Alert Date</Label>
                 <Input
                   type="date"
+                  className={inputClass}
                   value={form.reminderDate || ""}
                   onChange={(e) => setForm({ ...form, reminderDate: e.target.value })}
                   data-testid="input-apt-reminder"
                 />
               </div>
-              <div>
-                <Label className="text-xs font-body">Alert Time</Label>
-                <Input
-                  type="time"
+              <div className="space-y-1.5">
+                <Label className={labelClass}>Alert Time</Label>
+                <Select
                   value={form.reminderTime || ""}
-                  onChange={(e) => setForm({ ...form, reminderTime: e.target.value })}
-                  data-testid="input-apt-reminder-time"
-                />
+                  onValueChange={(v) => setForm({ ...form, reminderTime: v })}
+                >
+                  <SelectTrigger className={inputClass} data-testid="input-apt-reminder-time">
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {TIME_OPTIONS.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="sm:col-span-2 flex items-center justify-between gap-2">
+              <div className="sm:col-span-2 flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-xs text-muted-foreground">
                   Set both a date and time so reminders do not default to midnight.
                 </p>
@@ -164,13 +226,31 @@ initial?.reminderTime)
           )}
         </div>
       </div>
-      <div>
-        <Label className="text-xs font-body">Notes</Label>
-        <Textarea value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Bring insurance card..." rows={2} data-testid="input-apt-notes" />
+      <div className="space-y-1.5">
+        <Label className={labelClass}>Notes</Label>
+        <Textarea
+          className="text-base"
+          value={form.notes || ""}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          placeholder="Bring insurance card..."
+          rows={3}
+          data-testid="input-apt-notes"
+        />
       </div>
-      <div className="flex gap-2 justify-end">
-        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSubmit(form)} disabled={!form.title || !form.date || !form.time} className="gradient-primary text-white border-none" data-testid="button-apt-save">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          className="h-11 sm:flex-1 sm:max-w-[160px]"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={() => onSubmit(form)}
+          disabled={!form.title || !form.date || !form.time}
+          className="gradient-primary text-white border-none h-11 sm:flex-1 sm:max-w-[220px] font-semibold"
+          data-testid="button-apt-save"
+        >
           {initial?.id ? "Update" : "Add"} Appointment
         </Button>
       </div>
