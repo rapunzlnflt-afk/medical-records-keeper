@@ -12,6 +12,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown } from "lucide-react";
@@ -670,9 +681,50 @@ function AppointmentCard({
                 />
               </DialogContent>
             </Dialog>
-            <Button size="icon" variant="ghost" onClick={() => onDelete(apt.id!)} data-testid={`button-delete-apt-${apt.id}`}>
-              <Trash2 className="w-4 h-4 text-destructive" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  data-testid={`button-delete-apt-${apt.id}`}
+                  aria-label={`Delete appointment ${apt.title}`}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-heading flex items-center gap-2">
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                    Delete appointment?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    <span className="font-medium text-foreground">{apt.title}</span>
+                    {" "}on{" "}
+                    <span className="font-medium text-foreground">
+                      {format(parseISO(apt.date), "MMM d, yyyy")}
+                    </span>
+                    {apt.time ? ` at ${apt.time}` : ""}{" "}
+                    will be permanently removed. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:gap-2">
+                  <AlertDialogCancel
+                    className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                    data-testid={`button-delete-apt-cancel-${apt.id}`}
+                  >
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(apt.id!)}
+                    className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+                    data-testid={`button-delete-apt-confirm-${apt.id}`}
+                  >
+                    Delete appointment
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </CardContent>
