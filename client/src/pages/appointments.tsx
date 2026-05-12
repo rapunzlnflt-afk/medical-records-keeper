@@ -439,11 +439,11 @@ export default function Appointments() {
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-heading text-xl font-bold">Appointments</h1>
-          <p className="text-sm text-muted-foreground font-body mt-1">Manage your doctor visits and procedures</p>
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Appointments</h1>
+          <p className="text-base text-muted-foreground font-body mt-1.5">Manage your doctor visits and procedures</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => {
+          <Button variant="outline" className="gap-1.5 h-10 print-button-area" onClick={() => {
             const printContent = document.querySelector('[data-testid="appointments-list"]');
             if (!printContent) return;
             const w = window.open('', '_blank', 'width=800,height=600');
@@ -476,7 +476,7 @@ export default function Appointments() {
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-appointment">
+              <Button className="gradient-primary text-white border-none gap-1.5 h-10" data-testid="button-add-appointment">
                 <Plus className="w-4 h-4" /> Add Appointment
               </Button>
             </DialogTrigger>
@@ -501,17 +501,17 @@ export default function Appointments() {
       </div>
 
       {/* Mini Calendar */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-primary" />
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary" />
             {format(currentMonth, "MMMM yyyy")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-1 text-center">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="text-xs font-heading font-semibold text-muted-foreground py-1">{d}</div>
+              <div key={d} className="text-xs font-heading font-semibold text-muted-foreground py-1.5">{d}</div>
             ))}
             {Array.from({ length: firstDayOfWeek }).map((_, i) => (
               <div key={`e-${i}`} />
@@ -522,9 +522,18 @@ export default function Appointments() {
               const hasAppt = monthAppts.some((a) => a.date === dateStr);
               const isToday = dateStr === today;
               return (
-                <div key={day} className={`text-xs py-1.5 rounded-md relative ${isToday ? "gradient-primary text-white font-bold" : hasAppt ? "bg-primary/10 font-semibold" : ""}`}>
+                <div
+                  key={day}
+                  className={`text-sm py-2.5 rounded-md relative ${
+                    isToday
+                      ? "gradient-primary text-white font-bold"
+                      : hasAppt
+                      ? "bg-primary/10 font-semibold text-foreground"
+                      : "text-foreground/85"
+                  }`}
+                >
                   {day}
-                  {hasAppt && !isToday && <div className="w-1 h-1 rounded-full gradient-primary mx-auto mt-0.5" />}
+                  {hasAppt && !isToday && <div className="w-1.5 h-1.5 rounded-full gradient-primary mx-auto mt-0.5" />}
                 </div>
               );
             })}
@@ -540,18 +549,18 @@ export default function Appointments() {
           <>
             {/* Upcoming */}
             <div className="flex items-center justify-between gap-2 pt-1">
-              <h2 className="font-heading text-base font-semibold flex items-center gap-2">
-                <Clock className="w-4 h-4 text-primary" />
+              <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
+                <Clock className="w-5 h-5 text-primary" />
                 Upcoming
-                <Badge variant="secondary" className="text-[10px] font-medium">{activeList.length}</Badge>
+                <Badge variant="secondary" className="text-xs font-semibold">{activeList.length}</Badge>
               </h2>
             </div>
 
             {activeList.length === 0 ? (
-              <Card>
+              <Card className="shadow-sm">
                 <CardContent className="py-10 text-center">
                   <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-                  <p className="text-sm text-muted-foreground">No upcoming appointments</p>
+                  <p className="text-base text-muted-foreground">No upcoming appointments</p>
                 </CardContent>
               </Card>
             ) : (
@@ -569,22 +578,22 @@ export default function Appointments() {
             )}
 
             {/* History (collapsible) */}
-            <Card className="mt-2">
+            <Card className="mt-3 shadow-sm">
               <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
-                    className="w-full text-left hover-elevate rounded-md"
+                    className="w-full text-left hover-elevate rounded-md min-h-[3rem]"
                     aria-label={historyOpen ? "Hide Appointment History" : "Show Appointment History"}
                     data-testid="button-toggle-appointment-history"
                   >
-                    <CardHeader className="py-3">
-                      <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-                        <History className="w-4 h-4 text-primary" />
+                    <CardHeader className="py-3.5">
+                      <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+                        <History className="w-5 h-5 text-primary" />
                         <span>Appointment History</span>
-                        <Badge variant="secondary" className="text-[10px] font-medium">{historyList.length}</Badge>
+                        <Badge variant="secondary" className="text-xs font-semibold">{historyList.length}</Badge>
                         <span className="ml-auto text-muted-foreground">
-                          <ChevronDown className={`w-4 h-4 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
+                          <ChevronDown className={`w-5 h-5 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
                         </span>
                       </CardTitle>
                     </CardHeader>
@@ -593,7 +602,7 @@ export default function Appointments() {
                 <CollapsibleContent>
                   <CardContent className="pt-0 space-y-3">
                     {historyList.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">No past appointments yet.</p>
+                      <p className="text-base text-muted-foreground py-4 text-center">No past appointments yet.</p>
                     ) : (
                       historyList.map((apt) => (
                         <AppointmentCard
@@ -632,35 +641,35 @@ function AppointmentCard({
 }) {
   const doc = physicians.find((p) => p.id === apt.physicianId);
   return (
-    <Card className={`hover-elevate ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
-            <span className={`text-xs font-heading font-bold leading-none ${muted ? "text-muted-foreground" : "text-white"}`}>{format(parseISO(apt.date), "MMM")}</span>
-            <span className={`text-lg font-heading font-bold leading-none ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
+    <Card className={`hover-elevate shadow-sm ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-start gap-4">
+          <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
+            <span className={`text-[11px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
+            <span className={`text-2xl font-heading font-bold leading-none mt-1 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-heading text-sm font-semibold">{apt.title}</h3>
-              <Badge variant="secondary" className="text-xs">{apt.type}</Badge>
-              <Badge className={`text-xs ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
+              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight">{apt.title}</h3>
+              <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
+              <Badge className={`text-xs font-medium ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
                 {apt.status === "completed" && <CheckCircle2 className="w-3 h-3 mr-1" />}
                 {apt.status === "cancelled" && <XCircle className="w-3 h-3 mr-1" />}
                 {apt.status}
               </Badge>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{apt.time}</span>
-              {doc && <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{doc.name}</span>}
-              {apt.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{apt.location}</span>}
+            <div className="flex items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{apt.time}</span>
+              {doc && <span className="flex items-center gap-1.5"><Stethoscope className="w-3.5 h-3.5" />{doc.name}</span>}
+              {apt.location && <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{apt.location}</span>}
             </div>
-            {apt.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{apt.notes}</p>}
+            {apt.notes && <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">{apt.notes}</p>}
           </div>
-          <div className="flex gap-1 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
             <Dialog open={editingId === apt.id} onOpenChange={(o) => !o && setEditing(null)}>
               <DialogTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
-                  <Edit2 className="w-4 h-4" />
+                <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
+                  <Edit2 className="w-5 h-5" />
                 </Button>
               </DialogTrigger>
               <DialogContent className={APT_DIALOG_CLASS}>
@@ -686,10 +695,11 @@ function AppointmentCard({
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="h-10 w-10"
                   data-testid={`button-delete-apt-${apt.id}`}
                   aria-label={`Delete appointment ${apt.title}`}
                 >
-                  <Trash2 className="w-4 h-4 text-destructive" />
+                  <Trash2 className="w-5 h-5 text-destructive" />
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="max-w-md">

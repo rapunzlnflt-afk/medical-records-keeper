@@ -46,15 +46,15 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
 }) {
   return (
     <Link href={href} className="block h-full">
-      <Card className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent" : ""}`} data-testid={`stat-${title.toLowerCase().replace(/\\s+/g, "-")}`}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className={`text-xs font-body ${gradient ? "text-white/80" : "text-muted-foreground"}`}>{title}</p>
-              <p className={`text-2xl font-heading font-bold mt-1 ${gradient ? "text-white" : ""}`}>{value}</p>
+      <Card className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent shadow-md" : "shadow-sm"}`} data-testid={`stat-${title.toLowerCase().replace(/\\s+/g, "-")}`}>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className={`text-sm font-body font-semibold ${gradient ? "text-white/90" : "text-muted-foreground"}`}>{title}</p>
+              <p className={`text-4xl font-heading font-bold mt-1.5 leading-none ${gradient ? "text-white" : ""}`}>{value}</p>
             </div>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${gradient ? "bg-white/20" : "gradient-primary"}`}>
-              <Icon className={`w-5 h-5 ${gradient ? "text-white" : "text-white"}`} />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${gradient ? "bg-white/20" : "gradient-primary"}`}>
+              <Icon className="w-6 h-6 text-white" />
             </div>
           </div>
         </CardContent>
@@ -219,8 +219,8 @@ const getReminderStatusLabel = (appointment: Appointment) => {
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
       <div>
-        <h1 className="font-heading text-xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground font-body mt-1">
+        <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-base text-muted-foreground font-body mt-1.5">
           {activePatient ? `${activePatient.name.endsWith('s') ? activePatient.name + "'" : activePatient.name + "'s"} health overview` : "Your health overview at a glance"}
         </p>
       </div>
@@ -268,19 +268,19 @@ const getReminderStatusLabel = (appointment: Appointment) => {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 items-start">
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" />
+            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
               Upcoming Appointments
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2.5">
             {upcoming.length === 0 ? (
-              <div className="text-center py-6">
-                <CalendarDays className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                <p className="text-sm text-muted-foreground">No upcoming appointments</p>
-                <Link href="/appointments" className="text-xs text-primary hover:underline mt-1 inline-block">
+              <div className="text-center py-8">
+                <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+                <p className="text-base text-muted-foreground">No upcoming appointments</p>
+                <Link href="/appointments" className="text-sm font-semibold text-primary hover:underline mt-2 inline-block">
                   Schedule one
                 </Link>
               </div>
@@ -290,40 +290,48 @@ const getReminderStatusLabel = (appointment: Appointment) => {
                 const hasFiredReminder = reminders.some((r) => r.id === apt.id);
                 const reminderStatus = hasFiredReminder ? getReminderStatusLabel(apt) : null;
                 return (
-                  <div key={apt.id} className="flex items-center gap-3 p-2 rounded-md bg-secondary/50" data-testid={`upcoming-apt-${apt.id}`}>
-                    <div className="w-10 h-10 rounded-md gradient-primary flex items-center justify-center flex-shrink-0 relative">
-                      <span className="text-white text-xs font-heading font-bold">
+                  <Link
+                    key={apt.id}
+                    href="/appointments"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 hover-elevate"
+                    data-testid={`upcoming-apt-${apt.id}`}
+                  >
+                    <div className="w-14 h-14 rounded-lg gradient-primary flex flex-col items-center justify-center flex-shrink-0 relative">
+                      <span className="text-white text-[10px] font-heading font-bold leading-none uppercase tracking-wide">
+                        {format(parseISO(apt.date), "MMM")}
+                      </span>
+                      <span className="text-white text-xl font-heading font-bold leading-none mt-0.5">
                         {format(parseISO(apt.date), "dd")}
                       </span>
                       {hasFiredReminder && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary border-2 border-background flex items-center justify-center">
-                          <Bell className="w-2 h-2 text-white" />
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary border-2 border-background flex items-center justify-center">
+                          <Bell className="w-2.5 h-2.5 text-white" />
                         </span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate">{apt.title}</p>
+                        <p className="text-base font-semibold truncate">{apt.title}</p>
                         {reminderStatus && (
-                          <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-[10px] font-medium px-2 py-0.5">
+                          <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5">
                             {reminderStatus}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {format(parseISO(apt.date), "MMM d")} at {apt.time}
+                      <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                        {format(parseISO(apt.date), "EEE MMM d")} at {apt.time}
                         {doc ? ` · ${doc.name}` : ""}
                       </p>
                     </div>
-                    <Badge variant="secondary" className="text-xs flex-shrink-0">{apt.type}</Badge>
-                  </div>
+                    <Badge variant="secondary" className="text-xs flex-shrink-0 font-medium">{apt.type}</Badge>
+                  </Link>
                 );
               })
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <Collapsible open={medSummaryOpen} onOpenChange={setMedSummaryOpen}>
             <CollapsibleTrigger asChild>
               <button
@@ -333,10 +341,10 @@ const getReminderStatusLabel = (appointment: Appointment) => {
                 data-testid="button-toggle-medication-summary"
               >
                 <CardHeader className="pb-3">
-                  <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-                    <Pill className="w-4 h-4 text-primary" />
+                  <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+                    <Pill className="w-5 h-5 text-primary" />
                     <span>Medication Summary</span>
-                    <Badge variant="secondary" className="text-[10px] font-medium">
+                    <Badge variant="secondary" className="text-xs font-semibold">
                       {activeMeds.length}
                     </Badge>
                     {!medSummaryOpen && refillSoon.length > 0 && (
