@@ -12,8 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown } from "lucide-react";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
@@ -144,7 +145,7 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className={isEdit ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : ""}>
             <div className="space-y-2">
               <Label className={labelClass}>Type</Label>
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
@@ -154,15 +155,17 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label className={labelClass}>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger className={controlClass} data-testid="select-apt-status"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {isEdit && (
+              <div className="space-y-2">
+                <Label className={labelClass}>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger className={controlClass} data-testid="select-apt-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="apt-location" className={labelClass}>Location</Label>
@@ -335,12 +338,19 @@ const APT_DIALOG_CLASS =
   "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(640px,calc(100vw-2rem))] sm:max-w-[640px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
   "overflow-hidden flex flex-col";
 
+// Considered "past" when its scheduled date+time has already gone by.
+// Uses end-of-day if no time is set so all-day items don't expire at midnight.
+function hasAppointmentPassed(a: Appointment): boolean {
+  const startIso = a.time ? `${a.date}T${a.time}:00` : `${a.date}T23:59:59`;
+  return new Date(startIso).getTime() < Date.now();
+}
+
 export default function Appointments() {
   const { activePatientId } = usePatient();
   const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
-  const [filter, setFilter] = useState<string>("all");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
@@ -373,12 +383,20 @@ export default function Appointments() {
   });
 
   const today = new Date().toISOString().split("T")[0];
-  const filtered = appointments.filter((a) => {
-    if (filter === "upcoming") return a.status === "upcoming" && a.date >= today;
-    if (filter === "past") return a.status === "completed" || a.date < today;
-    if (filter === "cancelled") return a.status === "cancelled";
-    return true;
-  });
+  // Active = anything still on the schedule (not yet passed, not cancelled).
+  // History = everything else: explicitly completed, explicitly cancelled, or
+  // simply in the past.
+  const sortAscByDateTime = (a: Appointment, b: Appointment) => {
+    const aKey = `${a.date}T${a.time || "00:00"}`;
+    const bKey = `${b.date}T${b.time || "00:00"}`;
+    return aKey.localeCompare(bKey);
+  };
+  const activeList = appointments
+    .filter((a) => a.status !== "cancelled" && a.status !== "completed" && !hasAppointmentPassed(a))
+    .sort(sortAscByDateTime);
+  const historyList = appointments
+    .filter((a) => a.status === "cancelled" || a.status === "completed" || hasAppointmentPassed(a))
+    .sort((a, b) => -sortAscByDateTime(a, b));
 
   // Simple calendar view data
   const currentMonth = new Date();
@@ -410,10 +428,16 @@ export default function Appointments() {
               .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
               .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: #dbeafe; color: #1e40af; margin-left: 6px; }
             </style></head><body><h1>Appointments</h1>`);
-            filtered.forEach((apt) => {
+            const writeApt = (apt: Appointment) => {
               const doc = physicians.find((p) => p.id === apt.physicianId);
               w.document.write(`<div class="card"><div class="title">${apt.title} <span class="badge">${apt.type}</span> <span class="badge">${apt.status}</span></div><div class="meta">${apt.date} at ${apt.time}${doc ? ' &mdash; ' + doc.name : ''}${apt.location ? ' &mdash; ' + apt.location : ''}</div>${apt.notes ? '<div class="meta">' + apt.notes + '</div>' : ''}</div>`);
-            });
+            };
+            w.document.write('<h2 style="font-family:Montserrat,Arial,sans-serif;font-size:16px;margin:20px 0 10px;">Upcoming</h2>');
+            if (activeList.length === 0) w.document.write('<p style="font-size:12px;color:#64748b;">No upcoming appointments.</p>');
+            activeList.forEach(writeApt);
+            w.document.write('<h2 style="font-family:Montserrat,Arial,sans-serif;font-size:16px;margin:20px 0 10px;">History</h2>');
+            if (historyList.length === 0) w.document.write('<p style="font-size:12px;color:#64748b;">No past appointments.</p>');
+            historyList.forEach(writeApt);
             w.document.write('</body></html>');
             w.document.close();
             w.focus();
@@ -480,92 +504,161 @@ export default function Appointments() {
         </CardContent>
       </Card>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {["all", "upcoming", "past", "cancelled"].map((f) => (
-          <Button key={f} variant={filter === f ? "default" : "outline"} size="sm"
-            className={filter === f ? "gradient-primary text-white border-none" : ""}
-            onClick={() => setFilter(f)} data-testid={`filter-${f}`}>
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </Button>
-        ))}
-      </div>
-
       {/* List */}
       <div className="space-y-3" data-testid="appointments-list">
         {isLoading ? (
           <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)}</div>
-        ) : filtered.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">No appointments found</p>
-            </CardContent>
-          </Card>
         ) : (
-          filtered.map((apt) => {
-            const doc = physicians.find((p) => p.id === apt.physicianId);
-            return (
-              <Card key={apt.id} className="hover-elevate" data-testid={`appointment-${apt.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-lg gradient-primary flex flex-col items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs font-heading font-bold leading-none">{format(parseISO(apt.date), "MMM")}</span>
-                      <span className="text-white text-lg font-heading font-bold leading-none">{format(parseISO(apt.date), "dd")}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-heading text-sm font-semibold">{apt.title}</h3>
-                        <Badge variant="secondary" className="text-xs">{apt.type}</Badge>
-                        <Badge className={`text-xs ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
-                          {apt.status === "completed" && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                          {apt.status === "cancelled" && <XCircle className="w-3 h-3 mr-1" />}
-                          {apt.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{apt.time}</span>
-                        {doc && <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{doc.name}</span>}
-                        {apt.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{apt.location}</span>}
-                      </div>
-                      {apt.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{apt.notes}</p>}
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <Dialog open={editing?.id === apt.id} onOpenChange={(o) => !o && setEditing(null)}>
-                        <DialogTrigger asChild>
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className={APT_DIALOG_CLASS}>
-                          <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
-                            <DialogTitle className="font-heading text-2xl sm:text-2xl font-bold text-white">
-                              Edit Appointment
-                            </DialogTitle>
-                            <DialogDescription className="text-white/85 text-sm">
-                              Update the visit details. Changes save when you press Update.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <AppointmentForm
-                            physicians={physicians}
-                            initial={apt}
-                            isEdit={true}
-                            onSubmit={(data) => updateMut.mutate({ id: apt.id!, data })}
-                            onCancel={() => setEditing(null)}
-                          />
-                        </DialogContent>
-                      </Dialog>
-                      <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(apt.id!)} data-testid={`button-delete-apt-${apt.id}`}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
+          <>
+            {/* Upcoming */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <h2 className="font-heading text-base font-semibold flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                Upcoming
+                <Badge variant="secondary" className="text-[10px] font-medium">{activeList.length}</Badge>
+              </h2>
+            </div>
+
+            {activeList.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+                  <p className="text-sm text-muted-foreground">No upcoming appointments</p>
                 </CardContent>
               </Card>
-            );
-          })
+            ) : (
+              activeList.map((apt) => (
+                <AppointmentCard
+                  key={apt.id}
+                  apt={apt}
+                  physicians={physicians}
+                  editingId={editing?.id ?? null}
+                  setEditing={setEditing}
+                  onSave={(id, data) => updateMut.mutate({ id, data })}
+                  onDelete={(id) => deleteMut.mutate(id)}
+                />
+              ))
+            )}
+
+            {/* History (collapsible) */}
+            <Card className="mt-2">
+              <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full text-left hover-elevate rounded-md"
+                    aria-label={historyOpen ? "Hide Appointment History" : "Show Appointment History"}
+                    data-testid="button-toggle-appointment-history"
+                  >
+                    <CardHeader className="py-3">
+                      <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
+                        <History className="w-4 h-4 text-primary" />
+                        <span>Appointment History</span>
+                        <Badge variant="secondary" className="text-[10px] font-medium">{historyList.length}</Badge>
+                        <span className="ml-auto text-muted-foreground">
+                          <ChevronDown className={`w-4 h-4 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 space-y-3">
+                    {historyList.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">No past appointments yet.</p>
+                    ) : (
+                      historyList.map((apt) => (
+                        <AppointmentCard
+                          key={apt.id}
+                          apt={apt}
+                          physicians={physicians}
+                          editingId={editing?.id ?? null}
+                          setEditing={setEditing}
+                          onSave={(id, data) => updateMut.mutate({ id, data })}
+                          onDelete={(id) => deleteMut.mutate(id)}
+                          muted
+                        />
+                      ))
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+function AppointmentCard({
+  apt, physicians, editingId, setEditing, onSave, onDelete, muted,
+}: {
+  apt: Appointment;
+  physicians: Physician[];
+  editingId: number | null;
+  setEditing: (a: Appointment | null) => void;
+  onSave: (id: number, data: any) => void;
+  onDelete: (id: number) => void;
+  muted?: boolean;
+}) {
+  const doc = physicians.find((p) => p.id === apt.physicianId);
+  return (
+    <Card className={`hover-elevate ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
+            <span className={`text-xs font-heading font-bold leading-none ${muted ? "text-muted-foreground" : "text-white"}`}>{format(parseISO(apt.date), "MMM")}</span>
+            <span className={`text-lg font-heading font-bold leading-none ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-heading text-sm font-semibold">{apt.title}</h3>
+              <Badge variant="secondary" className="text-xs">{apt.type}</Badge>
+              <Badge className={`text-xs ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
+                {apt.status === "completed" && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                {apt.status === "cancelled" && <XCircle className="w-3 h-3 mr-1" />}
+                {apt.status}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{apt.time}</span>
+              {doc && <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{doc.name}</span>}
+              {apt.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{apt.location}</span>}
+            </div>
+            {apt.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{apt.notes}</p>}
+          </div>
+          <div className="flex gap-1 flex-shrink-0">
+            <Dialog open={editingId === apt.id} onOpenChange={(o) => !o && setEditing(null)}>
+              <DialogTrigger asChild>
+                <Button size="icon" variant="ghost" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className={APT_DIALOG_CLASS}>
+                <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                  <DialogTitle className="font-heading text-2xl sm:text-2xl font-bold text-white">
+                    Edit Appointment
+                  </DialogTitle>
+                  <DialogDescription className="text-white/85 text-sm">
+                    Update the visit details. Changes save when you press Update.
+                  </DialogDescription>
+                </DialogHeader>
+                <AppointmentForm
+                  physicians={physicians}
+                  initial={apt}
+                  isEdit={true}
+                  onSubmit={(data) => onSave(apt.id!, data)}
+                  onCancel={() => setEditing(null)}
+                />
+              </DialogContent>
+            </Dialog>
+            <Button size="icon" variant="ghost" onClick={() => onDelete(apt.id!)} data-testid={`button-delete-apt-${apt.id}`}>
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
