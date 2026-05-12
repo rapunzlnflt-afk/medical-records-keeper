@@ -86,10 +86,34 @@ export default function Dashboard() {
     [],
   );
 
-  const today = new Date().toISOString().split("T")[0];
-  const upcoming = appointments.filter(
-    (a) => a.status === "upcoming" && a.date >= today
-  ).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+  // Numeric "start time" for an appointment so the dashboard can both filter
+  // out past items and sort the remaining ones next-first using one consistent
+  // wall-clock interpretation. End-of-day fallback for missing time keeps
+  // all-day items visible until midnight local.
+  const appointmentStartMs = (a: Appointment): number => {
+    const date = (a.date || "").trim();
+    if (!date) return Number.POSITIVE_INFINITY;
+    const raw = (a.time || "").trim();
+    let hh = 23, mm = 59;
+    const m = raw.match(/^(\d{1,2}):(\d{1,2})/);
+    if (m) {
+      hh = Math.min(23, Math.max(0, Number(m[1])));
+      mm = Math.min(59, Math.max(0, Number(m[2])));
+    }
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const ms = new Date(`${date}T${pad(hh)}:${pad(mm)}:00`).getTime();
+    return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+  };
+  const isUpcoming = (a: Appointment) => {
+    if (a.status === "cancelled") return false;
+    if (a.status === "completed") return false;
+    return appointmentStartMs(a) >= Date.now();
+  };
+  const upcomingAll = appointments.filter(isUpcoming);
+  const upcoming = upcomingAll
+    .slice()
+    .sort((a, b) => appointmentStartMs(a) - appointmentStartMs(b))
+    .slice(0, 5);
 
   const activeMeds = medications.filter((m) => m.active === 1);
   const refillSoon = activeMeds.filter((m) => {
@@ -237,7 +261,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        <StatCard title="Appointments" value={appointments.filter(a => a.status === "upcoming").length} icon={CalendarDays} href="/appointments" gradient />
+        <StatCard title="Appointments" value={upcomingAll.length} icon={CalendarDays} href="/appointments" gradient />
         <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
         <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
         <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
