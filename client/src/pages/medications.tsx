@@ -26,7 +26,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, XCircle, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar } from "lucide-react";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 import { useLocation } from "wouter";
@@ -377,8 +377,11 @@ export default function Medications() {
     onSuccess: () => { invalidateMeds(); toast({ title: "Medication deleted" }); },
   });
   const logMut = useMutation({
-    mutationFn: (data: any) => createMedicationLog(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medication-logs"] }); toast({ title: "Dose logged" }); },
+    mutationFn: (data: Omit<MedicationLog, "id">) => createMedicationLog(data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["medication-logs"] });
+      toast({ title: variables.taken ? "Dose taken" : "Dose skipped" });
+    },
   });
 
   const active = medications.filter((m) => m.active === 1);
@@ -391,6 +394,7 @@ export default function Medications() {
       date: today,
       taken: taken ? 1 : 0,
       time: format(new Date(), "HH:mm"),
+      notes: null,
     });
   };
 
@@ -452,9 +456,15 @@ export default function Medications() {
             <div className="flex items-center gap-2 flex-wrap">
               {med.active === 1 && (
                 todayLog ? (
-                  <Badge className="status-completed text-xs font-semibold h-9 px-3">
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Taken
-                  </Badge>
+                  todayLog.taken ? (
+                    <Badge className="status-completed text-xs font-semibold h-9 px-3" data-testid={`badge-taken-${med.id}`}>
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Taken
+                    </Badge>
+                  ) : (
+                    <Badge className="status-skipped text-xs font-semibold h-9 px-3" data-testid={`badge-skipped-${med.id}`}>
+                      <XCircle className="w-3.5 h-3.5 mr-1" />Skipped
+                    </Badge>
+                  )
                 ) : (
                   <>
                     <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-sm h-9 px-4" data-testid={`button-take-${med.id}`}>
@@ -618,14 +628,26 @@ export default function Medications() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 min-w-0">
               {active.map((med) => {
                 const todayLog = logs.find((l) => l.medicationId === med.id && l.date === today);
+                const taken = !!todayLog && !!todayLog.taken;
+                const skipped = !!todayLog && !todayLog.taken;
                 return (
-                  <div key={med.id} className={`p-2.5 rounded-md text-center text-sm min-w-0 ${todayLog ? "bg-green-50 dark:bg-green-950/20" : "bg-secondary/50"}`}>
+                  <div
+                    key={med.id}
+                    className={`p-2.5 rounded-md text-center text-sm min-w-0 ${
+                      taken
+                        ? "bg-green-50 dark:bg-green-950/20"
+                        : skipped
+                          ? "bg-amber-50 dark:bg-amber-950/20"
+                          : "bg-secondary/50"
+                    }`}
+                  >
                     <div className="flex items-center justify-center gap-1 mb-1 min-w-0">
                       {timeIcon(med.timeOfDay)}
                       <span className="font-semibold truncate">{med.name}</span>
                     </div>
                     <span className="text-muted-foreground">{med.dosage}</span>
-                    {todayLog && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 mx-auto mt-1" />}
+                    {taken && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 mx-auto mt-1" />}
+                    {skipped && <XCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mx-auto mt-1" />}
                   </div>
                 );
               })}
