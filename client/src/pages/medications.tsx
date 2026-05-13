@@ -400,115 +400,138 @@ export default function Medications() {
 
     return (
       <Card className="hover-elevate" data-testid={`medication-${med.id}`}>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
+          {/* Header row: icon + full-width title that wraps naturally */}
           <div className="flex items-start gap-3 min-w-0">
             <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
               <Pill className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{med.name}</h3>
-                <Badge variant="secondary" className="text-xs font-medium flex-shrink-0">{med.type}</Badge>
-                {!med.active && <Badge variant="outline" className="text-xs font-medium flex-shrink-0">Inactive</Badge>}
+              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words">
+                {med.name}
+              </h3>
+              <div className="flex items-center gap-2 flex-wrap mt-1">
+                <Badge variant="secondary" className="text-xs font-medium">{med.type}</Badge>
+                {!med.active && <Badge variant="outline" className="text-xs font-medium">Inactive</Badge>}
               </div>
-              <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-foreground/80 flex-wrap min-w-0">
-                <span className="font-medium">{med.dosage}</span>
-                <span className="flex items-center gap-1">{timeIcon(med.timeOfDay)}{med.frequency}</span>
-                {med.purpose && <span className="text-muted-foreground">{med.purpose}</span>}
-              </div>
-              {med.prescribedBy && <p className="text-sm text-muted-foreground mt-1">Rx: {med.prescribedBy}</p>}
-              {med.pharmacy && <p className="text-sm text-muted-foreground">Pharmacy: {med.pharmacy}</p>}
-              {med.refillDate && (
-                <p className="text-sm mt-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5">
-                    <AlertCircle className="w-3.5 h-3.5" />Refill: {format(parseISO(med.refillDate), "MMM d, yyyy")}
-                  </span>
-                </p>
+            </div>
+          </div>
+
+          {/* Details row: reads across the card, wraps cleanly on narrow widths */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-foreground/80 min-w-0">
+            <span className="font-medium">{med.dosage}</span>
+            <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+            <span className="flex items-center gap-1">{timeIcon(med.timeOfDay)}{med.frequency}</span>
+            {med.purpose && (
+              <>
+                <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+                <span className="text-muted-foreground">{med.purpose}</span>
+              </>
+            )}
+            {med.prescribedBy && (
+              <>
+                <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+                <span className="text-muted-foreground">Rx: {med.prescribedBy}</span>
+              </>
+            )}
+            {med.pharmacy && (
+              <>
+                <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+                <span className="text-muted-foreground">Pharmacy: {med.pharmacy}</span>
+              </>
+            )}
+            {med.refillDate && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5">
+                <AlertCircle className="w-3.5 h-3.5" />Refill: {format(parseISO(med.refillDate), "MMM d, yyyy")}
+              </span>
+            )}
+          </div>
+
+          {/* Action row: Take/Skip on the left, edit/delete on the right */}
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-border/50">
+            <div className="flex items-center gap-2 flex-wrap">
+              {med.active === 1 && (
+                todayLog ? (
+                  <Badge className="status-completed text-xs font-semibold h-9 px-3">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Taken
+                  </Badge>
+                ) : (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-sm h-9 px-4" data-testid={`button-take-${med.id}`}>
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => logDose(med.id!, false)} className="text-sm h-9 px-3 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
+                      Skip
+                    </Button>
+                  </>
+                )
               )}
             </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              {med.active === 1 && (
-                <div className="flex gap-1">
-                  {todayLog ? (
-                    <Badge className="status-completed text-xs font-semibold"><CheckCircle2 className="w-3 h-3 mr-1" />Taken</Badge>
-                  ) : (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-sm h-9 px-3" data-testid={`button-take-${med.id}`}>
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => logDose(med.id!, false)} className="text-sm h-9 px-2 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
-                        Skip
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="flex gap-1 mt-1">
-                <Dialog open={editing?.id === med.id} onOpenChange={(o) => !o && setEditing(null)}>
-                  <DialogTrigger asChild>
-                    <Button size="icon" variant="ghost" onClick={() => setEditing(med)} data-testid={`button-edit-med-${med.id}`}>
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className={MED_DIALOG_CLASS}>
-                    <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
-                      <DialogTitle className="font-heading text-2xl font-bold text-white">
-                        Edit Medication
-                      </DialogTitle>
-                      <DialogDescription className="text-white/85 text-sm">
-                        Update the medication details. Changes save when you press Update.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <MedicationForm
-                      physicians={physicians}
-                      initial={med}
-                      isEdit={true}
-                      onSubmit={(data) => updateMut.mutate({ id: med.id!, data })}
-                      onCancel={() => setEditing(null)}
-                    />
-                  </DialogContent>
-                </Dialog>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      data-testid={`button-delete-med-${med.id}`}
-                      aria-label={`Delete medication ${med.name}`}
+            <div className="flex items-center gap-1 ml-auto">
+              <Dialog open={editing?.id === med.id} onOpenChange={(o) => !o && setEditing(null)}>
+                <DialogTrigger asChild>
+                  <Button size="icon" variant="ghost" onClick={() => setEditing(med)} data-testid={`button-edit-med-${med.id}`}>
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className={MED_DIALOG_CLASS}>
+                  <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                    <DialogTitle className="font-heading text-2xl font-bold text-white">
+                      Edit Medication
+                    </DialogTitle>
+                    <DialogDescription className="text-white/85 text-sm">
+                      Update the medication details. Changes save when you press Update.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <MedicationForm
+                    physicians={physicians}
+                    initial={med}
+                    isEdit={true}
+                    onSubmit={(data) => updateMut.mutate({ id: med.id!, data })}
+                    onCancel={() => setEditing(null)}
+                  />
+                </DialogContent>
+              </Dialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    data-testid={`button-delete-med-${med.id}`}
+                    aria-label={`Delete medication ${med.name}`}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-heading flex items-center gap-2">
+                      <Trash2 className="w-5 h-5 text-destructive" />
+                      Delete medication?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      <span className="font-medium text-foreground">{med.name}</span>
+                      {med.dosage ? ` (${med.dosage})` : ""}
+                      {" "}will be permanently removed, along with its dose history. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="gap-2 sm:gap-2">
+                    <AlertDialogCancel
+                      className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                      data-testid={`button-delete-med-cancel-${med.id}`}
                     >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="max-w-md">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="font-heading flex items-center gap-2">
-                        <Trash2 className="w-5 h-5 text-destructive" />
-                        Delete medication?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        <span className="font-medium text-foreground">{med.name}</span>
-                        {med.dosage ? ` (${med.dosage})` : ""}
-                        {" "}will be permanently removed, along with its dose history. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2 sm:gap-2">
-                      <AlertDialogCancel
-                        className="h-11 text-base sm:h-10 sm:text-sm mt-0"
-                        data-testid={`button-delete-med-cancel-${med.id}`}
-                      >
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteMut.mutate(med.id!)}
-                        className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
-                        data-testid={`button-delete-med-confirm-${med.id}`}
-                      >
-                        Delete medication
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMut.mutate(med.id!)}
+                      className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+                      data-testid={`button-delete-med-confirm-${med.id}`}
+                    >
+                      Delete medication
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
         </CardContent>
