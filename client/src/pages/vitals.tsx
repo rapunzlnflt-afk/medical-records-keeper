@@ -59,8 +59,8 @@ function VitalFieldSection({
           <Icon className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0">
-          <h3 className="font-heading text-base font-semibold leading-tight">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+          <h3 className="font-heading text-lg font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
         </div>
       </header>
       <div className="px-4 sm:px-5 pb-5 pt-2 space-y-4">{children}</div>
@@ -317,9 +317,9 @@ export default function Vitals() {
             <Card className="gradient-primary text-white border-none">
               <CardContent className="p-3 text-center">
                 <Activity className="w-5 h-5 mx-auto mb-1 text-white/80" />
-                <p className="text-xs text-white/80 font-semibold">Blood Pressure</p>
-                <p className="text-lg font-heading font-bold tabular-nums">{latest.bloodPressureSystolic}/{latest.bloodPressureDiastolic}</p>
-                <p className="text-xs text-white/70">mmHg</p>
+                <p className="text-sm text-white/90 font-semibold">Blood Pressure</p>
+                <p className="text-2xl font-heading font-bold tabular-nums mt-1">{latest.bloodPressureSystolic}/{latest.bloodPressureDiastolic}</p>
+                <p className="text-xs text-white/80 mt-0.5">mmHg</p>
               </CardContent>
             </Card>
           )}
@@ -327,9 +327,9 @@ export default function Vitals() {
             <Card>
               <CardContent className="p-3 text-center">
                 <HeartPulse className="w-5 h-5 mx-auto mb-1 text-primary" />
-                <p className="text-xs text-muted-foreground font-semibold">Heart Rate</p>
-                <p className="text-lg font-heading font-bold tabular-nums">{latest.heartRate}</p>
-                <p className="text-xs text-muted-foreground">bpm</p>
+                <p className="text-sm text-muted-foreground font-semibold">Heart Rate</p>
+                <p className="text-2xl font-heading font-bold tabular-nums mt-1">{latest.heartRate}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">bpm</p>
               </CardContent>
             </Card>
           )}
@@ -337,8 +337,8 @@ export default function Vitals() {
             <Card>
               <CardContent className="p-3 text-center">
                 <Thermometer className="w-5 h-5 mx-auto mb-1 text-primary" />
-                <p className="text-xs text-muted-foreground font-semibold">Temperature</p>
-                <p className="text-lg font-heading font-bold tabular-nums">{latest.temperature}°F</p>
+                <p className="text-sm text-muted-foreground font-semibold">Temperature</p>
+                <p className="text-2xl font-heading font-bold tabular-nums mt-1">{latest.temperature}°F</p>
               </CardContent>
             </Card>
           )}
@@ -346,8 +346,8 @@ export default function Vitals() {
             <Card>
               <CardContent className="p-3 text-center">
                 <Wind className="w-5 h-5 mx-auto mb-1 text-primary" />
-                <p className="text-xs text-muted-foreground font-semibold">O₂ Sat</p>
-                <p className="text-lg font-heading font-bold tabular-nums">{latest.oxygenSaturation}%</p>
+                <p className="text-sm text-muted-foreground font-semibold">O₂ Sat</p>
+                <p className="text-2xl font-heading font-bold tabular-nums mt-1">{latest.oxygenSaturation}%</p>
               </CardContent>
             </Card>
           )}
@@ -357,7 +357,7 @@ export default function Vitals() {
       {/* History Table */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="font-heading text-base font-semibold">History</CardTitle>
+          <CardTitle className="font-heading text-lg font-semibold">History</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -372,26 +372,26 @@ export default function Vitals() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs font-heading">Date</TableHead>
-                    <TableHead className="text-xs font-heading">Weight</TableHead>
-                    <TableHead className="text-xs font-heading">BP</TableHead>
-                    <TableHead className="text-xs font-heading">HR</TableHead>
-                    <TableHead className="text-xs font-heading">Temp</TableHead>
-                    <TableHead className="text-xs font-heading">Sugar</TableHead>
-                    <TableHead className="text-xs font-heading">O2</TableHead>
-                    <TableHead className="text-xs font-heading w-8"></TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">Date</TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">Weight</TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">BP</TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">HR</TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">Temp</TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">Sugar</TableHead>
+                    <TableHead className="text-sm font-heading font-semibold">O2</TableHead>
+                    <TableHead className="text-sm font-heading w-8"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {vitals.map((v) => (
                     <TableRow key={v.id} data-testid={`vital-${v.id}`}>
-                      <TableCell className="text-xs font-medium">{format(parseISO(v.date), "MMM d, yy")}</TableCell>
-                      <TableCell className="text-xs">{v.weight || "—"}</TableCell>
-                      <TableCell className="text-xs">{v.bloodPressureSystolic && v.bloodPressureDiastolic ? `${v.bloodPressureSystolic}/${v.bloodPressureDiastolic}` : "—"}</TableCell>
-                      <TableCell className="text-xs">{v.heartRate || "—"}</TableCell>
-                      <TableCell className="text-xs">{v.temperature ? `${v.temperature}°` : "—"}</TableCell>
-                      <TableCell className="text-xs">{v.bloodSugar || "—"}</TableCell>
-                      <TableCell className="text-xs">{v.oxygenSaturation ? `${v.oxygenSaturation}%` : "—"}</TableCell>
+                      <TableCell className="text-sm font-medium">{format(parseISO(v.date), "MMM d, yy")}</TableCell>
+                      <TableCell className="text-sm">{v.weight || "—"}</TableCell>
+                      <TableCell className="text-sm">{v.bloodPressureSystolic && v.bloodPressureDiastolic ? `${v.bloodPressureSystolic}/${v.bloodPressureDiastolic}` : "—"}</TableCell>
+                      <TableCell className="text-sm">{v.heartRate || "—"}</TableCell>
+                      <TableCell className="text-sm">{v.temperature ? `${v.temperature}°` : "—"}</TableCell>
+                      <TableCell className="text-sm">{v.bloodSugar || "—"}</TableCell>
+                      <TableCell className="text-sm">{v.oxygenSaturation ? `${v.oxygenSaturation}%` : "—"}</TableCell>
                       <TableCell>
                         <Button size="icon" variant="ghost" onClick={() => deleteMut.mutate(v.id!)}>
                           <Trash2 className="w-3 h-3 text-destructive" />

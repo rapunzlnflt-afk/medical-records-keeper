@@ -60,8 +60,8 @@ function MedFieldSection({
           <Icon className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0">
-          <h3 className="font-heading text-base font-semibold leading-tight">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+          <h3 className="font-heading text-lg font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
         </div>
       </header>
       <div className="px-4 sm:px-5 pb-5 pt-2 space-y-4">{children}</div>
@@ -188,7 +188,7 @@ function MedicationForm({ initial, onSubmit, onCancel, physicians, isEdit }: {
             <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3">
               <div className="min-w-0">
                 <Label className={medLabelClass}>Active</Label>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Turn off to keep this medication in history without dose prompts.
                 </p>
               </div>
@@ -401,27 +401,27 @@ export default function Medications() {
     return (
       <Card className="hover-elevate" data-testid={`medication-${med.id}`}>
         <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
               <Pill className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-heading text-sm font-semibold">{med.name}</h3>
-                <Badge variant="secondary" className="text-xs">{med.type}</Badge>
-                {!med.active && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{med.name}</h3>
+                <Badge variant="secondary" className="text-xs font-medium flex-shrink-0">{med.type}</Badge>
+                {!med.active && <Badge variant="outline" className="text-xs font-medium flex-shrink-0">Inactive</Badge>}
               </div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                <span>{med.dosage}</span>
+              <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-foreground/80 flex-wrap min-w-0">
+                <span className="font-medium">{med.dosage}</span>
                 <span className="flex items-center gap-1">{timeIcon(med.timeOfDay)}{med.frequency}</span>
-                {med.purpose && <span>{med.purpose}</span>}
+                {med.purpose && <span className="text-muted-foreground">{med.purpose}</span>}
               </div>
-              {med.prescribedBy && <p className="text-xs text-muted-foreground mt-1">Rx: {med.prescribedBy}</p>}
-              {med.pharmacy && <p className="text-xs text-muted-foreground">Pharmacy: {med.pharmacy}</p>}
+              {med.prescribedBy && <p className="text-sm text-muted-foreground mt-1">Rx: {med.prescribedBy}</p>}
+              {med.pharmacy && <p className="text-sm text-muted-foreground">Pharmacy: {med.pharmacy}</p>}
               {med.refillDate && (
-                <p className="text-xs mt-1">
-                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />Refill: {format(parseISO(med.refillDate), "MMM d, yyyy")}
+                <p className="text-sm mt-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5">
+                    <AlertCircle className="w-3.5 h-3.5" />Refill: {format(parseISO(med.refillDate), "MMM d, yyyy")}
                   </span>
                 </p>
               )}
@@ -430,13 +430,13 @@ export default function Medications() {
               {med.active === 1 && (
                 <div className="flex gap-1">
                   {todayLog ? (
-                    <Badge className="status-completed text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Taken</Badge>
+                    <Badge className="status-completed text-xs font-semibold"><CheckCircle2 className="w-3 h-3 mr-1" />Taken</Badge>
                   ) : (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-xs h-7" data-testid={`button-take-${med.id}`}>
-                        <CheckCircle2 className="w-3 h-3 mr-1" /> Take
+                      <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-sm h-9 px-3" data-testid={`button-take-${med.id}`}>
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => logDose(med.id!, false)} className="text-xs h-7 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
+                      <Button size="sm" variant="ghost" onClick={() => logDose(med.id!, false)} className="text-sm h-9 px-2 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
                         Skip
                       </Button>
                     </>
@@ -517,11 +517,11 @@ export default function Medications() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="font-heading text-xl font-bold">Medications</h1>
-          <p className="text-sm text-muted-foreground font-body mt-1">Track prescriptions, supplements, and daily doses</p>
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
+        <div className="min-w-0">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Medications</h1>
+          <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Track prescriptions, supplements, and daily doses</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => {
@@ -586,23 +586,23 @@ export default function Medications() {
       {active.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" />
+            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
               Today's Medications
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 min-w-0">
               {active.map((med) => {
                 const todayLog = logs.find((l) => l.medicationId === med.id && l.date === today);
                 return (
-                  <div key={med.id} className={`p-2 rounded-md text-center text-xs ${todayLog ? "bg-green-50 dark:bg-green-950/20" : "bg-secondary/50"}`}>
-                    <div className="flex items-center justify-center gap-1 mb-1">
+                  <div key={med.id} className={`p-2.5 rounded-md text-center text-sm min-w-0 ${todayLog ? "bg-green-50 dark:bg-green-950/20" : "bg-secondary/50"}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1 min-w-0">
                       {timeIcon(med.timeOfDay)}
                       <span className="font-semibold truncate">{med.name}</span>
                     </div>
                     <span className="text-muted-foreground">{med.dosage}</span>
-                    {todayLog && <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400 mx-auto mt-1" />}
+                    {todayLog && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 mx-auto mt-1" />}
                   </div>
                 );
               })}
@@ -613,8 +613,8 @@ export default function Medications() {
 
       <Tabs defaultValue="active">
         <TabsList>
-          <TabsTrigger value="active" className="font-body text-xs">Active ({active.length})</TabsTrigger>
-          <TabsTrigger value="inactive" className="font-body text-xs">Inactive ({inactive.length})</TabsTrigger>
+          <TabsTrigger value="active" className="font-body text-sm font-semibold">Active ({active.length})</TabsTrigger>
+          <TabsTrigger value="inactive" className="font-body text-sm font-semibold">Inactive ({inactive.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="space-y-3 mt-3">
           {isLoading ? (
@@ -622,14 +622,14 @@ export default function Medications() {
           ) : active.length === 0 ? (
             <Card><CardContent className="py-12 text-center">
               <Pill className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">No active medications</p>
+              <p className="text-base text-muted-foreground">No active medications</p>
             </CardContent></Card>
           ) : active.map((med) => <MedCard key={med.id} med={med} />)}
         </TabsContent>
         <TabsContent value="inactive" className="space-y-3 mt-3">
           {inactive.length === 0 ? (
             <Card><CardContent className="py-12 text-center">
-              <p className="text-sm text-muted-foreground">No inactive medications</p>
+              <p className="text-base text-muted-foreground">No inactive medications</p>
             </CardContent></Card>
           ) : inactive.map((med) => <MedCard key={med.id} med={med} />)}
         </TabsContent>
@@ -640,13 +640,13 @@ export default function Medications() {
         {/* Drug Interaction Checkers */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-destructive" />
+            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-destructive" />
               Drug Interaction Checkers
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground mb-3">Check if your medications interact with each other</p>
+            <p className="text-sm text-muted-foreground mb-3">Check if your medications interact with each other</p>
             {[
               { name: "Drugs.com Interaction Checker", url: "https://www.drugs.com/drug_interactions.html" },
               { name: "WebMD Interaction Checker", url: "https://www.webmd.com/interaction-checker/default.htm" },
@@ -666,13 +666,13 @@ export default function Medications() {
         {/* Prescription Discounts */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="font-heading text-base font-semibold flex items-center gap-2">
-              <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+              <Tag className="w-5 h-5 text-green-600 dark:text-green-400" />
               Prescription Discounts
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground mb-3">Save money on your prescriptions</p>
+            <p className="text-sm text-muted-foreground mb-3">Save money on your prescriptions</p>
             {[
               { name: "GoodRx", url: "https://www.goodrx.com" },
               { name: "RxSaver by RetailMeNot", url: "https://www.rxsaver.com" },

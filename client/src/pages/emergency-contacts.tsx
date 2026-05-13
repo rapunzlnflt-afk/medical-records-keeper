@@ -57,8 +57,8 @@ function EcFieldSection({
           <Icon className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0">
-          <h3 className="font-heading text-base font-semibold leading-tight">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+          <h3 className="font-heading text-lg font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
         </div>
       </header>
       <div className="px-4 sm:px-5 pb-5 pt-2 space-y-4">{children}</div>
@@ -116,7 +116,7 @@ function ContactForm({ initial, onSubmit, onCancel, isEdit }: {
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
             <div className="min-w-0">
               <p className={ecLabelClass}>Primary Contact</p>
-              <p className="text-xs text-muted-foreground mt-0.5">The first person to reach in an emergency.</p>
+              <p className="text-sm text-muted-foreground mt-1">The first person to reach in an emergency.</p>
             </div>
             <Switch
               checked={form.isPrimary === 1}
@@ -274,14 +274,14 @@ export default function EmergencyContacts() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
-                      <h3 className="font-heading text-base font-semibold break-words min-w-0">{contact.name}</h3>
+                      <h3 className="font-heading text-base sm:text-lg font-semibold break-words min-w-0">{contact.name}</h3>
                       {contact.isPrimary === 1 && (
-                        <Badge className="gradient-primary text-white text-xs border-none flex-shrink-0">
+                        <Badge className="gradient-primary text-white text-xs border-none flex-shrink-0 font-semibold">
                           <Star className="w-3 h-3 mr-1" />Primary
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-primary font-medium">{contact.relationship}</p>
+                    <p className="text-sm text-primary font-semibold mt-0.5">{contact.relationship}</p>
                     <div className="mt-2 space-y-1 min-w-0">
                       <p className="text-sm text-foreground/75 flex items-center gap-1.5 min-w-0 truncate">
                         <Phone className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{contact.phone}</span>
