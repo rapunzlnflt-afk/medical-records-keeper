@@ -473,7 +473,7 @@ export default function Physicians() {
 
       <Input placeholder="Search by name or specialty..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" data-testid="input-search-physicians" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 min-w-0">
         {isLoading ? (
           [1,2,3,4].map(i => <div key={i} className="h-48 rounded-lg bg-muted animate-pulse" />)
         ) : filtered.length === 0 ? (
@@ -485,106 +485,111 @@ export default function Physicians() {
           </Card>
         ) : (
           filtered.map((doc) => (
-            <Card key={doc.id} className="hover-elevate" data-testid={`physician-${doc.id}`}>
-              <CardContent className="p-4">
+            <Card key={doc.id} className="hover-elevate w-full min-w-0 max-w-full overflow-hidden" data-testid={`physician-${doc.id}`}>
+              <CardContent className="p-4 space-y-3 min-w-0">
+                {/* Header row: icon + full-width name & specialty (no buttons squeezing the right) */}
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
                     <Stethoscope className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words">{doc.name}</h3>
-                    <p className="text-sm text-primary font-semibold mt-0.5">{doc.specialty}</p>
-                    <div className="mt-2 space-y-1.5">
-                      {doc.phone && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                          <Phone className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{doc.phone}</span>
-                        </p>
-                      )}
-                      {doc.email && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                          <Mail className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{doc.email}</span>
-                        </p>
-                      )}
-                      {(doc.address || doc.city) && (
-                        <p className="text-sm text-muted-foreground flex items-start gap-1.5 min-w-0">
-                          <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                          <span className="break-words">{[doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ")}</span>
-                        </p>
-                      )}
-                      {doc.npi && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                          <FileText className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">NPI: {doc.npi}</span>
-                        </p>
-                      )}
-                    </div>
-                    {doc.notes && <p className="text-sm text-muted-foreground mt-2 italic line-clamp-2">{doc.notes}</p>}
+                    <p className="text-sm text-primary font-semibold mt-0.5 break-words">{doc.specialty}</p>
                   </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <Dialog open={editing?.id === doc.id} onOpenChange={(o) => !o && setEditing(null)}>
-                      <DialogTrigger asChild>
-                        <Button size="icon" variant="ghost" onClick={() => setEditing(doc)} data-testid={`button-edit-doc-${doc.id}`}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className={PHYS_DIALOG_CLASS}>
-                        <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
-                          <DialogTitle className="font-heading text-2xl font-bold text-white">
-                            Edit Physician
-                          </DialogTitle>
-                          <DialogDescription className="text-white/85 text-sm">
-                            Update this provider's details. Changes save when you press Update.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <PhysicianForm
-                          initial={doc}
-                          isEdit={true}
-                          onSubmit={(data) => updateMut.mutate({ id: doc.id!, data })}
-                          onCancel={() => setEditing(null)}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          data-testid={`button-delete-doc-${doc.id}`}
-                          aria-label={`Delete physician ${doc.name}`}
+                </div>
+
+                {/* Contact details: span full card width, wrap safely */}
+                <div className="space-y-1.5 min-w-0">
+                  {doc.phone && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate min-w-0">{doc.phone}</span>
+                    </p>
+                  )}
+                  {doc.email && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
+                      <Mail className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate min-w-0">{doc.email}</span>
+                    </p>
+                  )}
+                  {(doc.address || doc.city) && (
+                    <p className="text-sm text-muted-foreground flex items-start gap-1.5 min-w-0">
+                      <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span className="break-words min-w-0">{[doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ")}</span>
+                    </p>
+                  )}
+                  {doc.npi && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
+                      <FileText className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate min-w-0">NPI: {doc.npi}</span>
+                    </p>
+                  )}
+                </div>
+                {doc.notes && <p className="text-sm text-muted-foreground italic line-clamp-2 break-words min-w-0">{doc.notes}</p>}
+
+                {/* Action row: edit/delete on the right, no longer competing with content */}
+                <div className="flex items-center justify-end gap-1 pt-1 border-t border-border/50">
+                  <Dialog open={editing?.id === doc.id} onOpenChange={(o) => !o && setEditing(null)}>
+                    <DialogTrigger asChild>
+                      <Button size="icon" variant="ghost" onClick={() => setEditing(doc)} data-testid={`button-edit-doc-${doc.id}`}>
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className={PHYS_DIALOG_CLASS}>
+                      <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                        <DialogTitle className="font-heading text-2xl font-bold text-white">
+                          Edit Physician
+                        </DialogTitle>
+                        <DialogDescription className="text-white/85 text-sm">
+                          Update this provider's details. Changes save when you press Update.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <PhysicianForm
+                        initial={doc}
+                        isEdit={true}
+                        onSubmit={(data) => updateMut.mutate({ id: doc.id!, data })}
+                        onCancel={() => setEditing(null)}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        data-testid={`button-delete-doc-${doc.id}`}
+                        aria-label={`Delete physician ${doc.name}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="font-heading flex items-center gap-2">
+                          <Trash2 className="w-5 h-5 text-destructive" />
+                          Delete physician?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          <span className="font-medium text-foreground">{doc.name}</span>
+                          {doc.specialty ? ` (${doc.specialty})` : ""}
+                          {" "}will be removed from your provider directory. This cannot be undone.
+                          Existing appointments and medications referencing this physician will be kept but will no longer auto-link.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="gap-2 sm:gap-2">
+                        <AlertDialogCancel
+                          className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                          data-testid={`button-delete-doc-cancel-${doc.id}`}
                         >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="max-w-md">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-heading flex items-center gap-2">
-                            <Trash2 className="w-5 h-5 text-destructive" />
-                            Delete physician?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            <span className="font-medium text-foreground">{doc.name}</span>
-                            {doc.specialty ? ` (${doc.specialty})` : ""}
-                            {" "}will be removed from your provider directory. This cannot be undone.
-                            Existing appointments and medications referencing this physician will be kept but will no longer auto-link.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="gap-2 sm:gap-2">
-                          <AlertDialogCancel
-                            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
-                            data-testid={`button-delete-doc-cancel-${doc.id}`}
-                          >
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteMut.mutate(doc.id!)}
-                            className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
-                            data-testid={`button-delete-doc-confirm-${doc.id}`}
-                          >
-                            Delete physician
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteMut.mutate(doc.id!)}
+                          className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+                          data-testid={`button-delete-doc-confirm-${doc.id}`}
+                        >
+                          Delete physician
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
