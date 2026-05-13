@@ -26,10 +26,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar, ArrowLeft } from "lucide-react";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 const MED_TYPES = ["prescription", "otc", "supplement", "vitamin"];
 const FREQUENCIES = ["daily", "twice-daily", "three-times-daily", "weekly", "bi-weekly", "monthly", "as-needed"];
 const TIMES_OF_DAY = ["morning", "afternoon", "evening", "bedtime"];
@@ -475,7 +475,7 @@ export default function Medications() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className={MED_DIALOG_CLASS}>
-                  <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                  <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                     <DialogTitle className="font-heading text-2xl font-bold text-white">
                       Edit Medication
                     </DialogTitle>
@@ -541,6 +541,9 @@ export default function Medications() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Medications</h1>
@@ -586,7 +589,7 @@ export default function Medications() {
               </Button>
             </DialogTrigger>
             <DialogContent className={MED_DIALOG_CLASS}>
-              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                 <DialogTitle className="font-heading text-2xl font-bold text-white">
                   New Medication
                 </DialogTitle>
