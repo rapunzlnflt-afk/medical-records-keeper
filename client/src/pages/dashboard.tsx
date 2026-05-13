@@ -310,16 +310,16 @@ const getReminderStatusLabel = (appointment: Appointment) => {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <p className="text-base font-semibold truncate min-w-0 flex-1">{apt.title}</p>
-                        <Badge variant="secondary" className="text-[10px] sm:text-xs flex-shrink-0 font-medium px-1.5 py-0.5">{apt.type}</Badge>
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
+                        <p className="text-base sm:text-lg font-semibold truncate min-w-0 flex-1 leading-tight">{apt.title}</p>
+                        <Badge variant="secondary" className="text-xs flex-shrink-0 font-medium px-2 py-0.5">{apt.type}</Badge>
                       </div>
                       {reminderStatus && (
-                        <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5 mt-1 max-w-full truncate">
+                        <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5 mt-1.5 max-w-full truncate">
                           {reminderStatus}
                         </span>
                       )}
-                      <p className="text-sm text-muted-foreground mt-1 truncate">
+                      <p className="text-sm text-muted-foreground mt-1.5 truncate">
                         {format(parseISO(apt.date), "EEE MMM d")} at {apt.time}
                         {doc ? ` · ${doc.name}` : ""}
                       </p>
@@ -349,7 +349,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
                     </Badge>
                     {!medSummaryOpen && refillSoon.length > 0 && (
                       <span
-                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[10px] font-medium px-2 py-0.5 flex-shrink-0"
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-semibold px-2 py-0.5 flex-shrink-0"
                         data-testid="badge-refill-alert"
                       >
                         <AlertCircle className="w-3 h-3" />

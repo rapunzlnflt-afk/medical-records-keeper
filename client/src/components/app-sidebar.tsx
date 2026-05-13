@@ -133,11 +133,11 @@ function PatientSwitcher() {
       >
         <PatientAvatar patient={activePatient} />
         <div className="flex-1 min-w-0 text-left">
-          <p className="text-sm font-heading font-semibold text-sidebar-foreground truncate">
+          <p className="text-base font-heading font-semibold text-sidebar-foreground truncate">
             {activePatient.name}
           </p>
           {activePatient.relationship && (
-            <p className="text-[10px] text-muted-foreground leading-tight">{activePatient.relationship}</p>
+            <p className="text-xs text-muted-foreground leading-tight mt-0.5">{activePatient.relationship}</p>
           )}
         </div>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
@@ -184,8 +184,8 @@ function PatientSwitcher() {
                 >
                   <PatientAvatar patient={p} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold truncate">{p.name}</p>
-                    {p.relationship && <p className="text-[10px] text-muted-foreground">{p.relationship}</p>}
+                    <p className="text-sm font-semibold truncate">{p.name}</p>
+                    {p.relationship && <p className="text-xs text-muted-foreground mt-0.5">{p.relationship}</p>}
                   </div>
                 </div>
                 {p.id === activePatientId && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
@@ -350,17 +350,17 @@ export function AppSidebar() {
             </svg>
           </div>
           <div className="min-w-0">
-            <h1 className="font-heading text-sm font-bold text-sidebar-foreground leading-tight truncate">
+            <h1 className="font-heading text-base font-bold text-sidebar-foreground leading-tight truncate">
               Medical Records
             </h1>
-            <p className="text-xs text-muted-foreground leading-tight">Keeper</p>
+            <p className="text-sm text-muted-foreground leading-tight">Keeper</p>
           </div>
         </div>
         <PatientSwitcher />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="font-heading text-xs font-semibold uppercase tracking-wider">
+          <SidebarGroupLabel className="font-heading text-sm font-semibold uppercase tracking-wider">
             Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -383,8 +383,8 @@ export function AppSidebar() {
                         data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                         onClick={() => { if (isMobile) setOpenMobile(false); }}
                       >
-                        <item.icon className="w-4 h-4" />
-                        <span className="font-body text-sm">{item.title}</span>
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-body text-base font-medium">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -401,10 +401,10 @@ export function AppSidebar() {
             size="sm"
             onClick={handleSaveData}
             disabled={saving}
-            className="flex-1 gap-1 font-body text-[11px] px-2"
+            className="flex-1 gap-1 font-body text-sm font-semibold px-2 h-10"
             data-testid="button-save-data"
           >
-            <Download className="w-3.5 h-3.5 flex-shrink-0" />
+            <Download className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">{saving ? "Saving..." : "Save My Data"}</span>
           </Button>
           <Button
@@ -412,10 +412,10 @@ export function AppSidebar() {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex-1 gap-1 font-body text-[11px] px-2"
+            className="flex-1 gap-1 font-body text-sm font-semibold px-2 h-10"
             data-testid="button-load-data"
           >
-            <Upload className="w-3.5 h-3.5 flex-shrink-0" />
+            <Upload className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">{loading ? "Loading..." : "Load My Data"}</span>
           </Button>
           <input
@@ -431,7 +431,7 @@ export function AppSidebar() {
           variant="outline"
           size="sm"
           onClick={toggle}
-          className="w-full gap-2 font-body text-xs"
+          className="w-full gap-2 font-body text-sm font-semibold h-10"
           data-testid="button-theme-toggle"
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

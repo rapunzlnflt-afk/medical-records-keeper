@@ -78,9 +78,9 @@ function FieldSection({
           <Icon className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0">
-          <h3 className="font-heading text-base font-semibold leading-tight">{title}</h3>
+          <h3 className="font-heading text-lg font-semibold leading-tight">{title}</h3>
           {description && (
-            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+            <p className="text-sm text-muted-foreground mt-1">{description}</p>
           )}
         </div>
       </header>

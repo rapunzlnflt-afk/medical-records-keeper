@@ -21,7 +21,7 @@
     --secondary-foreground: 215 33% 21%;
 
     --muted: 210 18% 91%;
-    --muted-foreground: 215 22% 30%;
+    --muted-foreground: 215 28% 22%;
 
     --accent: 224 76% 48%;
     --accent-foreground: 0 0% 100%;
@@ -71,7 +71,7 @@
     --secondary-foreground: 210 20% 92%;
 
     --muted: 215 25% 20%;
-    --muted-foreground: 210 18% 75%;
+    --muted-foreground: 210 22% 82%;
 
     --accent: 213 80% 65%;
     --accent-foreground: 216 40% 8%;
@@ -107,21 +107,50 @@
   * {
     @apply border-border;
   }
+  /* Root font-size scaling: phones get a noticeably larger base so every
+     rem-based utility (text-sm, text-base, text-lg, padding, gaps) grows
+     together. Desktop returns to the 16px default. */
+  html {
+    font-size: 18px;
+  }
+  @media (min-width: 768px) {
+    html {
+      font-size: 16px;
+    }
+  }
   body {
     @apply bg-background text-foreground;
-    /* Slightly relaxed line-height + antialiasing for easier reading at
-       smaller text sizes throughout the app. */
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
-  /* Bump the truly-tiny utility text up to ~12.5px so meta lines on
-     cards (dates, location, etc.) stay readable. Tailwind's text-xs is
-     12px out of the box, and most of the app's secondary text uses it. */
+  /* Tailwind's text-xs is 12px out of the box — far too small for body
+     copy on a phone. Mobile raises it to ~14.5px (relative to the 18px
+     root), so card meta lines, chips, and tab labels are all legible. */
   .text-xs {
-    font-size: 0.78rem;
-    line-height: 1.45;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+  @media (min-width: 768px) {
+    .text-xs {
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+  }
+  /* On phones, push text-sm closer to text-base so default body copy is
+     clearly readable without growing too tall. */
+  .text-sm {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+  @media (min-width: 768px) {
+    .text-sm {
+      font-size: 0.875rem;
+    }
+  }
+  .text-base {
+    line-height: 1.55;
   }
 }
 
