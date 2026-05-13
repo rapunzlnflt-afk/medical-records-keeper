@@ -117,6 +117,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
               className={pharmControlClass}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, name: formatPersonName(e.target.value) }))}
               placeholder="CVS Pharmacy"
               data-testid="input-pharm-name"
             />
@@ -191,6 +192,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
               className={pharmControlClass}
               value={form.address || ""}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, address: formatStreetAddress(e.target.value) }))}
               placeholder="123 Main St"
               data-testid="input-pharm-address"
             />
@@ -202,6 +204,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
               className={pharmControlClass}
               value={form.city || ""}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, city: formatCity(e.target.value) }))}
               placeholder="Fort Worth"
               data-testid="input-pharm-city"
             />
@@ -214,6 +217,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
                 className={pharmControlClass}
                 value={form.state || ""}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
+                onBlur={(e) => setForm((prev) => ({ ...prev, state: formatState(e.target.value) }))}
                 placeholder="TX"
                 data-testid="input-pharm-state"
               />

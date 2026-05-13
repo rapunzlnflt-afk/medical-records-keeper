@@ -216,6 +216,7 @@ function PatientSwitcher() {
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                onBlur={(e) => setNewName(formatPersonName(e.target.value))}
                 placeholder="Name"
                 className="h-7 text-xs"
                 data-testid="input-new-patient-name"
@@ -224,6 +225,7 @@ function PatientSwitcher() {
               <Input
                 value={newRelationship}
                 onChange={(e) => setNewRelationship(e.target.value)}
+                onBlur={(e) => setNewRelationship(formatPersonName(e.target.value))}
                 placeholder="Relationship (e.g. Spouse, Child)"
                 className="h-7 text-xs"
                 data-testid="input-new-patient-relationship"
