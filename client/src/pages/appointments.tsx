@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
@@ -437,6 +438,9 @@ export default function Appointments() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Appointments</h1>
@@ -481,7 +485,7 @@ export default function Appointments() {
               </Button>
             </DialogTrigger>
             <DialogContent className={APT_DIALOG_CLASS}>
-              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                 <DialogTitle className="font-heading text-2xl sm:text-2xl font-bold text-white">
                   New Appointment
                 </DialogTitle>
@@ -673,7 +677,7 @@ function AppointmentCard({
                 </Button>
               </DialogTrigger>
               <DialogContent className={APT_DIALOG_CLASS}>
-                <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                   <DialogTitle className="font-heading text-2xl sm:text-2xl font-bold text-white">
                     Edit Appointment
                   </DialogTitle>

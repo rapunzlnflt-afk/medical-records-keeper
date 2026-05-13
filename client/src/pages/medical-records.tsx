@@ -26,8 +26,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   FileText, Plus, Trash2, Edit2, Search, FlaskConical, Scan, Syringe,
   AlertTriangle, Heart, Shield, FolderOpen, ImageIcon, ExternalLink,
-  Upload, Link2, Info, HardDrive, X, TriangleAlert, Receipt,
+  Upload, Link2, Info, HardDrive, X, TriangleAlert, Receipt, ArrowLeft,
 } from "lucide-react";
+import { Link } from "wouter";
 import type { MedicalRecord, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 
@@ -275,6 +276,9 @@ export default function MedicalRecords() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Medical Records</h1>
