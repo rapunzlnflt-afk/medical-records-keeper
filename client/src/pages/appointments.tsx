@@ -31,6 +31,10 @@ import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
+const mapHref = (address?: string) => {
+  if (!address) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+};
 
 // 15-minute interval time options (00:00 through 23:45) with 12-hour display labels.
 const TIME_OPTIONS: { value: string; label: string }[] = (() => {
@@ -665,8 +669,18 @@ function AppointmentCard({
             <div className="flex items-center gap-x-3 sm:gap-x-4 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
               <span className="flex items-center gap-1.5 min-w-0"><Clock className="w-3.5 h-3.5 flex-shrink-0" />{apt.time}</span>
               {doc && <span className="flex items-center gap-1.5 min-w-0 truncate"><Stethoscope className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{doc.name}</span></span>}
-              {apt.location && <span className="flex items-center gap-1.5 min-w-0 truncate"><MapPin className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{apt.location}</span></span>}
-            </div>
+              {apt.location && (
+            <a
+              href={mapHref(apt.location)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 min-w-0 truncate underline underline-offset-2"
+            >
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">{apt.location}</span>
+            </a>
+            )}
+           </div>
             {apt.notes && <p className="text-sm text-foreground/70 mt-1.5 line-clamp-2 break-words">{apt.notes}</p>}
           </div>
           <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
