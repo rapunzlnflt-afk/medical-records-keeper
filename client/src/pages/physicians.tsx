@@ -188,6 +188,10 @@ const phoneHref = (phone?: string) => {
   if (!phone) return "";
   return `tel:${phone.replace(/[^\d+]/g, "")}`;
 };
+const mapHref = (address?: string) => {
+  if (!address) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+};
 
 function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
   initial?: Partial<Physician>;
@@ -528,7 +532,14 @@ export default function Physicians() {
                   {(doc.address || doc.city) && (
                     <p className="text-sm text-muted-foreground flex items-start gap-1.5 min-w-0">
                       <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                      <span className="break-words min-w-0">{[doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ")}</span>
+                      <a
+                        href={mapHref([doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", "))}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-words min-w-0 underline underline-offset-2"
+                      >
+                  {[doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ")}
+                      </a>
                     </p>
                   )}
                   {doc.npi && (
