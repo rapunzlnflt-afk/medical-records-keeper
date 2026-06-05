@@ -401,7 +401,7 @@ export function AppSidebar() {
             size="sm"
             onClick={handleSaveData}
             disabled={saving}
-            className="flex-1 gap-1 font-body text-sm font-semibold px-1 h-8"
+            className="flex-1 gap-1 font-body text-[11px] font-semibold px-1 h-8"
             data-testid="button-save-data"
           >
             <Download className="w-4 h-4 flex-shrink-0" />
@@ -412,7 +412,7 @@ export function AppSidebar() {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex-1 gap-1 font-body text-sm font-semibold px-1 h-8"
+            className="flex-1 gap-1 font-body text-[11px] font-semibold px-1 h-8"
             data-testid="button-load-data"
           >
             <Upload className="w-4 h-4 flex-shrink-0" />
@@ -431,7 +431,7 @@ export function AppSidebar() {
           variant="outline"
           size="sm"
           onClick={toggle}
-          className="w-full gap-1.5 font-body text-sm font-semibold h-8"
+          className="w-full gap-1.5 font-body text-[11px] font-semibold h-8"
           data-testid="button-theme-toggle"
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
