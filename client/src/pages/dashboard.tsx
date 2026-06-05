@@ -53,7 +53,7 @@ function StatCard({ title, value, icon: Icon, href, gradient, lowerIcon }: {
               <p className={`text-sm font-body font-semibold leading-snug ${gradient ? "text-white/90" : "text-muted-foreground"}`}>{title}</p>
               <p className={`text-3xl sm:text-4xl font-heading font-bold mt-1.5 leading-none tabular-nums ${gradient ? "text-white" : ""}`}>{value}</p>
             </div>
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${lowerIcon ? "translate-y-2 sm:translate-y-0" : ""} ${gradient ? "bg-white/20" : "gradient-primary"}`}>
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${lowerIcon ? "translate-y-6" : ""} ${gradient ? "bg-white/20" : "gradient-primary"}`}>
               <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
           </div>
