@@ -395,13 +395,13 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3 border-t border-sidebar-border space-y-2">
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <Button
             variant="outline"
             size="sm"
             onClick={handleSaveData}
             disabled={saving}
-            className="flex-1 gap-1 font-body text-sm font-semibold px-2 h-10"
+            className="flex-1 gap-1 font-body text-sm font-semibold px-1 h-8"
             data-testid="button-save-data"
           >
             <Download className="w-4 h-4 flex-shrink-0" />
