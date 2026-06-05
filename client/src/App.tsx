@@ -43,13 +43,20 @@ function AppLayout() {
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         {isMobile && (
-          <header className="flex items-center gap-2 px-3 py-1 border-b bg-card/50 backdrop-blur-sm shrink-0 z-40">
-            <SidebarTrigger
-               data-testid="button-sidebar-toggle"
-               className="h-12 w-12 [&>svg]:size-8"
-            />
-            <div className="flex-1" />
-          </header>
+         <header className="flex items-center gap-3 px-4 py-2 gradient-primary text-white shadow-sm shrink-0 z-40">
+  <SidebarTrigger
+    data-testid="button-sidebar-toggle"
+    className="text-white hover:bg-white/15 hover:text-white"
+  />
+  <div className="flex flex-col leading-tight">
+    <span className="font-heading text-base font-semibold text-white">
+      MedRecords
+    </span>
+    <span className="text-xs text-white/80">
+      Health organizer
+    </span>
+  </div>
+</header>
         )}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
           <AppRouter />
