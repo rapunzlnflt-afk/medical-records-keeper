@@ -395,7 +395,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3 border-t border-sidebar-border space-y-2">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           <Button
             variant="outline"
             size="sm"
@@ -431,7 +431,7 @@ export function AppSidebar() {
           variant="outline"
           size="sm"
           onClick={toggle}
-          className="w-full gap-2 font-body text-sm font-semibold h-10"
+          className="w-full gap-1.5 font-body text-sm font-semibold h-8"
           data-testid="button-theme-toggle"
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
