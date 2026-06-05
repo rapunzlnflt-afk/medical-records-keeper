@@ -41,8 +41,8 @@ import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { PhoneRemindersCard } from "@/components/phone-reminders-card";
 import { BackupReminderCard, FirstVisitNoticeCard } from "@/components/backup-reminder-card";
 
-function StatCard({ title, value, icon: Icon, href, gradient, lowerIcon }: {
-  title: string; value: number; icon: any; href: string; gradient?: boolean; lowerIcon?: boolean;
+function StatCard({ title, value, icon: Icon, href, gradient, lowerValue }: {
+  title: string; value: number; icon: any; href: string; gradient?: boolean; lowerValue?: boolean;
 }) {
   return (
     <Link href={href} className="block h-full min-w-0">
@@ -51,9 +51,9 @@ function StatCard({ title, value, icon: Icon, href, gradient, lowerIcon }: {
           <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-body font-semibold leading-snug ${gradient ? "text-white/90" : "text-muted-foreground"}`}>{title}</p>
-              <p className={`text-3xl sm:text-4xl font-heading font-bold mt-1.5 leading-none tabular-nums ${gradient ? "text-white" : ""}`}>{value}</p>
+              <p className={`text-3xl sm:text-4xl font-heading font-bold ${lowerValue ? "mt-4" : "mt-1.5"} leading-none tabular-nums ${gradient ? "text-white" : ""}`}>{value}</p>
             </div>
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${lowerIcon ? "translate-y-4" : ""} ${gradient ? "bg-white/20" : "gradient-primary"}`}>
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${gradient ? "bg-white/20" : "gradient-primary"}`}>
               <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
           </div>
@@ -261,9 +261,9 @@ const getReminderStatusLabel = (appointment: Appointment) => {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 min-w-0">
-        <StatCard title="Appointments" value={appointments.length} icon={CalendarDays} href="/appointments" gradient lowerIcon />
+        <StatCard title="Appointments" value={appointments.length} icon={CalendarDays} href="/appointments" gradient lowerValue />
         <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
-        <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" lowerIcon />
+        <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" lowerValue />
         <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
       </div>
 
