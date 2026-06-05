@@ -416,7 +416,9 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         <StatCard title="Emergency Contacts" value={contacts.length} icon={Phone} href="/emergency" />
       </div>
 
-      <PhoneRemindersCard />
+      <div className="min-[500px]:hidden">
+  <PhoneRemindersCard />
+</div>
     </div>
   );
 }
