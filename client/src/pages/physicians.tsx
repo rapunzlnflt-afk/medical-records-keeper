@@ -184,6 +184,11 @@ const PHYS_DIALOG_CLASS =
   "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(640px,calc(100vw-2rem))] sm:max-w-[640px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
   "overflow-hidden flex flex-col";
 
+const phoneHref = (phone?: string) => {
+  if (!phone) return "";
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+};
+
 function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
   initial?: Partial<Physician>;
   onSubmit: (data: any) => void;
@@ -506,7 +511,13 @@ export default function Physicians() {
                 <div className="space-y-1.5 min-w-0">
                   {doc.phone && (
                     <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                      <Phone className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate min-w-0">{doc.phone}</span>
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                      <a
+                        href={`tel:${doc.phone.replace(/[^\d+]/g, "")}`}
+                        className="truncate min-w-0 underline underline-offset-2"
+                      >
+                        {doc.phone}
+                      </a>
                     </p>
                   )}
                   {doc.email && (
