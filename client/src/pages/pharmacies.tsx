@@ -408,7 +408,10 @@ export default function Pharmacies() {
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-sm text-foreground/75 flex-wrap min-w-0">
                       {pharm.phone && (
-                        <a href={`tel:${pharm.phone}`} className="flex items-center gap-1 hover:text-primary min-w-0 truncate">
+                        <a
+                          href={`tel:${pharm.phone.replace(/[^\d+]/g, "")}`}
+                          className="flex items-center gap-1 hover:text-primary min-w-0 truncate"
+                        >
                           <Phone className="w-3.5 h-3.5 flex-shrink-0" />{pharm.phone}
                         </a>
                       )}
