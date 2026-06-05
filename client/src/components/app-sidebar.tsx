@@ -412,7 +412,7 @@ export function AppSidebar() {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex-1 gap-1 font-body text-sm font-semibold px-2 h-10"
+            className="flex-1 gap-1 font-body text-sm font-semibold px-1 h-8"
             data-testid="button-load-data"
           >
             <Upload className="w-4 h-4 flex-shrink-0" />
