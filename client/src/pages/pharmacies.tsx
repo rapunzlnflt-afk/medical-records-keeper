@@ -37,6 +37,10 @@ import { Link } from "wouter";
 import type { Pharmacy } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
 import { formatPersonName, formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
+const mapHref = (address?: string) => {
+  if (!address) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+};
 
 function normalizePharmacyFields<T extends Partial<Pharmacy>>(data: T): T {
   return {
@@ -420,7 +424,14 @@ export default function Pharmacies() {
                     {(pharm.address || pharm.city) && (
                       <p className="text-sm text-foreground/75 mt-1 flex items-start gap-1 min-w-0">
                         <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                        <span className="break-words min-w-0">{[pharm.address, pharm.city, pharm.state, pharm.zip].filter(Boolean).join(", ")}</span>
+                        <a
+                          href={mapHref([pharm.address, pharm.city, pharm.state, pharm.zip].filter(Boolean).join(", "))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="break-words min-w-0 underline underline-offset-2"
+                        >
+                          {[pharm.address, pharm.city, pharm.state, pharm.zip].filter(Boolean).join(", ")}
+                        </a>
                       </p>
                     )}
                     {pharm.website && (
