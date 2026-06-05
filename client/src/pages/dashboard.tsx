@@ -240,7 +240,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
                 <p className="text-sm text-muted-foreground mt-1.5 font-body leading-relaxed">
                   The best way to get started is to add your physicians first. Their names will then appear in dropdown menus when you add appointments, medications, and medical records.
                 </p>
-                <div className="mt-3 space-y-2">
+                <div className="mt-4 space-y-2">
                   <Link href="/physicians" className="flex items-center gap-2 text-sm font-semibold text-primary hover:underline" data-testid="link-get-started-physicians">
                     <Stethoscope className="w-4 h-4 flex-shrink-0" /> <span className="min-w-0">Step 1: Add your physicians</span> <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
                   </Link>
