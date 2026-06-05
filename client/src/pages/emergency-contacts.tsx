@@ -288,11 +288,23 @@ export default function EmergencyContacts() {
                     <p className="text-sm text-primary font-semibold mt-0.5">{contact.relationship}</p>
                     <div className="mt-2 space-y-1 min-w-0">
                       <p className="text-sm text-foreground/75 flex items-center gap-1.5 min-w-0 truncate">
-                        <Phone className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{contact.phone}</span>
+                        <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                        <a
+                          href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+                          className="truncate underline underline-offset-2"
+                        >
+                          {contact.phone}
+                        </a>
                       </p>
                       {contact.altPhone && (
                         <p className="text-sm text-foreground/75 flex items-center gap-1.5 min-w-0 truncate">
-                          <Phone className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{contact.altPhone} (alt)</span>
+                          <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                          <a
+                            href={`tel:${contact.altPhone.replace(/[^\d+]/g, "")}`}
+                            className="truncate underline underline-offset-2"
+                          >
+                            {contact.altPhone} (alt)
+                          </a>
                         </p>
                       )}
                       {contact.email && (
