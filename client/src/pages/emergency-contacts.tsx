@@ -99,6 +99,7 @@ function ContactForm({ initial, onSubmit, onCancel, isEdit }: {
               className={ecControlClass}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, name: formatPersonName(e.target.value) }))}
               placeholder="Jane Doe"
               data-testid="input-ec-name"
             />
@@ -110,6 +111,7 @@ function ContactForm({ initial, onSubmit, onCancel, isEdit }: {
               className={ecControlClass}
               value={form.relationship}
               onChange={(e) => setForm({ ...form, relationship: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, relationship: formatPersonName(e.target.value) }))}
               placeholder="Spouse, Parent, Sibling..."
               data-testid="input-ec-relationship"
             />
