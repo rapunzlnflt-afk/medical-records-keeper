@@ -266,7 +266,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 min-w-0">
-        <StatCard title="Appointments" value={appointments.length} icon={CalendarDays} href="/appointments" gradient />
+        <StatCard title="Appointments" value={upcomingAll.length} icon={CalendarDays} href="/appointments" gradient />
         <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
         <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
         <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
