@@ -577,8 +577,15 @@ export default function Medications() {
             w.document.write('</body></html>');
             w.document.close();
             w.focus();
-            w.print();
-            w.close();
+            const triggerPrint = () => {
+              w.print();
+            };
+            w.onafterprint = () => w.close();
+            if (w.document.readyState === 'complete') {
+              setTimeout(triggerPrint, 100);
+            } else {
+              w.onload = () => setTimeout(triggerPrint, 100);
+            }
           }} data-testid="button-print-medications">
             <Printer className="w-4 h-4" /> Print
           </Button>
