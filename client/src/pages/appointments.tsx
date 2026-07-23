@@ -26,7 +26,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
-import { Link, useSearch } from "wouter";
+import { Link } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 import { appointmentHasNotes } from "@/lib/appointment-notes";
@@ -388,10 +388,7 @@ export default function Appointments() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const search = useSearch();
-  const [timelineOpen, setTimelineOpen] = useState(
-    () => new URLSearchParams(search).get("tab") === "timeline",
-  );
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
@@ -926,15 +923,15 @@ function AppointmentCard({
   const hasNotes = appointmentHasNotes(apt);
   return (
     <Card className={`hover-elevate shadow-sm ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
-            <span className={`text-[10px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
-            <span className={`text-xl sm:text-2xl font-heading font-bold leading-none mt-1 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
+      <CardContent className="p-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
+            <span className={`text-[9px] sm:text-[10px] font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
+            <span className={`text-lg sm:text-xl font-heading font-bold leading-none mt-0.5 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
+              <h3 className="font-heading text-sm sm:text-base font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
               <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
               {/* Status badge only makes sense for still-scheduled visits; past
                   appointments default to "upcoming" so showing it there is noise. */}
@@ -942,7 +939,7 @@ function AppointmentCard({
                 <Badge className="text-xs font-medium status-upcoming">upcoming</Badge>
               )}
             </div>
-           <div className="flex items-center gap-x-3 sm:gap-x-4 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
+           <div className="flex items-center gap-x-3 gap-y-0.5 mt-1 text-sm text-foreground/75 flex-wrap min-w-0">
   <span className="flex items-center gap-1.5 min-w-0">
     <Clock className="w-3.5 h-3.5 flex-shrink-0" />
     {apt.time}
@@ -965,12 +962,12 @@ function AppointmentCard({
     </a>
   )}
 </div>
-            {apt.notes && <p className="text-sm text-foreground/70 mt-1.5 line-clamp-2 break-words">{apt.notes}</p>}
+            {apt.notes && <p className="text-sm text-foreground/70 mt-1 line-clamp-2 break-words">{apt.notes}</p>}
             {canAddNotes && (
               <Button
                 size="sm"
                 variant={hasNotes ? "ghost" : "outline"}
-                className={`h-9 mt-2 ${hasNotes ? "text-primary" : ""}`}
+                className={`h-8 mt-1.5 ${hasNotes ? "text-primary" : ""}`}
                 onClick={() => setNotesOpen(true)}
                 data-testid={`button-apt-notes-${apt.id}`}
               >
@@ -982,7 +979,7 @@ function AppointmentCard({
           <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
             <Dialog open={editingId === apt.id} onOpenChange={(o) => !o && setEditing(null)}>
               <DialogTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
+                <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
                   <Edit2 className="w-5 h-5" />
                 </Button>
               </DialogTrigger>
@@ -1009,7 +1006,7 @@ function AppointmentCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-10 w-10"
+                  className="h-9 w-9"
                   data-testid={`button-delete-apt-${apt.id}`}
                   aria-label={`Delete appointment ${apt.title}`}
                 >
