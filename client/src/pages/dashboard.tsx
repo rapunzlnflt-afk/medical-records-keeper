@@ -40,6 +40,8 @@ import {
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { PhoneRemindersCard } from "@/components/phone-reminders-card";
 import { BackupReminderCard, FirstVisitNoticeCard } from "@/components/backup-reminder-card";
+import { VisitNotesPromptCard } from "@/components/visit-notes-prompt-card";
+import { RecentVisitNotesCard } from "@/components/recent-visit-notes-card";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
   title: string; value: number; icon: any; href: string; gradient?: boolean;
@@ -232,6 +234,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
 
       <FirstVisitNoticeCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
       <BackupReminderCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
+      <VisitNotesPromptCard appointments={appointments} physicians={physicians} patientId={pid} />
 
       {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
@@ -415,6 +418,8 @@ const getReminderStatusLabel = (appointment: Appointment) => {
           </Collapsible>
         </Card>
       </div>
+
+      <RecentVisitNotesCard appointments={appointments} physicians={physicians} />
 
       <div className="grid grid-cols-2 gap-3 min-w-0">
         <StatCard title="Vitals Logged" value={vitals.length} icon={HeartPulse} href="/vitals" />

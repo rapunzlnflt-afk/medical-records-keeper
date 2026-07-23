@@ -24,11 +24,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
+import { Link, useSearch } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
+import { appointmentHasNotes } from "@/lib/appointment-notes";
+import { AppointmentNotesDialog, AppointmentNotesView, FollowUpOfferDialog } from "@/components/appointment-notes-dialog";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
 const mapHref = (address?: string) => {
@@ -386,6 +389,10 @@ export default function Appointments() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const search = useSearch();
+  const [tab, setTab] = useState(
+    () => (new URLSearchParams(search).get("tab") === "timeline" ? "timeline" : "schedule"),
+  );
   const { toast } = useToast();
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
@@ -429,6 +436,10 @@ export default function Appointments() {
   // History stays reverse-chronological: most recent past first.
   const historyList = appointments
     .filter((a) => a.status === "cancelled" || a.status === "completed" || hasAppointmentPassed(a))
+    .sort((a, b) => -sortAscByDateTime(a, b));
+  // Visit timeline: past appointments that actually have notes, newest first.
+  const timelineList = appointments
+    .filter((a) => hasAppointmentPassed(a) && appointmentHasNotes(a))
     .sort((a, b) => -sortAscByDateTime(a, b));
 
   // Simple calendar view data
@@ -549,6 +560,19 @@ export default function Appointments() {
         </CardContent>
       </Card>
 
+      {/* Schedule vs. Visit Notes timeline */}
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 h-11">
+          <TabsTrigger value="schedule" data-testid="tab-schedule" className="text-sm">
+            Upcoming
+          </TabsTrigger>
+          <TabsTrigger value="timeline" data-testid="tab-timeline" className="text-sm">
+            Visit Notes
+            <Badge variant="secondary" className="ml-2 text-xs font-semibold">{timelineList.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schedule">
       {/* List */}
       <div className="space-y-3" data-testid="appointments-list">
         {isLoading ? (
@@ -577,6 +601,7 @@ export default function Appointments() {
                   key={apt.id}
                   apt={apt}
                   physicians={physicians}
+                  patientId={pid}
                   editingId={editing?.id ?? null}
                   setEditing={setEditing}
                   onSave={(id, data) => updateMut.mutate({ id, data })}
@@ -617,6 +642,7 @@ export default function Appointments() {
                           key={apt.id}
                           apt={apt}
                           physicians={physicians}
+                          patientId={pid}
                           editingId={editing?.id ?? null}
                           setEditing={setEditing}
                           onSave={(id, data) => updateMut.mutate({ id, data })}
@@ -632,22 +658,163 @@ export default function Appointments() {
           </>
         )}
       </div>
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          <VisitTimeline appointments={timelineList} physicians={physicians} patientId={pid} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function AppointmentCard({
-  apt, physicians, editingId, setEditing, onSave, onDelete, muted,
+function VisitTimeline({
+  appointments, physicians, patientId,
+}: {
+  appointments: Appointment[];
+  physicians: Physician[];
+  patientId: number;
+}) {
+  if (appointments.length === 0) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="py-12 text-center">
+          <NotebookPen className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+          <p className="text-base text-muted-foreground">No visit notes yet</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Add notes to a past appointment from the Upcoming tab to build your visit history.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3" data-testid="visit-timeline">
+      {appointments.map((apt) => (
+        <VisitTimelineCard
+          key={apt.id}
+          apt={apt}
+          physicians={physicians}
+          patientId={patientId}
+        />
+      ))}
+    </div>
+  );
+}
+
+function VisitTimelineCard({
+  apt, physicians, patientId,
 }: {
   apt: Appointment;
   physicians: Physician[];
+  patientId: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
+  const doc = physicians.find((p) => p.id === apt.physicianId);
+  const preview = (apt.visitSummary || apt.diagnosisFindings || apt.providerInstructions || "").trim();
+
+  return (
+    <Card className="shadow-sm" data-testid={`visit-timeline-${apt.id}`}>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg gradient-primary flex flex-col items-center justify-center flex-shrink-0">
+            <span className="text-[10px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide text-white/90">{format(parseISO(apt.date), "MMM")}</span>
+            <span className="text-xl sm:text-2xl font-heading font-bold leading-none mt-1 text-white">{format(parseISO(apt.date), "dd")}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
+              <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
+            </div>
+            <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                {format(parseISO(apt.date), "EEE MMM d, yyyy")}
+              </span>
+              {doc && (
+                <span className="flex items-center gap-1.5 min-w-0 truncate">
+                  <Stethoscope className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{doc.name}{doc.specialty ? ` · ${doc.specialty}` : ""}</span>
+                </span>
+              )}
+            </div>
+            {!expanded && preview && (
+              <p className="text-sm text-foreground/70 mt-2 line-clamp-2 break-words">{preview}</p>
+            )}
+            {expanded && (
+              <div className="mt-3 rounded-lg bg-muted/40 p-3">
+                <AppointmentNotesView appointment={apt} />
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9"
+                onClick={() => setExpanded((v) => !v)}
+                data-testid={`button-visit-expand-${apt.id}`}
+              >
+                <ChevronDown className={`w-4 h-4 mr-1.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                {expanded ? "Hide notes" : "View notes"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-9 text-primary"
+                onClick={() => setNotesOpen(true)}
+                data-testid={`button-visit-edit-notes-${apt.id}`}
+              >
+                <NotebookPen className="w-4 h-4 mr-1.5" />
+                Edit Notes
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+      {notesOpen && (
+        <AppointmentNotesDialog
+          appointment={apt}
+          physicians={physicians}
+          patientId={patientId}
+          open={notesOpen}
+          onOpenChange={setNotesOpen}
+          onFollowUpRequested={(appointment, date) => setPendingFollowUp({ appointment, date })}
+        />
+      )}
+      <FollowUpOfferDialog
+        appointment={pendingFollowUp?.appointment ?? null}
+        date={pendingFollowUp?.date ?? null}
+        physicians={physicians}
+        patientId={patientId}
+        open={pendingFollowUp !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingFollowUp(null);
+        }}
+      />
+    </Card>
+  );
+}
+
+function AppointmentCard({
+  apt, physicians, patientId, editingId, setEditing, onSave, onDelete, muted,
+}: {
+  apt: Appointment;
+  physicians: Physician[];
+  patientId: number;
   editingId: number | null;
   setEditing: (a: Appointment | null) => void;
   onSave: (id: number, data: any) => void;
   onDelete: (id: number) => void;
   muted?: boolean;
 }) {
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
   const doc = physicians.find((p) => p.id === apt.physicianId);
+  const canAddNotes = hasAppointmentPassed(apt) || appointmentHasNotes(apt);
+  const hasNotes = appointmentHasNotes(apt);
   return (
     <Card className={`hover-elevate shadow-sm ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
       <CardContent className="p-4 sm:p-5">
@@ -690,6 +857,18 @@ function AppointmentCard({
   )}
 </div>
             {apt.notes && <p className="text-sm text-foreground/70 mt-1.5 line-clamp-2 break-words">{apt.notes}</p>}
+            {canAddNotes && (
+              <Button
+                size="sm"
+                variant={hasNotes ? "ghost" : "outline"}
+                className={`h-9 mt-2 ${hasNotes ? "text-primary" : ""}`}
+                onClick={() => setNotesOpen(true)}
+                data-testid={`button-apt-notes-${apt.id}`}
+              >
+                <NotebookPen className="w-4 h-4 mr-1.5" />
+                {hasNotes ? "Edit Visit Notes" : "Add Visit Notes"}
+              </Button>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
             <Dialog open={editingId === apt.id} onOpenChange={(o) => !o && setEditing(null)}>
@@ -764,6 +943,26 @@ function AppointmentCard({
           </div>
         </div>
       </CardContent>
+      {notesOpen && (
+        <AppointmentNotesDialog
+          appointment={apt}
+          physicians={physicians}
+          patientId={patientId}
+          open={notesOpen}
+          onOpenChange={setNotesOpen}
+          onFollowUpRequested={(appointment, date) => setPendingFollowUp({ appointment, date })}
+        />
+      )}
+      <FollowUpOfferDialog
+        appointment={pendingFollowUp?.appointment ?? null}
+        date={pendingFollowUp?.date ?? null}
+        physicians={physicians}
+        patientId={patientId}
+        open={pendingFollowUp !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingFollowUp(null);
+        }}
+      />
     </Card>
   );
 }

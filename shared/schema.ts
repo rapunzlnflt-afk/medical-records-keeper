@@ -38,6 +38,21 @@ export interface Appointment {
   notes: string | null;
   reminderDate: string | null;
   reminderTime: string | null;
+  // Structured post-visit notes. All optional so existing appointments
+  // migrate gracefully (they simply have no visit notes yet).
+  visitSummary?: string | null;
+  diagnosisFindings?: string | null;
+  providerInstructions?: string | null;
+  medicationChanges?: string | null;
+  testsOrdered?: string | null;
+  referrals?: string | null;
+  followUpDate?: string | null;
+  questionsNextTime?: string | null;
+  notesCreatedAt?: string | null;
+  notesUpdatedAt?: string | null;
+  // Set when the user dismisses the dashboard "add notes" prompt for this
+  // past appointment, so it doesn't nag on every load.
+  notesPromptDismissedAt?: string | null;
 }
 
 export interface Medication {
