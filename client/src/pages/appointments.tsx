@@ -31,7 +31,7 @@ import { Link, useSearch } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 import { appointmentHasNotes } from "@/lib/appointment-notes";
-import { AppointmentNotesDialog, AppointmentNotesView } from "@/components/appointment-notes-dialog";
+import { AppointmentNotesDialog, AppointmentNotesView, FollowUpOfferDialog } from "@/components/appointment-notes-dialog";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
 const mapHref = (address?: string) => {
@@ -712,6 +712,7 @@ function VisitTimelineCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
   const doc = physicians.find((p) => p.id === apt.physicianId);
   const preview = (apt.visitSummary || apt.diagnosisFindings || apt.providerInstructions || "").trim();
 
@@ -780,8 +781,19 @@ function VisitTimelineCard({
           patientId={patientId}
           open={notesOpen}
           onOpenChange={setNotesOpen}
+          onFollowUpRequested={(appointment, date) => setPendingFollowUp({ appointment, date })}
         />
       )}
+      <FollowUpOfferDialog
+        appointment={pendingFollowUp?.appointment ?? null}
+        date={pendingFollowUp?.date ?? null}
+        physicians={physicians}
+        patientId={patientId}
+        open={pendingFollowUp !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingFollowUp(null);
+        }}
+      />
     </Card>
   );
 }
@@ -799,6 +811,7 @@ function AppointmentCard({
   muted?: boolean;
 }) {
   const [notesOpen, setNotesOpen] = useState(false);
+  const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
   const doc = physicians.find((p) => p.id === apt.physicianId);
   const canAddNotes = hasAppointmentPassed(apt) || appointmentHasNotes(apt);
   const hasNotes = appointmentHasNotes(apt);
@@ -937,8 +950,19 @@ function AppointmentCard({
           patientId={patientId}
           open={notesOpen}
           onOpenChange={setNotesOpen}
+          onFollowUpRequested={(appointment, date) => setPendingFollowUp({ appointment, date })}
         />
       )}
+      <FollowUpOfferDialog
+        appointment={pendingFollowUp?.appointment ?? null}
+        date={pendingFollowUp?.date ?? null}
+        physicians={physicians}
+        patientId={patientId}
+        open={pendingFollowUp !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingFollowUp(null);
+        }}
+      />
     </Card>
   );
 }

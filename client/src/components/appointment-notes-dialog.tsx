@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { updateAppointment, createAppointment } from "@/lib/db";
@@ -67,30 +67,20 @@ export function AppointmentNotesDialog({
   patientId,
   open,
   onOpenChange,
+  onFollowUpRequested,
 }: {
   appointment: Appointment;
   physicians: Physician[];
   patientId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Fired after notes save when a new/changed follow-up date was entered. The
+  // parent owns the follow-up offer AlertDialog so it survives this dialog (and
+  // this whole component) being unmounted by the post-save query invalidation.
+  onFollowUpRequested?: (appointment: Appointment, date: string) => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState<NotesForm>(() => toForm(appointment));
-  // Holds the follow-up date to offer once notes have saved.
-  const [followUpOffer, setFollowUpOffer] = useState<string | null>(null);
-  // Controls the inner notes Dialog independently of the parent `open` prop so
-  // we can fully close it (and let its exit animation finish) before showing
-  // the follow-up AlertDialog. Stacking an AlertDialog on top of a still-open
-  // Radix Dialog makes the focus guards suppress the AlertDialog, so only one
-  // Radix modal may be mounted at a time.
-  const [notesVisible, setNotesVisible] = useState(true);
-  const followUpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (followUpTimer.current) clearTimeout(followUpTimer.current);
-    };
-  }, []);
 
   const doc = physicians.find((p) => p.id === appointment.physicianId);
 
@@ -122,45 +112,16 @@ export function AppointmentNotesDialog({
       });
     },
     onSuccess: () => {
+      const newDate = form.followUpDate;
+      const wantsFollowUp = Boolean(newDate) && newDate !== appointment.followUpDate;
       invalidate();
       toast({ title: "Visit notes saved" });
-      // Offer to create a follow-up appointment only when a new/changed
-      // follow-up date was entered. Close the notes Dialog first and open the
-      // AlertDialog only after its exit animation, so the two Radix modals are
-      // never mounted at the same time. We intentionally do NOT call
-      // onOpenChange(false) here — that would unmount this whole component
-      // (parents render it as `{open && <AppointmentNotesDialog/>}`) and take
-      // the follow-up prompt down with it.
-      const newDate = form.followUpDate;
-      if (newDate && newDate !== appointment.followUpDate) {
-        setNotesVisible(false);
-        followUpTimer.current = setTimeout(() => setFollowUpOffer(newDate), 250);
-      } else {
-        onOpenChange(false);
-      }
-    },
-  });
-
-  const followUpMut = useMutation({
-    mutationFn: (date: string) =>
-      createAppointment({
-        patientId,
-        title: appointment.title ? `Follow-up: ${appointment.title}` : "Follow-up appointment",
-        physicianId: appointment.physicianId ?? null,
-        date,
-        time: appointment.time || "09:00",
-        location: appointment.location ?? null,
-        type: appointment.type || "checkup",
-        status: "upcoming",
-        notes: null,
-        reminderDate: null,
-        reminderTime: null,
-      }),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: "Follow-up appointment created" });
-      setFollowUpOffer(null);
+      // Hand the follow-up offer to the parent BEFORE closing. This component
+      // is typically rendered as `{open && <AppointmentNotesDialog/>}` by a
+      // parent whose list drops this appointment once it gains notes, so it
+      // gets unmounted right after save — the parent must own the offer.
       onOpenChange(false);
+      if (wantsFollowUp) onFollowUpRequested?.(appointment, newDate);
     },
   });
 
@@ -168,15 +129,7 @@ export function AppointmentNotesDialog({
 
   return (
     <>
-      <Dialog
-        open={open && notesVisible}
-        onOpenChange={(o) => {
-          // Only a user-initiated close (Esc / overlay / X) should tear down
-          // the whole flow. The programmatic close during the save→follow-up
-          // hand-off is driven by `notesVisible` and must not bubble up.
-          if (!o && notesVisible) onOpenChange(false);
-        }}
-      >
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className={NOTES_DIALOG_CLASS}>
           <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
             <DialogTitle className="font-heading text-2xl font-bold text-white flex items-center gap-2">
@@ -251,55 +204,100 @@ export function AppointmentNotesDialog({
           </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog
-        open={followUpOffer !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setFollowUpOffer(null);
-            onOpenChange(false);
-          }
-        }}
-      >
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-heading flex items-center gap-2">
-              <CalendarPlus className="w-5 h-5 text-primary" />
-              Create follow-up appointment?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Add a follow-up appointment
-              {doc ? ` with ${doc.name}` : ""} on{" "}
-              <span className="font-medium text-foreground">
-                {followUpOffer ? format(parseISO(followUpOffer), "MMM d, yyyy") : ""}
-              </span>
-              ? It will show up under Upcoming appointments.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel
-              className="h-11 text-base sm:h-10 sm:text-sm mt-0"
-              data-testid="button-followup-decline"
-            >
-              No thanks
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                // Keep the dialog mounted until the create mutation resolves so
-                // its onSuccess can invalidate queries and refresh Upcoming.
-                e.preventDefault();
-                if (followUpOffer) followUpMut.mutate(followUpOffer);
-              }}
-              disabled={followUpMut.isPending}
-              className="h-11 text-base sm:h-10 sm:text-sm gradient-primary text-white border-none font-semibold"
-              data-testid="button-followup-confirm"
-            >
-              {followUpMut.isPending ? "Creating..." : "Create appointment"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
+  );
+}
+
+/**
+ * Follow-up offer AlertDialog. Owned by parents (not by AppointmentNotesDialog)
+ * so it survives the post-save query invalidation that can unmount the notes
+ * dialog and its host. Parents capture the appointment + date in their own
+ * state and render this; it is fully self-contained (owns the create mutation).
+ */
+export function FollowUpOfferDialog({
+  appointment,
+  date,
+  physicians,
+  patientId,
+  open,
+  onOpenChange,
+}: {
+  appointment: Appointment | null;
+  date: string | null;
+  physicians: Physician[];
+  patientId: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const doc = appointment
+    ? physicians.find((p) => p.id === appointment.physicianId)
+    : undefined;
+
+  const followUpMut = useMutation({
+    mutationFn: (d: string) =>
+      createAppointment({
+        patientId,
+        title: appointment?.title ? `Follow-up: ${appointment.title}` : "Follow-up appointment",
+        physicianId: appointment?.physicianId ?? null,
+        date: d,
+        time: appointment?.time || "09:00",
+        location: appointment?.location ?? null,
+        type: appointment?.type || "checkup",
+        status: "upcoming",
+        notes: null,
+        reminderDate: null,
+        reminderTime: null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments", patientId] });
+      queryClient.invalidateQueries({ queryKey: ["all-appointments-for-sync"] });
+      requestRemindersSync();
+      toast({ title: "Follow-up appointment created" });
+      onOpenChange(false);
+    },
+  });
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-heading flex items-center gap-2">
+            <CalendarPlus className="w-5 h-5 text-primary" />
+            Create follow-up appointment?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Add a follow-up appointment
+            {doc ? ` with ${doc.name}` : ""} on{" "}
+            <span className="font-medium text-foreground">
+              {date ? format(parseISO(date), "MMM d, yyyy") : ""}
+            </span>
+            ? It will show up under Upcoming appointments.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-2 sm:gap-2">
+          <AlertDialogCancel
+            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+            data-testid="button-followup-decline"
+          >
+            No thanks
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              // Keep the dialog mounted until the create mutation resolves so
+              // its onSuccess can invalidate queries and refresh Upcoming.
+              e.preventDefault();
+              if (date) followUpMut.mutate(date);
+            }}
+            disabled={followUpMut.isPending}
+            className="h-11 text-base sm:h-10 sm:text-sm gradient-primary text-white border-none font-semibold"
+            data-testid="button-followup-confirm"
+          >
+            {followUpMut.isPending ? "Creating..." : "Create appointment"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
