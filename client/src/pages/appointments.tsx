@@ -24,9 +24,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
@@ -390,8 +389,8 @@ export default function Appointments() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const search = useSearch();
-  const [tab, setTab] = useState(
-    () => (new URLSearchParams(search).get("tab") === "timeline" ? "timeline" : "schedule"),
+  const [timelineOpen, setTimelineOpen] = useState(
+    () => new URLSearchParams(search).get("tab") === "timeline",
   );
   const { toast } = useToast();
 
@@ -437,9 +436,9 @@ export default function Appointments() {
   const historyList = appointments
     .filter((a) => a.status === "cancelled" || a.status === "completed" || hasAppointmentPassed(a))
     .sort((a, b) => -sortAscByDateTime(a, b));
-  // Visit timeline: past appointments that actually have notes, newest first.
+  // Visit timeline: ALL past appointments (notes or not), newest first.
   const timelineList = appointments
-    .filter((a) => hasAppointmentPassed(a) && appointmentHasNotes(a))
+    .filter((a) => hasAppointmentPassed(a))
     .sort((a, b) => -sortAscByDateTime(a, b));
 
   // Simple calendar view data
@@ -461,7 +460,15 @@ export default function Appointments() {
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Appointments</h1>
           <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Manage your doctor visits and procedures</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            className="gap-1.5 h-10"
+            onClick={() => setTimelineOpen(true)}
+            data-testid="button-view-timeline"
+          >
+            <History className="w-4 h-4" /> View Timeline
+          </Button>
           <Button variant="outline" className="gap-1.5 h-10 print-button-area" onClick={() => {
             const printContent = document.querySelector('[data-testid="appointments-list"]');
             if (!printContent) return;
@@ -560,19 +567,6 @@ export default function Appointments() {
         </CardContent>
       </Card>
 
-      {/* Schedule vs. Visit Notes timeline */}
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-11">
-          <TabsTrigger value="schedule" data-testid="tab-schedule" className="text-sm">
-            Upcoming
-          </TabsTrigger>
-          <TabsTrigger value="timeline" data-testid="tab-timeline" className="text-sm">
-            Visit Notes
-            <Badge variant="secondary" className="ml-2 text-xs font-semibold">{timelineList.length}</Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="schedule">
       {/* List */}
       <div className="space-y-3" data-testid="appointments-list">
         {isLoading ? (
@@ -658,13 +652,94 @@ export default function Appointments() {
           </>
         )}
       </div>
-        </TabsContent>
 
-        <TabsContent value="timeline">
-          <VisitTimeline appointments={timelineList} physicians={physicians} patientId={pid} />
-        </TabsContent>
-      </Tabs>
+      <TimelineDialog
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+        appointments={timelineList}
+        physicians={physicians}
+        patientId={pid}
+      />
     </div>
+  );
+}
+
+// Near-full-screen sheet on mobile, roomy centered dialog on desktop — mirrors
+// the appointment/notes dialogs so the timeline feels consistent.
+const TIMELINE_DIALOG_CLASS =
+  "p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
+  "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(720px,calc(100vw-2rem))] sm:max-w-[720px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
+  "overflow-hidden flex flex-col";
+
+function TimelineDialog({
+  open, onOpenChange, appointments, physicians, patientId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  appointments: Appointment[];
+  physicians: Physician[];
+  patientId: number;
+}) {
+  // "all" (default) or a physician id as string. "none" gathers appointments
+  // with no physician set.
+  const [physicianFilter, setPhysicianFilter] = useState<string>("all");
+
+  // Only offer physicians that actually appear in the past appointments.
+  const timelinePhysicianIds = new Set(
+    appointments.map((a) => a.physicianId).filter((id): id is number => id != null),
+  );
+  const filterPhysicians = physicians.filter((p) => p.id != null && timelinePhysicianIds.has(p.id));
+  const hasUnassigned = appointments.some((a) => a.physicianId == null);
+
+  const filtered = appointments.filter((a) => {
+    if (physicianFilter === "all") return true;
+    if (physicianFilter === "none") return a.physicianId == null;
+    return String(a.physicianId) === physicianFilter;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={TIMELINE_DIALOG_CLASS}>
+        <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
+          <DialogTitle className="font-heading text-2xl font-bold text-white flex items-center gap-2">
+            <History className="w-6 h-6" />
+            Visit Timeline
+          </DialogTitle>
+          <DialogDescription className="text-white/85 text-sm">
+            Your past appointments, most recent first. Add or review notes for any visit.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="shrink-0 border-b bg-background px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Label htmlFor="timeline-physician" className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Stethoscope className="w-4 h-4 text-primary" />
+              Physician
+            </Label>
+            <Select value={physicianFilter} onValueChange={setPhysicianFilter}>
+              <SelectTrigger
+                id="timeline-physician"
+                className="h-10 w-full sm:w-64"
+                data-testid="select-timeline-physician"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="all">All physicians</SelectItem>
+                {filterPhysicians.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+                {hasUnassigned && <SelectItem value="none">No physician</SelectItem>}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 bg-muted/20">
+          <VisitTimeline appointments={filtered} physicians={physicians} patientId={patientId} />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -680,9 +755,9 @@ function VisitTimeline({
       <Card className="shadow-sm">
         <CardContent className="py-12 text-center">
           <NotebookPen className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="text-base text-muted-foreground">No visit notes yet</p>
+          <p className="text-base text-muted-foreground">No past appointments</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Add notes to a past appointment from the Upcoming tab to build your visit history.
+            Once an appointment date has passed, it will appear here so you can add visit notes.
           </p>
         </CardContent>
       </Card>
@@ -714,6 +789,7 @@ function VisitTimelineCard({
   const [notesOpen, setNotesOpen] = useState(false);
   const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
   const doc = physicians.find((p) => p.id === apt.physicianId);
+  const hasNotes = appointmentHasNotes(apt);
   const preview = (apt.visitSummary || apt.diagnosisFindings || apt.providerInstructions || "").trim();
 
   return (
@@ -741,35 +817,50 @@ function VisitTimelineCard({
                 </span>
               )}
             </div>
-            {!expanded && preview && (
+            {hasNotes && !expanded && preview && (
               <p className="text-sm text-foreground/70 mt-2 line-clamp-2 break-words">{preview}</p>
             )}
-            {expanded && (
+            {hasNotes && expanded && (
               <div className="mt-3 rounded-lg bg-muted/40 p-3">
                 <AppointmentNotesView appointment={apt} />
               </div>
             )}
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-9"
-                onClick={() => setExpanded((v) => !v)}
-                data-testid={`button-visit-expand-${apt.id}`}
-              >
-                <ChevronDown className={`w-4 h-4 mr-1.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                {expanded ? "Hide notes" : "View notes"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-9 text-primary"
-                onClick={() => setNotesOpen(true)}
-                data-testid={`button-visit-edit-notes-${apt.id}`}
-              >
-                <NotebookPen className="w-4 h-4 mr-1.5" />
-                Edit Notes
-              </Button>
+              {hasNotes ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9"
+                    onClick={() => setExpanded((v) => !v)}
+                    data-testid={`button-visit-expand-${apt.id}`}
+                  >
+                    <ChevronDown className={`w-4 h-4 mr-1.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                    {expanded ? "Hide notes" : "View notes"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9 text-primary"
+                    onClick={() => setNotesOpen(true)}
+                    data-testid={`button-visit-edit-notes-${apt.id}`}
+                  >
+                    <NotebookPen className="w-4 h-4 mr-1.5" />
+                    Edit Notes
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9"
+                  onClick={() => setNotesOpen(true)}
+                  data-testid={`button-visit-add-notes-${apt.id}`}
+                >
+                  <NotebookPen className="w-4 h-4 mr-1.5" />
+                  Add Notes
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -827,11 +918,11 @@ function AppointmentCard({
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
               <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
-              <Badge className={`text-xs font-medium ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
-                {apt.status === "completed" && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                {apt.status === "cancelled" && <XCircle className="w-3 h-3 mr-1" />}
-                {apt.status}
-              </Badge>
+              {/* Status badge only makes sense for still-scheduled visits; past
+                  appointments default to "upcoming" so showing it there is noise. */}
+              {!hasAppointmentPassed(apt) && (
+                <Badge className="text-xs font-medium status-upcoming">upcoming</Badge>
+              )}
             </div>
            <div className="flex items-center gap-x-3 sm:gap-x-4 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
   <span className="flex items-center gap-1.5 min-w-0">
