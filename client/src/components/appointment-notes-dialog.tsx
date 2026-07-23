@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { updateAppointment, createAppointment } from "@/lib/db";
@@ -78,6 +78,19 @@ export function AppointmentNotesDialog({
   const [form, setForm] = useState<NotesForm>(() => toForm(appointment));
   // Holds the follow-up date to offer once notes have saved.
   const [followUpOffer, setFollowUpOffer] = useState<string | null>(null);
+  // Controls the inner notes Dialog independently of the parent `open` prop so
+  // we can fully close it (and let its exit animation finish) before showing
+  // the follow-up AlertDialog. Stacking an AlertDialog on top of a still-open
+  // Radix Dialog makes the focus guards suppress the AlertDialog, so only one
+  // Radix modal may be mounted at a time.
+  const [notesVisible, setNotesVisible] = useState(true);
+  const followUpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (followUpTimer.current) clearTimeout(followUpTimer.current);
+    };
+  }, []);
 
   const doc = physicians.find((p) => p.id === appointment.physicianId);
 
@@ -112,10 +125,16 @@ export function AppointmentNotesDialog({
       invalidate();
       toast({ title: "Visit notes saved" });
       // Offer to create a follow-up appointment only when a new/changed
-      // follow-up date was entered.
+      // follow-up date was entered. Close the notes Dialog first and open the
+      // AlertDialog only after its exit animation, so the two Radix modals are
+      // never mounted at the same time. We intentionally do NOT call
+      // onOpenChange(false) here — that would unmount this whole component
+      // (parents render it as `{open && <AppointmentNotesDialog/>}`) and take
+      // the follow-up prompt down with it.
       const newDate = form.followUpDate;
       if (newDate && newDate !== appointment.followUpDate) {
-        setFollowUpOffer(newDate);
+        setNotesVisible(false);
+        followUpTimer.current = setTimeout(() => setFollowUpOffer(newDate), 250);
       } else {
         onOpenChange(false);
       }
@@ -149,7 +168,15 @@ export function AppointmentNotesDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog
+        open={open && notesVisible}
+        onOpenChange={(o) => {
+          // Only a user-initiated close (Esc / overlay / X) should tear down
+          // the whole flow. The programmatic close during the save→follow-up
+          // hand-off is driven by `notesVisible` and must not bubble up.
+          if (!o && notesVisible) onOpenChange(false);
+        }}
+      >
         <DialogContent className={NOTES_DIALOG_CLASS}>
           <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
             <DialogTitle className="font-heading text-2xl font-bold text-white flex items-center gap-2">
@@ -257,11 +284,17 @@ export function AppointmentNotesDialog({
               No thanks
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => followUpOffer && followUpMut.mutate(followUpOffer)}
+              onClick={(e) => {
+                // Keep the dialog mounted until the create mutation resolves so
+                // its onSuccess can invalidate queries and refresh Upcoming.
+                e.preventDefault();
+                if (followUpOffer) followUpMut.mutate(followUpOffer);
+              }}
+              disabled={followUpMut.isPending}
               className="h-11 text-base sm:h-10 sm:text-sm gradient-primary text-white border-none font-semibold"
               data-testid="button-followup-confirm"
             >
-              Create appointment
+              {followUpMut.isPending ? "Creating..." : "Create appointment"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
