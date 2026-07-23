@@ -277,7 +277,9 @@ export async function updateReminderSoundPreferences(
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
-    version: 2,
+    // v3 adds structured appointment visit notes. Older backups still import
+    // cleanly since appointment records are spread field-for-field on restore.
+    version: 3,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
