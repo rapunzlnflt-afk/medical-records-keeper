@@ -30,7 +30,7 @@ import { Link, useSearch } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 import { appointmentHasNotes } from "@/lib/appointment-notes";
-import { AppointmentNotesDialog, AppointmentNotesView, FollowUpOfferDialog } from "@/components/appointment-notes-dialog";
+import { AppointmentNotesDialog, FollowUpOfferDialog } from "@/components/appointment-notes-dialog";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
 const mapHref = (address?: string) => {
@@ -573,36 +573,37 @@ export default function Appointments() {
           <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)}</div>
         ) : (
           <>
-            {/* Upcoming */}
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                Upcoming
-                <Badge variant="secondary" className="text-xs font-semibold">{activeList.length}</Badge>
-              </h2>
-            </div>
-
-            {activeList.length === 0 ? (
-              <Card className="shadow-sm">
-                <CardContent className="py-10 text-center">
-                  <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-                  <p className="text-base text-muted-foreground">No upcoming appointments</p>
-                </CardContent>
-              </Card>
-            ) : (
-              activeList.map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  apt={apt}
-                  physicians={physicians}
-                  patientId={pid}
-                  editingId={editing?.id ?? null}
-                  setEditing={setEditing}
-                  onSave={(id, data) => updateMut.mutate({ id, data })}
-                  onDelete={(id) => deleteMut.mutate(id)}
-                />
-              ))
-            )}
+            {/* Upcoming (boxed card to match Appointment History) */}
+            <Card className="shadow-sm">
+              <CardHeader className="py-3.5">
+                <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-primary" />
+                  <span>Upcoming</span>
+                  <Badge variant="secondary" className="text-xs font-semibold">{activeList.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {activeList.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+                    <p className="text-base text-muted-foreground">No upcoming appointments</p>
+                  </div>
+                ) : (
+                  activeList.map((apt) => (
+                    <AppointmentCard
+                      key={apt.id}
+                      apt={apt}
+                      physicians={physicians}
+                      patientId={pid}
+                      editingId={editing?.id ?? null}
+                      setEditing={setEditing}
+                      onSave={(id, data) => updateMut.mutate({ id, data })}
+                      onDelete={(id) => deleteMut.mutate(id)}
+                    />
+                  ))
+                )}
+              </CardContent>
+            </Card>
 
             {/* History (collapsible) */}
             <Card className="mt-3 shadow-sm">
@@ -743,6 +744,45 @@ function TimelineDialog({
   );
 }
 
+// Structured note fields shown as sub-bullets, in clinical reading order.
+// Deliberately EXCLUDES questionsNextTime (a prep field, not a visit record).
+// followUpDate is handled separately so it can be prefixed "Follow-up:".
+const TIMELINE_NOTE_KEYS: (keyof Appointment)[] = [
+  "visitSummary",
+  "diagnosisFindings",
+  "providerInstructions",
+  "medicationChanges",
+  "testsOrdered",
+  "referrals",
+];
+
+// Build the ordered list of sub-bullet strings for a visit. Multi-line fields
+// split into one bullet per non-empty line; the follow-up date reads
+// "Follow-up: {date}" while every other bullet is clean prose (no field label).
+function visitSubBullets(apt: Appointment): string[] {
+  const bullets: string[] = [];
+  for (const key of TIMELINE_NOTE_KEYS) {
+    const raw = apt[key];
+    if (typeof raw !== "string") continue;
+    for (const line of raw.split("\n")) {
+      const t = line.trim();
+      if (t) bullets.push(t);
+    }
+  }
+  if (apt.followUpDate) {
+    bullets.push(`Follow-up: ${format(parseISO(apt.followUpDate), "MMM d, yyyy")}`);
+  }
+  return bullets;
+}
+
+// Visit title for the outline: explicit title, else the capitalized type.
+function visitTitle(apt: Appointment): string {
+  const t = (apt.title || "").trim();
+  if (t) return t;
+  const type = apt.type || "Visit";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function VisitTimeline({
   appointments, physicians, patientId,
 }: {
@@ -752,119 +792,97 @@ function VisitTimeline({
 }) {
   if (appointments.length === 0) {
     return (
-      <Card className="shadow-sm">
-        <CardContent className="py-12 text-center">
-          <NotebookPen className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="text-base text-muted-foreground">No past appointments</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Once an appointment date has passed, it will appear here so you can add visit notes.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="py-12 text-center" data-testid="visit-timeline-empty">
+        <NotebookPen className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+        <p className="text-base text-muted-foreground">No past appointments</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Once an appointment date has passed, it will appear here so you can add visit notes.
+        </p>
+      </div>
     );
   }
 
+  // Group by physician, preserving the incoming most-recent-first order so the
+  // group with the most recent visit surfaces first and visits stay ordered.
+  const groups: { key: string; heading: string; visits: Appointment[] }[] = [];
+  const byKey = new Map<string, typeof groups[number]>();
+  for (const apt of appointments) {
+    const doc = physicians.find((p) => p.id === apt.physicianId);
+    const key = doc ? `p-${doc.id}` : "none";
+    let group = byKey.get(key);
+    if (!group) {
+      const heading = doc
+        ? `${doc.name}${doc.specialty ? ` – ${doc.specialty}` : ""}`
+        : "No physician";
+      group = { key, heading, visits: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.visits.push(apt);
+  }
+
   return (
-    <div className="space-y-3" data-testid="visit-timeline">
-      {appointments.map((apt) => (
-        <VisitTimelineCard
-          key={apt.id}
-          apt={apt}
-          physicians={physicians}
-          patientId={patientId}
-        />
+    <div className="space-y-6" data-testid="visit-timeline">
+      {groups.map((group) => (
+        <section key={group.key} data-testid={`visit-group-${group.key}`}>
+          <h3 className="font-heading text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-primary flex-shrink-0" />
+            <span className="break-words min-w-0">{group.heading}</span>
+          </h3>
+          <ul className="mt-2 space-y-4">
+            {group.visits.map((apt) => (
+              <VisitTimelineEntry
+                key={apt.id}
+                apt={apt}
+                physicians={physicians}
+                patientId={patientId}
+              />
+            ))}
+          </ul>
+        </section>
       ))}
     </div>
   );
 }
 
-function VisitTimelineCard({
+function VisitTimelineEntry({
   apt, physicians, patientId,
 }: {
   apt: Appointment;
   physicians: Physician[];
   patientId: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
-  const doc = physicians.find((p) => p.id === apt.physicianId);
   const hasNotes = appointmentHasNotes(apt);
-  const preview = (apt.visitSummary || apt.diagnosisFindings || apt.providerInstructions || "").trim();
+  const subBullets = visitSubBullets(apt);
 
   return (
-    <Card className="shadow-sm" data-testid={`visit-timeline-${apt.id}`}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg gradient-primary flex flex-col items-center justify-center flex-shrink-0">
-            <span className="text-[10px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide text-white/90">{format(parseISO(apt.date), "MMM")}</span>
-            <span className="text-xl sm:text-2xl font-heading font-bold leading-none mt-1 text-white">{format(parseISO(apt.date), "dd")}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
-              <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
-            </div>
-            <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                {format(parseISO(apt.date), "EEE MMM d, yyyy")}
-              </span>
-              {doc && (
-                <span className="flex items-center gap-1.5 min-w-0 truncate">
-                  <Stethoscope className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{doc.name}{doc.specialty ? ` · ${doc.specialty}` : ""}</span>
-                </span>
-              )}
-            </div>
-            {hasNotes && !expanded && preview && (
-              <p className="text-sm text-foreground/70 mt-2 line-clamp-2 break-words">{preview}</p>
-            )}
-            {hasNotes && expanded && (
-              <div className="mt-3 rounded-lg bg-muted/40 p-3">
-                <AppointmentNotesView appointment={apt} />
-              </div>
-            )}
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {hasNotes ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-9"
-                    onClick={() => setExpanded((v) => !v)}
-                    data-testid={`button-visit-expand-${apt.id}`}
-                  >
-                    <ChevronDown className={`w-4 h-4 mr-1.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                    {expanded ? "Hide notes" : "View notes"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-9 text-primary"
-                    onClick={() => setNotesOpen(true)}
-                    data-testid={`button-visit-edit-notes-${apt.id}`}
-                  >
-                    <NotebookPen className="w-4 h-4 mr-1.5" />
-                    Edit Notes
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9"
-                  onClick={() => setNotesOpen(true)}
-                  data-testid={`button-visit-add-notes-${apt.id}`}
-                >
-                  <NotebookPen className="w-4 h-4 mr-1.5" />
-                  Add Notes
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
+    <li className="pl-1" data-testid={`visit-timeline-${apt.id}`}>
+      <div className="flex items-baseline gap-2 flex-wrap text-foreground">
+        <span className="text-primary" aria-hidden="true">•</span>
+        <span className="text-sm sm:text-base font-medium break-words min-w-0">
+          {format(parseISO(apt.date), "MMM d, yyyy")} – {visitTitle(apt)}
+        </span>
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2"
+          onClick={() => setNotesOpen(true)}
+          data-testid={`button-visit-${hasNotes ? "edit" : "add"}-notes-${apt.id}`}
+        >
+          {hasNotes ? "Edit" : "Add notes"}
+        </button>
+      </div>
+      {subBullets.length > 0 && (
+        <ul className="mt-1 ml-6 space-y-1">
+          {subBullets.map((text, i) => (
+            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+              <span className="flex-shrink-0" aria-hidden="true">◦</span>
+              <span className="break-words min-w-0 whitespace-pre-wrap">{text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {notesOpen && (
         <AppointmentNotesDialog
           appointment={apt}
@@ -885,7 +903,7 @@ function VisitTimelineCard({
           if (!o) setPendingFollowUp(null);
         }}
       />
-    </Card>
+    </li>
   );
 }
 
