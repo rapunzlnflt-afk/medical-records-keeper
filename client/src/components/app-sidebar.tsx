@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
-  HeartPulse, Phone, Building2, Sun, Moon, Download, Upload,
+  HeartPulse, Phone, Building2, IdCard, Sun, Moon, Download, Upload,
   Plus, X, Check, ChevronDown, Pencil, Trash2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -39,6 +39,7 @@ function normalizePatientFields<T extends Partial<Patient>>(data: T): T {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Profile", url: "/profile", icon: IdCard },
   { title: "Appointments", url: "/appointments", icon: CalendarDays },
   { title: "Medications", url: "/medications", icon: Pill },
   { title: "Physicians", url: "/physicians", icon: Stethoscope },

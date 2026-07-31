@@ -234,9 +234,11 @@ export async function deletePharmacy(id: number): Promise<void> {
 
 // --- Reminder Sound Preferences ---
 const defaultReminderSoundPreferences = {
-  enabled: 0,
+  appointmentsEnabled: 0,
   appointmentsSound: "soft-chime",
+  medicationsEnabled: 0,
   medicationsSound: "clear-bell",
+  vitalsEnabled: 0,
   vitalsSound: "soft-chime",
 };
 
@@ -277,9 +279,9 @@ export async function updateReminderSoundPreferences(
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
-    // v3 adds structured appointment visit notes. Older backups still import
-    // cleanly since appointment records are spread field-for-field on restore.
-    version: 3,
+    // v4 adds patient profile details and insurance card fields. Older backups
+    // still import cleanly since records are spread field-for-field on restore.
+    version: 4,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
