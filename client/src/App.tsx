@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { PurchaseGate } from "@/components/purchase-gate";
 import { ThemeProvider } from "@/lib/theme";
 import { PatientProvider } from "@/lib/patient-context";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -74,18 +75,20 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <PatientProvider>
-          <TooltipProvider>
-            <Router hook={useHashLocation}>
-              <SidebarProvider style={style as React.CSSProperties}>
-                <AppLayout />
-              </SidebarProvider>
-            </Router>
-            <Toaster />
-          </TooltipProvider>
-        </PatientProvider>
-      </QueryClientProvider>
+      <PurchaseGate>
+        <QueryClientProvider client={queryClient}>
+          <PatientProvider>
+            <TooltipProvider>
+              <Router hook={useHashLocation}>
+                <SidebarProvider style={style as React.CSSProperties}>
+                  <AppLayout />
+                </SidebarProvider>
+              </Router>
+              <Toaster />
+            </TooltipProvider>
+          </PatientProvider>
+        </QueryClientProvider>
+      </PurchaseGate>
     </ThemeProvider>
   );
 }
