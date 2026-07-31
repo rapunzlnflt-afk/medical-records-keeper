@@ -29,6 +29,18 @@ export interface Patient {
   insurancePhone?: string | null;
   insurancePolicyHolder?: string | null;
   insuranceEffectiveDate?: string | null;
+  // Dental insurance card — separate from the medical card above because dental
+  // coverage is usually a different carrier. No Rx fields: those are pharmacy
+  // details that only appear on a medical card.
+  dentalCardFront?: string | null;
+  dentalCardBack?: string | null;
+  dentalCarrier?: string | null;
+  dentalMemberId?: string | null;
+  dentalGroupNumber?: string | null;
+  dentalPlanType?: string | null;
+  dentalPhone?: string | null;
+  dentalPolicyHolder?: string | null;
+  dentalEffectiveDate?: string | null;
 }
 
 export interface Physician {

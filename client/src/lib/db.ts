@@ -279,9 +279,9 @@ export async function updateReminderSoundPreferences(
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
-    // v4 adds patient profile details and insurance card fields. Older backups
-    // still import cleanly since records are spread field-for-field on restore.
-    version: 4,
+    // v5 adds the dental insurance card fields. Older backups still import
+    // cleanly since records are spread field-for-field on restore.
+    version: 5,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
