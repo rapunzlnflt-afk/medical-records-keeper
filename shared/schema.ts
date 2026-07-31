@@ -7,6 +7,40 @@ export interface Patient {
   relationship: string | null;
   dateOfBirth: string | null;
   color: string;
+  // Profile details. All optional so patient records created before the
+  // Profile tab existed keep working untouched.
+  photoUrl?: string | null;
+  bloodType?: string | null;
+  height?: string | null;
+  allergies?: string | null;
+  conditions?: string | null;
+  primaryPhysicianId?: number | null;
+  // Insurance card — one per family member. Front/back are downscaled JPEG
+  // data URLs (see client/src/lib/image.ts).
+  insuranceCardFront?: string | null;
+  insuranceCardBack?: string | null;
+  insuranceCarrier?: string | null;
+  insuranceMemberId?: string | null;
+  insuranceGroupNumber?: string | null;
+  insurancePlanType?: string | null;
+  insuranceRxBin?: string | null;
+  insuranceRxPcn?: string | null;
+  insuranceRxGroup?: string | null;
+  insurancePhone?: string | null;
+  insurancePolicyHolder?: string | null;
+  insuranceEffectiveDate?: string | null;
+  // Dental insurance card — separate from the medical card above because dental
+  // coverage is usually a different carrier. No Rx fields: those are pharmacy
+  // details that only appear on a medical card.
+  dentalCardFront?: string | null;
+  dentalCardBack?: string | null;
+  dentalCarrier?: string | null;
+  dentalMemberId?: string | null;
+  dentalGroupNumber?: string | null;
+  dentalPlanType?: string | null;
+  dentalPhone?: string | null;
+  dentalPolicyHolder?: string | null;
+  dentalEffectiveDate?: string | null;
 }
 
 export interface Physician {

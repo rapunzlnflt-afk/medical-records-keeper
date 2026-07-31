@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { PatientProvider } from "@/lib/patient-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Dashboard from "@/pages/dashboard";
+import Profile from "@/pages/profile";
 import Appointments from "@/pages/appointments";
 import Medications from "@/pages/medications";
 import Physicians from "@/pages/physicians";
@@ -24,6 +25,7 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/profile" component={Profile} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/medications" component={Medications} />
       <Route path="/physicians" component={Physicians} />
