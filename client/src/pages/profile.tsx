@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getPhysicians, updatePatient } from "@/lib/db";
@@ -16,10 +16,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Camera, Edit2, IdCard, Phone, Smile, Stethoscope, UserRound,
-  X, ZoomIn, ZoomOut,
+  ArrowLeft, Camera, Edit2, IdCard, ImageOff, Smile, Stethoscope, Trash2,
+  UserRound, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { Link } from "wouter";
 import { differenceInYears, format, parseISO } from "date-fns";
@@ -146,9 +156,17 @@ function FullScreenImage({ src, title, onClose }: { src: string; title: string; 
   );
 }
 
-function CardPhotoTile({ label, value, onChange, onView, testId }: {
+/**
+ * One front/back photo slot. Read-only in view mode so a stray tap can't erase
+ * anything; in edit mode it gains replace/remove controls that only ever touch
+ * the caller's draft state.
+ */
+function CardPhotoTile({ label, value, editable, photoDescription, onChange, onView, testId }: {
   label: string;
   value: string | null | undefined;
+  editable: boolean;
+  /** Reads inside the confirm prompt, e.g. "the front of your medical card". */
+  photoDescription: string;
   onChange: (dataUrl: string | null) => void;
   onView: () => void;
   testId: string;
@@ -156,6 +174,7 @@ function CardPhotoTile({ label, value, onChange, onView, testId }: {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -176,37 +195,15 @@ function CardPhotoTile({ label, value, onChange, onView, testId }: {
     <div className="min-w-0 space-y-1.5">
       <p className="text-sm font-body font-semibold">{label}</p>
       {value ? (
-        <div className="relative">
-          <button
-            type="button"
-            onClick={onView}
-            className="block w-full aspect-[1.586] rounded-lg border overflow-hidden bg-muted/30"
-            data-testid={`button-view-${testId}`}
-          >
-            <img src={value} alt={label} className="w-full h-full object-cover" />
-          </button>
-          <div className="absolute top-1.5 right-1.5 flex gap-1">
-            <Button
-              type="button" size="icon" variant="secondary"
-              className="w-8 h-8 rounded-full shadow"
-              onClick={() => inputRef.current?.click()}
-              aria-label={`Replace ${label}`}
-              data-testid={`button-replace-${testId}`}
-            >
-              <Camera className="w-4 h-4" />
-            </Button>
-            <Button
-              type="button" size="icon" variant="destructive"
-              className="w-8 h-8 rounded-full shadow"
-              onClick={() => onChange(null)}
-              aria-label={`Remove ${label}`}
-              data-testid={`button-remove-${testId}`}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      ) : (
+        <button
+          type="button"
+          onClick={onView}
+          className="block w-full aspect-[1.586] rounded-lg border overflow-hidden bg-muted/30"
+          data-testid={`button-view-${testId}`}
+        >
+          <img src={value} alt={label} className="w-full h-full object-cover" />
+        </button>
+      ) : editable ? (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -219,7 +216,45 @@ function CardPhotoTile({ label, value, onChange, onView, testId }: {
             {busy ? "Processing…" : "Take or choose a photo"}
           </span>
         </button>
+      ) : (
+        <div
+          className="w-full aspect-[1.586] min-h-[104px] rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-1.5 px-2 text-center"
+          data-testid={`empty-${testId}`}
+        >
+          <ImageOff className="w-6 h-6 text-muted-foreground/60" />
+          <span className="text-xs font-body text-muted-foreground leading-tight">No photo yet</span>
+        </div>
       )}
+
+      {/*
+        Stacked rather than side by side: at 375px each tile column is only
+        ~150px, too narrow to fit two labelled buttons without clipping words.
+      */}
+      {editable && value && (
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Button
+            type="button" size="sm" variant="outline" disabled={busy}
+            className="h-9 w-full min-w-0 px-2 gap-1.5 text-sm"
+            onClick={() => inputRef.current?.click()}
+            aria-label={`Replace ${photoDescription}`}
+            data-testid={`button-replace-${testId}`}
+          >
+            <Camera className="w-3.5 h-3.5 shrink-0" />
+            {busy ? "Working…" : "Replace"}
+          </Button>
+          <Button
+            type="button" size="sm" variant="outline"
+            className="h-9 w-full min-w-0 px-2 gap-1.5 text-sm text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setConfirmingRemove(true)}
+            aria-label={`Remove ${photoDescription}`}
+            data-testid={`button-remove-${testId}`}
+          >
+            <X className="w-3.5 h-3.5 shrink-0" />
+            Remove
+          </Button>
+        </div>
+      )}
+
       <input
         ref={inputRef}
         type="file"
@@ -229,6 +264,35 @@ function CardPhotoTile({ label, value, onChange, onView, testId }: {
         data-testid={`input-${testId}`}
       />
       {error && <p className="text-xs text-destructive break-words">{error}</p>}
+
+      <AlertDialog open={confirmingRemove} onOpenChange={setConfirmingRemove}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading flex items-center gap-2 text-left">
+              <Trash2 className="w-5 h-5 text-destructive shrink-0" />
+              Remove {photoDescription}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              Nothing is saved until you press Save. If you change your mind, press Cancel and the photo comes back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel
+              className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+              data-testid={`button-remove-${testId}-cancel`}
+            >
+              Keep photo
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => onChange(null)}
+              className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+              data-testid={`button-remove-${testId}-confirm`}
+            >
+              Remove photo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -247,32 +311,87 @@ function phoneLink(phone: string | null | undefined, testId: string) {
 }
 
 /**
- * One insurance card: front/back photos, a full-screen viewer, the typed
- * details, and the button that opens the edit dialog. Rendered once for the
- * medical card and once for the dental card.
+ * One insurance card: front/back photos, a full-screen viewer, and the typed
+ * plan details. Rendered once for the medical card and once for the dental one.
+ *
+ * View mode is entirely read-only. Tapping Edit snapshots the current values
+ * into `draft`; photo replacements, removals, and field edits all mutate only
+ * that draft, so Cancel restores the snapshot and Save is the single write.
  */
 function InsuranceCardSection({
-  icon: Icon, title, description, front, back, onFrontChange, onBackChange,
-  viewerLabel, frontTestId, backTestId, details, emptyDetailsText, onEdit, editTestId,
+  icon: Icon, title, description, sectionId, idPrefix, cardNoun, viewerLabel,
+  frontTestId, backTestId, showPharmacyFields, values, details, emptyDetailsText, onSave,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
-  front: string | null | undefined;
-  back: string | null | undefined;
-  onFrontChange: (dataUrl: string | null) => void;
-  onBackChange: (dataUrl: string | null) => void;
+  /** Drives the section-level test ids, e.g. "insurance" or "dental". */
+  sectionId: string;
+  /** Drives the typed-field test ids and input element ids. */
+  idPrefix: string;
+  /** Reads inside prompts, e.g. "medical card". */
+  cardNoun: string;
   viewerLabel: string;
   frontTestId: string;
   backTestId: string;
+  showPharmacyFields: boolean;
+  values: CardSectionValues;
   details: { label: string; value: React.ReactNode }[];
   emptyDetailsText: string;
-  onEdit: () => void;
-  editTestId: string;
+  onSave: (values: CardSectionValues) => Promise<void>;
 }) {
   const [viewing, setViewing] = useState<"front" | "back" | null>(null);
-  const viewingSrc = viewing === "front" ? front : back;
+  const [draft, setDraft] = useState<CardSectionValues | null>(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const snapshot = useRef<CardSectionValues | null>(null);
+  const editRegionRef = useRef<HTMLDivElement>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+
+  const editing = draft !== null;
+  const shown = draft ?? values;
+  const viewingSrc = viewing === "front" ? shown.front : shown.back;
   const hasDetails = details.some((d) => Boolean(d.value));
+  const dirty = draft !== null && snapshot.current !== null && !cardValuesEqual(draft, snapshot.current);
+
+  useEffect(() => {
+    if (editing) {
+      editRegionRef.current?.focus();
+    } else if (returnFocus.current) {
+      returnFocus.current = false;
+      editButtonRef.current?.focus();
+    }
+  }, [editing]);
+
+  const patchDraft = (patch: Partial<CardSectionValues>) =>
+    setDraft((current) => (current === null ? current : { ...current, ...patch }));
+
+  const startEdit = () => {
+    snapshot.current = { ...values };
+    setDraft({ ...values });
+  };
+
+  const discard = () => {
+    returnFocus.current = true;
+    setConfirmingCancel(false);
+    setDraft(null);
+  };
+
+  const handleSave = async () => {
+    if (draft === null) return;
+    setSaving(true);
+    try {
+      await onSave(draft);
+      returnFocus.current = true;
+      setDraft(null);
+    } catch {
+      // The mutation surfaces its own toast; stay in edit mode so the
+      // user's unsaved work is still on screen.
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Card className="shadow-sm">
@@ -289,26 +408,74 @@ function InsuranceCardSection({
 
         <div className="grid grid-cols-2 gap-3 min-w-0">
           <CardPhotoTile
-            label="Front" value={front} onChange={onFrontChange}
+            label="Front" value={shown.front} editable={editing}
+            photoDescription={`the front of your ${cardNoun}`}
+            onChange={(front) => patchDraft({ front })}
             onView={() => setViewing("front")} testId={frontTestId}
           />
           <CardPhotoTile
-            label="Back" value={back} onChange={onBackChange}
+            label="Back" value={shown.back} editable={editing}
+            photoDescription={`the back of your ${cardNoun}`}
+            onChange={(back) => patchDraft({ back })}
             onView={() => setViewing("back")} testId={backTestId}
           />
         </div>
 
-        {hasDetails ? (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-4 min-w-0">
-            {details.map((d) => <DetailRow key={d.label} label={d.label} value={d.value} />)}
-          </dl>
+        {editing ? (
+          <div
+            ref={editRegionRef}
+            tabIndex={-1}
+            role="group"
+            aria-label={`Edit ${title}`}
+            className="border-t pt-4 space-y-4 min-w-0 outline-none"
+            data-testid={`region-edit-${sectionId}`}
+          >
+            <CardDetailFields
+              values={draft}
+              idPrefix={idPrefix}
+              showPharmacyFields={showPharmacyFields}
+              onChange={patchDraft}
+            />
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end min-w-0">
+              <Button
+                variant="outline"
+                onClick={() => (dirty ? setConfirmingCancel(true) : discard())}
+                className="h-12 text-base w-full sm:w-auto sm:min-w-[140px]"
+                data-testid={`button-cancel-${sectionId}`}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="gradient-primary text-white border-none h-12 text-base font-semibold w-full sm:w-auto sm:min-w-[200px]"
+                data-testid={`button-save-${sectionId}`}
+              >
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground border-t pt-4">{emptyDetailsText}</p>
-        )}
+          <>
+            {hasDetails ? (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-4 min-w-0">
+                {details.map((d) => <DetailRow key={d.label} label={d.label} value={d.value} />)}
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground border-t pt-4">{emptyDetailsText}</p>
+            )}
 
-        <Button size="sm" variant="outline" className="gap-1.5" onClick={onEdit} data-testid={editTestId}>
-          <Edit2 className="w-3.5 h-3.5" /> {hasDetails ? "Edit plan details" : "Add plan details"}
-        </Button>
+            <Button
+              ref={editButtonRef}
+              size="sm" variant="outline" className="gap-1.5"
+              onClick={startEdit}
+              aria-label={`Edit ${title}`}
+              data-testid={`button-edit-${sectionId}`}
+            >
+              <Edit2 className="w-3.5 h-3.5" /> Edit
+            </Button>
+          </>
+        )}
       </CardContent>
 
       {viewing && viewingSrc && (
@@ -318,6 +485,32 @@ function InsuranceCardSection({
           onClose={() => setViewing(null)}
         />
       )}
+
+      <AlertDialog open={confirmingCancel} onOpenChange={setConfirmingCancel}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-left">Discard your changes?</AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              Your {cardNoun} goes back to how it was, including any photo you removed or replaced.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel
+              className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+              data-testid={`button-cancel-${sectionId}-keep-editing`}
+            >
+              Keep editing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={discard}
+              className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+              data-testid={`button-cancel-${sectionId}-confirm`}
+            >
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -584,123 +777,120 @@ interface CardDetailValues {
   rxGroup?: string;
 }
 
-function CardDetailsForm({ initial, idPrefix, showPharmacyFields, saveLabel, onSubmit, onCancel }: {
-  initial: CardDetailValues;
+/** The typed details plus the two photos — everything one Save commits. */
+interface CardSectionValues extends CardDetailValues {
+  front: string | null;
+  back: string | null;
+}
+
+const CARD_VALUE_KEYS = [
+  "front", "back", "carrier", "planType", "memberId", "groupNumber",
+  "policyHolder", "effectiveDate", "phone", "rxBin", "rxPcn", "rxGroup",
+] as const;
+
+function cardValuesEqual(a: CardSectionValues, b: CardSectionValues): boolean {
+  return CARD_VALUE_KEYS.every((key) => (a[key] ?? "") === (b[key] ?? ""));
+}
+
+function CardTextField({ id, label, value, onChange, placeholder, type, inputMode, upperCase, format, testId }: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  inputMode?: "tel";
+  upperCase?: boolean;
+  format?: (value: string) => string;
+  testId: string;
+}) {
+  return (
+    <div className="space-y-2 min-w-0">
+      <Label htmlFor={id} className={labelClass}>{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        inputMode={inputMode}
+        className={controlClass}
+        value={value}
+        onChange={(e) => onChange(format ? format(e.target.value) : e.target.value)}
+        autoCapitalize={upperCase ? "characters" : undefined}
+        autoCorrect={upperCase ? "off" : undefined}
+        placeholder={placeholder}
+        data-testid={testId}
+      />
+    </div>
+  );
+}
+
+/**
+ * The typed plan fields, rendered inline inside a section in edit mode. Fully
+ * controlled so the owning section keeps the single source of draft truth.
+ */
+function CardDetailFields({ values, idPrefix, showPharmacyFields, onChange }: {
+  values: CardDetailValues;
   idPrefix: string;
   showPharmacyFields: boolean;
-  saveLabel: string;
-  onSubmit: (values: CardDetailValues) => void;
-  onCancel: () => void;
+  onChange: (patch: Partial<CardDetailValues>) => void;
 }) {
-  const [form, setForm] = useState({ rxBin: "", rxPcn: "", rxGroup: "", ...initial });
-
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
-        <FieldSection icon={IdCard} title="Plan" description="What's printed on the front of the card.">
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-carrier`} className={labelClass}>Carrier / Plan Name</Label>
-            <Input
-              id={`${idPrefix}-carrier`} className={controlClass} value={form.carrier}
-              onChange={(e) => setForm({ ...form, carrier: e.target.value })}
-              placeholder="Blue Cross Blue Shield" data-testid={`input-${idPrefix}-carrier`}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-plan-type`} className={labelClass}>Plan Type</Label>
-            <Input
-              id={`${idPrefix}-plan-type`} className={controlClass} value={form.planType}
-              onChange={(e) => setForm({ ...form, planType: e.target.value })}
-              placeholder="PPO, HMO, Medicare Advantage..." data-testid={`input-${idPrefix}-plan-type`}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-member-id`} className={labelClass}>Member ID</Label>
-            <Input
-              id={`${idPrefix}-member-id`} className={controlClass} value={form.memberId}
-              onChange={(e) => setForm({ ...form, memberId: e.target.value })}
-              autoCapitalize="characters" autoCorrect="off"
-              placeholder="XZY123456789" data-testid={`input-${idPrefix}-member-id`}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-group`} className={labelClass}>Group Number</Label>
-            <Input
-              id={`${idPrefix}-group`} className={controlClass} value={form.groupNumber}
-              onChange={(e) => setForm({ ...form, groupNumber: e.target.value })}
-              autoCapitalize="characters" autoCorrect="off"
-              placeholder="000123456" data-testid={`input-${idPrefix}-group`}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-holder`} className={labelClass}>Policy Holder</Label>
-            <Input
-              id={`${idPrefix}-holder`} className={controlClass} value={form.policyHolder}
-              onChange={(e) => setForm({ ...form, policyHolder: e.target.value })}
-              placeholder="Jane Doe" data-testid={`input-${idPrefix}-holder`}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-effective`} className={labelClass}>Effective Date</Label>
-            <Input
-              id={`${idPrefix}-effective`} type="date" className={controlClass} value={form.effectiveDate}
-              onChange={(e) => setForm({ ...form, effectiveDate: e.target.value })}
-              data-testid={`input-${idPrefix}-effective`}
-            />
-          </div>
-        </FieldSection>
+    <div className="space-y-4 min-w-0">
+      <CardTextField
+        id={`${idPrefix}-carrier`} label="Carrier / Plan Name" value={values.carrier}
+        onChange={(carrier) => onChange({ carrier })}
+        placeholder="Blue Cross Blue Shield" testId={`input-${idPrefix}-carrier`}
+      />
+      <CardTextField
+        id={`${idPrefix}-plan-type`} label="Plan Type" value={values.planType}
+        onChange={(planType) => onChange({ planType })}
+        placeholder="PPO, HMO, Medicare Advantage..." testId={`input-${idPrefix}-plan-type`}
+      />
+      <CardTextField
+        id={`${idPrefix}-member-id`} label="Member ID" value={values.memberId}
+        onChange={(memberId) => onChange({ memberId })} upperCase
+        placeholder="XZY123456789" testId={`input-${idPrefix}-member-id`}
+      />
+      <CardTextField
+        id={`${idPrefix}-group`} label="Group Number" value={values.groupNumber}
+        onChange={(groupNumber) => onChange({ groupNumber })} upperCase
+        placeholder="000123456" testId={`input-${idPrefix}-group`}
+      />
+      <CardTextField
+        id={`${idPrefix}-holder`} label="Policy Holder" value={values.policyHolder}
+        onChange={(policyHolder) => onChange({ policyHolder })}
+        placeholder="Jane Doe" testId={`input-${idPrefix}-holder`}
+      />
+      <CardTextField
+        id={`${idPrefix}-effective`} label="Effective Date" value={values.effectiveDate}
+        onChange={(effectiveDate) => onChange({ effectiveDate })}
+        type="date" testId={`input-${idPrefix}-effective`}
+      />
 
-        <FieldSection
-          icon={Phone}
-          title={showPharmacyFields ? "Pharmacy & Contact" : "Contact"}
-          description={
-            showPharmacyFields
-              ? "The small print used at the pharmacy counter."
-              : "Who to call with a question about this plan."
-          }
-        >
-          {showPharmacyFields && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}-rxbin`} className={labelClass}>RxBIN</Label>
-                <Input
-                  id={`${idPrefix}-rxbin`} className={controlClass} value={form.rxBin}
-                  onChange={(e) => setForm({ ...form, rxBin: e.target.value })}
-                  autoCapitalize="characters" autoCorrect="off"
-                  placeholder="004336" data-testid={`input-${idPrefix}-rxbin`}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}-rxpcn`} className={labelClass}>RxPCN</Label>
-                <Input
-                  id={`${idPrefix}-rxpcn`} className={controlClass} value={form.rxPcn}
-                  onChange={(e) => setForm({ ...form, rxPcn: e.target.value })}
-                  autoCapitalize="characters" autoCorrect="off"
-                  placeholder="ADV" data-testid={`input-${idPrefix}-rxpcn`}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}-rxgroup`} className={labelClass}>RxGroup</Label>
-                <Input
-                  id={`${idPrefix}-rxgroup`} className={controlClass} value={form.rxGroup}
-                  onChange={(e) => setForm({ ...form, rxGroup: e.target.value })}
-                  autoCapitalize="characters" autoCorrect="off"
-                  placeholder="RX1234" data-testid={`input-${idPrefix}-rxgroup`}
-                />
-              </div>
-            </>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-phone`} className={labelClass}>Member Services Phone</Label>
-            <Input
-              id={`${idPrefix}-phone`} className={controlClass} inputMode="tel" value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
-              placeholder="(555) 123-4567" data-testid={`input-${idPrefix}-phone`}
-            />
-          </div>
-        </FieldSection>
-      </div>
-      <FormFooter onCancel={onCancel} onSave={() => onSubmit(form)} saveLabel={saveLabel} />
+      {showPharmacyFields && (
+        <>
+          <CardTextField
+            id={`${idPrefix}-rxbin`} label="RxBIN" value={values.rxBin ?? ""}
+            onChange={(rxBin) => onChange({ rxBin })} upperCase
+            placeholder="004336" testId={`input-${idPrefix}-rxbin`}
+          />
+          <CardTextField
+            id={`${idPrefix}-rxpcn`} label="RxPCN" value={values.rxPcn ?? ""}
+            onChange={(rxPcn) => onChange({ rxPcn })} upperCase
+            placeholder="ADV" testId={`input-${idPrefix}-rxpcn`}
+          />
+          <CardTextField
+            id={`${idPrefix}-rxgroup`} label="RxGroup" value={values.rxGroup ?? ""}
+            onChange={(rxGroup) => onChange({ rxGroup })} upperCase
+            placeholder="RX1234" testId={`input-${idPrefix}-rxgroup`}
+          />
+        </>
+      )}
+
+      <CardTextField
+        id={`${idPrefix}-phone`} label="Member Services Phone" value={values.phone}
+        onChange={(phone) => onChange({ phone })} format={formatPhone} inputMode="tel"
+        placeholder="(555) 123-4567" testId={`input-${idPrefix}-phone`}
+      />
     </div>
   );
 }
@@ -710,8 +900,6 @@ export default function Profile() {
   const pid = activePatientId;
   const { toast } = useToast();
   const [editingPersonal, setEditingPersonal] = useState(false);
-  const [editingInsurance, setEditingInsurance] = useState(false);
-  const [editingDental, setEditingDental] = useState(false);
 
   const { data: physicians = [] } = useQuery<Physician[]>({
     queryKey: ["physicians", pid],
@@ -723,8 +911,6 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       setEditingPersonal(false);
-      setEditingInsurance(false);
-      setEditingDental(false);
     },
     onError: () => {
       toast({ title: "Error", description: "Could not save. Please try again.", variant: "destructive" });
@@ -810,13 +996,41 @@ export default function Profile() {
         icon={IdCard}
         title="Medical Insurance Card"
         description="Photograph both sides so you can show them at check-in, even offline."
-        front={patient.insuranceCardFront}
-        back={patient.insuranceCardBack}
-        onFrontChange={(insuranceCardFront) => updateMut.mutate({ insuranceCardFront })}
-        onBackChange={(insuranceCardBack) => updateMut.mutate({ insuranceCardBack })}
+        sectionId="insurance"
+        idPrefix="ins"
+        cardNoun="medical card"
         viewerLabel="Medical card"
         frontTestId="card-front"
         backTestId="card-back"
+        showPharmacyFields
+        values={{
+          front: patient.insuranceCardFront ?? null,
+          back: patient.insuranceCardBack ?? null,
+          carrier: patient.insuranceCarrier || "",
+          planType: patient.insurancePlanType || "",
+          memberId: patient.insuranceMemberId || "",
+          groupNumber: patient.insuranceGroupNumber || "",
+          policyHolder: patient.insurancePolicyHolder || "",
+          effectiveDate: patient.insuranceEffectiveDate || "",
+          phone: patient.insurancePhone || "",
+          rxBin: patient.insuranceRxBin || "",
+          rxPcn: patient.insuranceRxPcn || "",
+          rxGroup: patient.insuranceRxGroup || "",
+        }}
+        onSave={(v) => updateMut.mutateAsync({
+          insuranceCardFront: v.front,
+          insuranceCardBack: v.back,
+          insuranceCarrier: blankToNull(v.carrier),
+          insurancePlanType: blankToNull(v.planType),
+          insuranceMemberId: blankToNull(v.memberId),
+          insuranceGroupNumber: blankToNull(v.groupNumber),
+          insurancePolicyHolder: toPersonNameOrNull(v.policyHolder),
+          insuranceEffectiveDate: blankToNull(v.effectiveDate),
+          insurancePhone: blankToNull(v.phone),
+          insuranceRxBin: blankToNull(v.rxBin),
+          insuranceRxPcn: blankToNull(v.rxPcn),
+          insuranceRxGroup: blankToNull(v.rxGroup),
+        }).then(() => undefined)}
         details={[
           { label: "Carrier", value: patient.insuranceCarrier },
           { label: "Plan Type", value: patient.insurancePlanType },
@@ -830,21 +1044,41 @@ export default function Profile() {
           { label: "Member Services", value: phoneLink(patient.insurancePhone, "link-insurance-phone") },
         ]}
         emptyDetailsText="No plan details saved yet. Add the member ID, group number, and member services phone so they're searchable even if the photo is hard to read."
-        onEdit={() => setEditingInsurance(true)}
-        editTestId="button-edit-insurance"
       />
 
       <InsuranceCardSection
         icon={Smile}
         title="Dental Insurance Card"
         description="Add this if your dental plan is separate. Skip it if dental is covered by the card above."
-        front={patient.dentalCardFront}
-        back={patient.dentalCardBack}
-        onFrontChange={(dentalCardFront) => updateMut.mutate({ dentalCardFront })}
-        onBackChange={(dentalCardBack) => updateMut.mutate({ dentalCardBack })}
+        sectionId="dental"
+        idPrefix="dental"
+        cardNoun="dental card"
         viewerLabel="Dental card"
         frontTestId="dental-card-front"
         backTestId="dental-card-back"
+        showPharmacyFields={false}
+        values={{
+          front: patient.dentalCardFront ?? null,
+          back: patient.dentalCardBack ?? null,
+          carrier: patient.dentalCarrier || "",
+          planType: patient.dentalPlanType || "",
+          memberId: patient.dentalMemberId || "",
+          groupNumber: patient.dentalGroupNumber || "",
+          policyHolder: patient.dentalPolicyHolder || "",
+          effectiveDate: patient.dentalEffectiveDate || "",
+          phone: patient.dentalPhone || "",
+        }}
+        onSave={(v) => updateMut.mutateAsync({
+          dentalCardFront: v.front,
+          dentalCardBack: v.back,
+          dentalCarrier: blankToNull(v.carrier),
+          dentalPlanType: blankToNull(v.planType),
+          dentalMemberId: blankToNull(v.memberId),
+          dentalGroupNumber: blankToNull(v.groupNumber),
+          dentalPolicyHolder: toPersonNameOrNull(v.policyHolder),
+          dentalEffectiveDate: blankToNull(v.effectiveDate),
+          dentalPhone: blankToNull(v.phone),
+        }).then(() => undefined)}
         details={[
           { label: "Carrier", value: patient.dentalCarrier },
           { label: "Plan Type", value: patient.dentalPlanType },
@@ -855,8 +1089,6 @@ export default function Profile() {
           { label: "Member Services", value: phoneLink(patient.dentalPhone, "link-dental-phone") },
         ]}
         emptyDetailsText="No dental plan details saved yet. Add them the next time you have the card in hand."
-        onEdit={() => setEditingDental(true)}
-        editTestId="button-edit-dental"
       />
 
       <Dialog open={editingPersonal} onOpenChange={setEditingPersonal}>
@@ -867,74 +1099,6 @@ export default function Profile() {
               physicians={physicians}
               onSubmit={(data) => updateMut.mutate(data)}
               onCancel={() => setEditingPersonal(false)}
-            />
-          </DialogShell>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editingInsurance} onOpenChange={setEditingInsurance}>
-        <DialogContent className={PROFILE_DIALOG_CLASS}>
-          <DialogShell title="Medical Insurance Details" description="Type in what's printed on the card so you can search and read it easily.">
-            <CardDetailsForm
-              idPrefix="ins"
-              showPharmacyFields
-              saveLabel="Save Medical Details"
-              initial={{
-                carrier: patient.insuranceCarrier || "",
-                planType: patient.insurancePlanType || "",
-                memberId: patient.insuranceMemberId || "",
-                groupNumber: patient.insuranceGroupNumber || "",
-                policyHolder: patient.insurancePolicyHolder || "",
-                effectiveDate: patient.insuranceEffectiveDate || "",
-                phone: patient.insurancePhone || "",
-                rxBin: patient.insuranceRxBin || "",
-                rxPcn: patient.insuranceRxPcn || "",
-                rxGroup: patient.insuranceRxGroup || "",
-              }}
-              onSubmit={(v) => updateMut.mutate({
-                insuranceCarrier: blankToNull(v.carrier),
-                insurancePlanType: blankToNull(v.planType),
-                insuranceMemberId: blankToNull(v.memberId),
-                insuranceGroupNumber: blankToNull(v.groupNumber),
-                insurancePolicyHolder: toPersonNameOrNull(v.policyHolder),
-                insuranceEffectiveDate: blankToNull(v.effectiveDate),
-                insurancePhone: blankToNull(v.phone),
-                insuranceRxBin: blankToNull(v.rxBin),
-                insuranceRxPcn: blankToNull(v.rxPcn),
-                insuranceRxGroup: blankToNull(v.rxGroup),
-              })}
-              onCancel={() => setEditingInsurance(false)}
-            />
-          </DialogShell>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editingDental} onOpenChange={setEditingDental}>
-        <DialogContent className={PROFILE_DIALOG_CLASS}>
-          <DialogShell title="Dental Insurance Details" description="Type in what's printed on the card so you can search and read it easily.">
-            <CardDetailsForm
-              idPrefix="dental"
-              showPharmacyFields={false}
-              saveLabel="Save Dental Details"
-              initial={{
-                carrier: patient.dentalCarrier || "",
-                planType: patient.dentalPlanType || "",
-                memberId: patient.dentalMemberId || "",
-                groupNumber: patient.dentalGroupNumber || "",
-                policyHolder: patient.dentalPolicyHolder || "",
-                effectiveDate: patient.dentalEffectiveDate || "",
-                phone: patient.dentalPhone || "",
-              }}
-              onSubmit={(v) => updateMut.mutate({
-                dentalCarrier: blankToNull(v.carrier),
-                dentalPlanType: blankToNull(v.planType),
-                dentalMemberId: blankToNull(v.memberId),
-                dentalGroupNumber: blankToNull(v.groupNumber),
-                dentalPolicyHolder: toPersonNameOrNull(v.policyHolder),
-                dentalEffectiveDate: blankToNull(v.effectiveDate),
-                dentalPhone: blankToNull(v.phone),
-              })}
-              onCancel={() => setEditingDental(false)}
             />
           </DialogShell>
         </DialogContent>
