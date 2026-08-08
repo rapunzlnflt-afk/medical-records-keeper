@@ -1,7 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type {
   Patient, Physician, Appointment, Medication, MedicationLog,
-  MedicalRecord, Vital, EmergencyContact, Pharmacy, ReminderSoundPreferences,
+  MedicalRecord, Vital, EmergencyContact, Pharmacy, ReminderSoundPreferences, Note,
 } from "@shared/schema";
 
 class MedicalRecordsDB extends Dexie {
@@ -15,6 +15,7 @@ class MedicalRecordsDB extends Dexie {
   emergencyContacts!: Table<EmergencyContact, number>;
   pharmacies!: Table<Pharmacy, number>;
   reminderSoundPreferences!: Table<ReminderSoundPreferences, number>;
+  notes!: Table<Note, number>;
 
   constructor() {
     super("MedicalRecordsKeeper");
@@ -41,6 +42,23 @@ class MedicalRecordsDB extends Dexie {
       emergencyContacts: "++id, patientId",
       pharmacies: "++id, patientId",
       reminderSoundPreferences: "++id, patientId",
+    });
+
+    // This migration only adds the notes table. Existing stores and indexes
+    // are intentionally declared exactly as they were in version 2 so local
+    // records survive the IndexedDB upgrade unchanged.
+    this.version(3).stores({
+      patients: "++id",
+      physicians: "++id, patientId",
+      appointments: "++id, patientId",
+      medications: "++id, patientId",
+      medicationLogs: "++id, medicationId",
+      medicalRecords: "++id, patientId",
+      vitals: "++id, patientId",
+      emergencyContacts: "++id, patientId",
+      pharmacies: "++id, patientId",
+      reminderSoundPreferences: "++id, patientId",
+      notes: "++id, patientId, date",
     });
   }
 }
@@ -85,6 +103,7 @@ export async function deletePatient(id: number): Promise<void> {
   await db.medications.where("patientId").equals(id).delete();
   await db.appointments.where("patientId").equals(id).delete();
   await db.physicians.where("patientId").equals(id).delete();
+  await db.notes.where("patientId").equals(id).delete();
   await db.patients.delete(id);
 }
 
@@ -232,6 +251,26 @@ export async function deletePharmacy(id: number): Promise<void> {
   await db.pharmacies.delete(id);
 }
 
+// --- Notes ---
+export async function getNotes(patientId: number): Promise<Note[]> {
+  const list = await db.notes.where("patientId").equals(patientId).toArray();
+  return list.sort((a, b) => {
+    const dateOrder = b.date.localeCompare(a.date);
+    return dateOrder || b.createdAt.localeCompare(a.createdAt);
+  });
+}
+export async function createNote(data: Omit<Note, "id">): Promise<Note> {
+  const id = await db.notes.add(data as Note);
+  return { ...data, id } as Note;
+}
+export async function updateNote(id: number, data: Partial<Note>): Promise<Note> {
+  await db.notes.update(id, data);
+  return (await db.notes.get(id))!;
+}
+export async function deleteNote(id: number): Promise<void> {
+  await db.notes.delete(id);
+}
+
 // --- Reminder Sound Preferences ---
 const defaultReminderSoundPreferences = {
   appointmentsEnabled: 0,
@@ -279,9 +318,9 @@ export async function updateReminderSoundPreferences(
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
-    // v5 adds the dental insurance card fields. Older backups still import
+    // v6 adds the notes timeline. Older backups still import
     // cleanly since records are spread field-for-field on restore.
-    version: 5,
+    version: 6,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
@@ -293,6 +332,7 @@ export async function exportAllData() {
     emergencyContacts: await db.emergencyContacts.toArray(),
     pharmacies: await db.pharmacies.toArray(),
     reminderSoundPreferences: await db.reminderSoundPreferences.toArray(),
+    notes: await db.notes.toArray(),
   };
 }
 
@@ -411,6 +451,15 @@ export async function importAllData(data: any): Promise<void> {
         patientId: patientIdMap[patientId] || patientId,
         ...rest,
       } as ReminderSoundPreferences);
+    }
+  }
+
+  // Import notes last because they only depend on the patient id mapping.
+  if (data.notes?.length) {
+    for (const note of data.notes) {
+      const { id, ...rest } = note;
+      rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
+      await db.notes.add(rest as Note);
     }
   }
 }
