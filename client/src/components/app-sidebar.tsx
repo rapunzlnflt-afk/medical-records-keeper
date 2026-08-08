@@ -26,13 +26,14 @@ import {
   exportAllData, importAllData, getPatients,
 } from "@/lib/db";
 import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
-import { formatPersonName } from "@/lib/format-name";
+import { formatPersonName, formatTitleCase } from "@/lib/format-name";
 import type { Patient } from "@shared/schema";
 
 function normalizePatientFields<T extends Partial<Patient>>(data: T): T {
   return {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
+    relationship: data.relationship ? formatTitleCase(data.relationship) : data.relationship,
   };
 }
 
@@ -225,6 +226,7 @@ function PatientSwitcher() {
               <Input
                 value={newRelationship}
                 onChange={(e) => setNewRelationship(e.target.value)}
+                onBlur={(e) => setNewRelationship(formatTitleCase(e.target.value))}
                 placeholder="Relationship (e.g. Spouse, Child)"
                 className="h-11 text-sm"
                 data-testid="input-new-patient-relationship"

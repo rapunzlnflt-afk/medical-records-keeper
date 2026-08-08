@@ -22,12 +22,13 @@ import { Phone, Plus, Trash2, Edit2, Mail, Star, User, Users, ArrowLeft } from "
 import { Link } from "wouter";
 import type { EmergencyContact } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
-import { formatPersonName } from "@/lib/format-name";
+import { formatPersonName, formatTitleCase } from "@/lib/format-name";
 
 function normalizeEmergencyContactFields<T extends Partial<EmergencyContact>>(data: T): T {
   return {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
+    relationship: data.relationship ? formatTitleCase(data.relationship) : data.relationship,
   };
 }
 
@@ -110,6 +111,7 @@ function ContactForm({ initial, onSubmit, onCancel, isEdit }: {
               className={ecControlClass}
               value={form.relationship}
               onChange={(e) => setForm({ ...form, relationship: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, relationship: formatTitleCase(e.target.value) }))}
               placeholder="Spouse, Parent, Sibling..."
               data-testid="input-ec-relationship"
             />
