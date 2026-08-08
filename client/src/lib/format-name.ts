@@ -34,10 +34,28 @@ function capitalizeWord(word: string): string {
   return lower.replace(/^\p{L}/u, (letter) => letter.toUpperCase());
 }
 
+function capitalizeTitleCaseWord(word: string): string {
+  if (!word) return word;
+  // Mixed case (has both upper and lower letters) — assume the user meant it
+  // (e.g. "iPhone").
+  if (/\p{Lu}/u.test(word) && /\p{Ll}/u.test(word)) return word;
+  // Keep an explicitly all-caps token of two or more Unicode letters as typed.
+  // It may be an acronym (e.g. "ENT", "OB", "GYN", "CVS"); normalizing it
+  // would lose user intent.
+  if (/^\p{Lu}{2,}$/u.test(word)) return word;
+
+  const lower = word.toLowerCase();
+  return lower.replace(/^\p{L}/u, (letter) => letter.toUpperCase());
+}
+
 // Capitalize after Unicode letters only; preserves separators like '-', "'", '.' verbatim
 // so "o'connor-smith" -> "O'Connor-Smith" and "st. john" -> "St. John".
 function titleCaseSegment(segment: string): string {
   return segment.replace(/(\p{L}+)/gu, (match) => capitalizeWord(match));
+}
+
+function titleCaseTextSegment(segment: string): string {
+  return segment.replace(/(\p{L}+)/gu, (match) => capitalizeTitleCaseWord(match));
 }
 
 /**
@@ -55,6 +73,25 @@ export function formatPersonName(value: string): string {
   return trimmed
     .split(" ")
     .map((word) => titleCaseSegment(word))
+    .join(" ");
+}
+
+/**
+ * Title-case general text fields while preserving existing acronym tokens.
+ * Unlike formatPersonName, this does not apply person-name-specific suffix
+ * handling.
+ *
+ *   "ear, nose & throat" -> "Ear, Nose & Throat"
+ *   "CVS pharmacy"       -> "CVS Pharmacy"
+ *   "OB/GYN"             -> "OB/GYN"
+ */
+export function formatTitleCase(value: string): string {
+  if (!value) return value;
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (!trimmed) return "";
+  return trimmed
+    .split(" ")
+    .map((word) => titleCaseTextSegment(word))
     .join(" ");
 }
 
