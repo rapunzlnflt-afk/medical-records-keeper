@@ -31,7 +31,6 @@ function normalizePhysicianFields<T extends Partial<Physician>>(data: T): T {
   return {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
-    specialty: data.specialty ? formatPersonName(data.specialty) : data.specialty,
     address: data.address ? formatStreetAddress(data.address) : data.address,
     city: data.city ? formatCity(data.city) : data.city,
     state: data.state ? formatState(data.state) : data.state,
@@ -245,6 +244,7 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
               className={physControlClass}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, name: formatPersonName(e.target.value) }))}
               placeholder="Dr. Jane Smith"
               data-testid="input-doc-name"
             />
@@ -321,6 +321,7 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
               className={physControlClass}
               value={form.address || ""}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, address: formatStreetAddress(e.target.value) }))}
               placeholder="123 Medical Center Dr"
               data-testid="input-doc-address"
             />
@@ -332,6 +333,7 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
               className={physControlClass}
               value={form.city || ""}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, city: formatCity(e.target.value) }))}
               placeholder="Fort Worth"
               data-testid="input-doc-city"
             />
@@ -344,6 +346,7 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
                 className={physControlClass}
                 value={form.state || ""}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
+                onBlur={(e) => setForm((prev) => ({ ...prev, state: formatState(e.target.value) }))}
                 placeholder="TX"
                 data-testid="input-doc-state"
               />

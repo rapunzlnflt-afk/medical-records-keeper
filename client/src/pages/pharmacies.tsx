@@ -36,7 +36,7 @@ import {
 import { Link } from "wouter";
 import type { Pharmacy } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
-import { formatPersonName, formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
+import { formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
 const mapHref = (address?: string) => {
   if (!address) return "";
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -45,7 +45,6 @@ const mapHref = (address?: string) => {
 function normalizePharmacyFields<T extends Partial<Pharmacy>>(data: T): T {
   return {
     ...data,
-    name: data.name ? formatPersonName(data.name) : data.name,
     address: data.address ? formatStreetAddress(data.address) : data.address,
     city: data.city ? formatCity(data.city) : data.city,
     state: data.state ? formatState(data.state) : data.state,
@@ -197,6 +196,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
               className={pharmControlClass}
               value={form.address || ""}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, address: formatStreetAddress(e.target.value) }))}
               placeholder="123 Main St"
               data-testid="input-pharm-address"
             />
@@ -208,6 +208,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
               className={pharmControlClass}
               value={form.city || ""}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
+              onBlur={(e) => setForm((prev) => ({ ...prev, city: formatCity(e.target.value) }))}
               placeholder="Fort Worth"
               data-testid="input-pharm-city"
             />
@@ -220,6 +221,7 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
                 className={pharmControlClass}
                 value={form.state || ""}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
+                onBlur={(e) => setForm((prev) => ({ ...prev, state: formatState(e.target.value) }))}
                 placeholder="TX"
                 data-testid="input-pharm-state"
               />

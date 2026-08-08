@@ -14,22 +14,15 @@
 const SUFFIX_TOKENS = new Set(["jr", "sr", "ii", "iii", "iv", "v"]);
 const SMALL_WORDS = new Set(["of", "the", "and", "de", "la", "le", "von", "van", "del"]);
 
-// True when the input contains at least one lowercase letter — i.e. the user
-// isn't shouting in all caps. Used to decide whether all-caps short tokens
-// inside the input are intentional acronyms or accidental shouting.
-function hasAnyLowercase(input: string): boolean {
-  return /[a-z]/.test(input);
-}
-
-function capitalizeWord(word: string, preserveAcronyms: boolean): string {
+function capitalizeWord(word: string): string {
   if (!word) return word;
   // Mixed case (has both upper and lower letters) — assume the user meant it
-  // (e.g. "McDonald", "deWitt", "iPhone"). All-caps words fall through to the
-  // normal title-case path below.
-  if (/[A-Z]/.test(word) && /[a-z]/.test(word)) return word;
-  // When the rest of the input has lowercase letters somewhere, preserve short
-  // all-caps tokens that look like deliberate acronyms ("USA", "NW", "II", "PO").
-  if (preserveAcronyms && word.length <= 4 && /^[A-Z]+$/.test(word)) return word;
+  // (e.g. "McDonald", "deWitt", "iPhone").
+  if (/\p{Lu}/u.test(word) && /\p{Ll}/u.test(word)) return word;
+  // Keep an explicitly all-caps token of two or more Unicode letters as typed.
+  // It may be an acronym (e.g. "ENT", "OB", "GYN", "USA"); normalizing it
+  // would lose user intent.
+  if (/^\p{Lu}{2,}$/u.test(word)) return word;
 
   const lower = word.toLowerCase();
 
@@ -38,13 +31,13 @@ function capitalizeWord(word: string, preserveAcronyms: boolean): string {
     return lower === "jr" || lower === "sr" ? lower[0].toUpperCase() + lower.slice(1) : lower.toUpperCase();
   }
 
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
+  return lower.replace(/^\p{L}/u, (letter) => letter.toUpperCase());
 }
 
-// Capitalize after letters only; preserves separators like '-', "'", '.' verbatim
+// Capitalize after Unicode letters only; preserves separators like '-', "'", '.' verbatim
 // so "o'connor-smith" -> "O'Connor-Smith" and "st. john" -> "St. John".
-function titleCaseSegment(segment: string, preserveAcronyms: boolean): string {
-  return segment.replace(/([A-Za-z]+)/g, (match) => capitalizeWord(match, preserveAcronyms));
+function titleCaseSegment(segment: string): string {
+  return segment.replace(/(\p{L}+)/gu, (match) => capitalizeWord(match));
 }
 
 /**
@@ -52,17 +45,16 @@ function titleCaseSegment(segment: string, preserveAcronyms: boolean): string {
  * apostrophes, and generational suffixes.
  *
  *   "mary jane o'connor-smith" -> "Mary Jane O'Connor-Smith"
- *   "JOHN DOE JR"              -> "John Doe Jr"
+ *   "JOHN DOE JR"              -> "JOHN DOE JR"
  *   "dr. jane smith"           -> "Dr. Jane Smith"
  */
 export function formatPersonName(value: string): string {
   if (!value) return value;
   const trimmed = value.trim().replace(/\s+/g, " ");
   if (!trimmed) return "";
-  const preserveAcronyms = hasAnyLowercase(trimmed);
   return trimmed
     .split(" ")
-    .map((word) => titleCaseSegment(word, preserveAcronyms))
+    .map((word) => titleCaseSegment(word))
     .join(" ");
 }
 
@@ -77,13 +69,12 @@ export function formatStreetAddress(value: string): string {
   if (!value) return value;
   const trimmed = value.trim().replace(/\s+/g, " ");
   if (!trimmed) return "";
-  const preserveAcronyms = hasAnyLowercase(trimmed);
   return trimmed
     .split(" ")
     .map((word) => {
       // Leave numeric tokens and ordinals alone: "123", "456a", "5th", "21st".
-      if (/^\d+([a-zA-Z]{0,3})?$/.test(word)) return word.toLowerCase();
-      return titleCaseSegment(word, preserveAcronyms);
+      if (/^\d+(\p{L}{0,3})?$/u.test(word)) return word.toLowerCase();
+      return titleCaseSegment(word);
     })
     .join(" ");
 }
@@ -101,13 +92,12 @@ export function formatCity(value: string): string {
   if (!value) return value;
   const trimmed = value.trim().replace(/\s+/g, " ");
   if (!trimmed) return "";
-  const preserveAcronyms = hasAnyLowercase(trimmed);
   const words = trimmed.split(" ");
   return words
     .map((word, idx) => {
       const lower = word.toLowerCase();
       if (idx > 0 && SMALL_WORDS.has(lower)) return lower;
-      return titleCaseSegment(word, preserveAcronyms);
+      return titleCaseSegment(word);
     })
     .join(" ");
 }
@@ -125,6 +115,6 @@ export function formatState(value: string): string {
   if (!value) return value;
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  if (/^\p{L}{2}$/u.test(trimmed)) return trimmed.toUpperCase();
   return formatCity(trimmed);
 }
