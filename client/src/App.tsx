@@ -6,10 +6,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { PurchaseGate } from "@/components/purchase-gate";
 import { ThemeProvider } from "@/lib/theme";
 import { PatientProvider } from "@/lib/patient-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Dashboard from "@/pages/dashboard";
+import Profile from "@/pages/profile";
 import Appointments from "@/pages/appointments";
 import Medications from "@/pages/medications";
 import Physicians from "@/pages/physicians";
@@ -23,6 +25,7 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/profile" component={Profile} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/medications" component={Medications} />
       <Route path="/physicians" component={Physicians} />
@@ -43,13 +46,20 @@ function AppLayout() {
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         {isMobile && (
-          <header className="flex items-center gap-2 p-3 border-b bg-card/50 backdrop-blur-sm shrink-0 z-40">
-            <SidebarTrigger
-               data-testid="button-sidebar-toggle"
-               className="h-12 w-12 [&>svg]:size-8"
-            />
-            <div className="flex-1" />
-          </header>
+         <header className="flex items-center gap-3 px-4 py-2 gradient-primary text-white shadow-sm shrink-0 z-40">
+  <SidebarTrigger
+    data-testid="button-sidebar-toggle"
+    className="text-white hover:bg-white/15 hover:text-white"
+  />
+  <div className="flex flex-col leading-tight">
+    <span className="font-heading text-base font-semibold text-white">
+      MedRecords
+    </span>
+    <span className="text-xs text-white/80">
+      Health organizer
+    </span>
+  </div>
+</header>
         )}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
           <AppRouter />
@@ -67,18 +77,20 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <PatientProvider>
-          <TooltipProvider>
-            <Router hook={useHashLocation}>
-              <SidebarProvider style={style as React.CSSProperties}>
-                <AppLayout />
-              </SidebarProvider>
-            </Router>
-            <Toaster />
-          </TooltipProvider>
-        </PatientProvider>
-      </QueryClientProvider>
+      <PurchaseGate>
+        <QueryClientProvider client={queryClient}>
+          <PatientProvider>
+            <TooltipProvider>
+              <Router hook={useHashLocation}>
+                <SidebarProvider style={style as React.CSSProperties}>
+                  <AppLayout />
+                </SidebarProvider>
+              </Router>
+              <Toaster />
+            </TooltipProvider>
+          </PatientProvider>
+        </QueryClientProvider>
+      </PurchaseGate>
     </ThemeProvider>
   );
 }
