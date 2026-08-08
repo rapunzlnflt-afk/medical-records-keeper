@@ -29,7 +29,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Camera, Edit2, IdCard, ImageOff, Smile, Stethoscope, Trash2,
-  UserRound, X, ZoomIn, ZoomOut,
+  UserRound, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { Link } from "wouter";
 import { differenceInYears, format, parseISO } from "date-fns";
@@ -226,30 +226,25 @@ function CardPhotoTile({ label, value, editable, photoDescription, onChange, onV
         </div>
       )}
 
-      {/*
-        Stacked rather than side by side: at 375px each tile column is only
-        ~150px, too narrow to fit two labelled buttons without clipping words.
-      */}
+      {/* Keep the actions visually quiet while retaining a 44px touch target. */}
       {editable && value && (
-        <div className="flex flex-col gap-1.5 min-w-0">
+        <div className="flex gap-2 min-w-0">
           <Button
-            type="button" size="sm" variant="outline" disabled={busy}
-            className="h-9 w-full min-w-0 px-2 gap-1.5 text-sm"
+            type="button" size="sm" variant="ghost" disabled={busy}
+            className="h-[44px] min-h-[44px] flex-1 min-w-0 border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none hover:translate-y-0 hover:bg-transparent hover:text-foreground hover:shadow-none active:bg-transparent active:shadow-none"
             onClick={() => inputRef.current?.click()}
             aria-label={`Replace ${photoDescription}`}
             data-testid={`button-replace-${testId}`}
           >
-            <Camera className="w-3.5 h-3.5 shrink-0" />
             {busy ? "Working…" : "Replace"}
           </Button>
           <Button
-            type="button" size="sm" variant="outline"
-            className="h-9 w-full min-w-0 px-2 gap-1.5 text-sm text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+            type="button" size="sm" variant="ghost"
+            className="h-[44px] min-h-[44px] flex-1 min-w-0 border-0 bg-transparent px-1 text-sm text-muted-foreground shadow-none hover:translate-y-0 hover:bg-transparent hover:text-destructive hover:shadow-none active:bg-transparent active:text-destructive active:shadow-none focus-visible:text-destructive"
             onClick={() => setConfirmingRemove(true)}
             aria-label={`Remove ${photoDescription}`}
             data-testid={`button-remove-${testId}`}
           >
-            <X className="w-3.5 h-3.5 shrink-0" />
             Remove
           </Button>
         </div>
