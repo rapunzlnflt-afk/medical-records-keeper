@@ -26,10 +26,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, XCircle, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, XCircle, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar, ArrowLeft } from "lucide-react";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 const MED_TYPES = ["prescription", "otc", "supplement", "vitamin"];
 const FREQUENCIES = ["daily", "twice-daily", "three-times-daily", "weekly", "bi-weekly", "monthly", "as-needed"];
 const TIMES_OF_DAY = ["morning", "afternoon", "evening", "bedtime"];
@@ -469,7 +469,7 @@ export default function Medications() {
                   <>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="text-sm h-9 px-4" data-testid={`button-take-${med.id}`}>
+                        <Button size="sm" variant="outline" className="h-11 text-sm px-4" data-testid={`button-take-${med.id}`}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
                         </Button>
                       </AlertDialogTrigger>
@@ -506,7 +506,7 @@ export default function Medications() {
                     </AlertDialog>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="text-sm h-9 px-3 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
+                        <Button size="sm" variant="ghost" className="h-11 text-sm px-3 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
                           Skip
                         </Button>
                       </AlertDialogTrigger>
@@ -548,12 +548,12 @@ export default function Medications() {
             <div className="flex items-center gap-1 ml-auto">
               <Dialog open={editing?.id === med.id} onOpenChange={(o) => !o && setEditing(null)}>
                 <DialogTrigger asChild>
-                  <Button size="icon" variant="ghost" onClick={() => setEditing(med)} data-testid={`button-edit-med-${med.id}`}>
+                  <Button size="icon" variant="ghost" className="h-11 w-11" onClick={() => setEditing(med)} data-testid={`button-edit-med-${med.id}`}>
                     <Edit2 className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent className={MED_DIALOG_CLASS}>
-                  <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                  <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                     <DialogTitle className="font-heading text-2xl font-bold text-white">
                       Edit Medication
                     </DialogTitle>
@@ -575,6 +575,7 @@ export default function Medications() {
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-11 w-11"
                     data-testid={`button-delete-med-${med.id}`}
                     aria-label={`Delete medication ${med.name}`}
                   >
@@ -619,13 +620,16 @@ export default function Medications() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Medications</h1>
           <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Track prescriptions, supplements, and daily doses</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => {
+          <Button size="sm" variant="outline" className="h-11 gap-1 print-button-area" onClick={() => {
             const w = window.open('', '_blank', 'width=800,height=600');
             if (!w) return;
             w.document.write(`<!DOCTYPE html><html><head><title>Medications</title><style>
@@ -652,19 +656,26 @@ export default function Medications() {
             w.document.write('</body></html>');
             w.document.close();
             w.focus();
-            w.print();
-            w.close();
+            const triggerPrint = () => {
+              w.print();
+            };
+            w.onafterprint = () => w.close();
+            if (w.document.readyState === 'complete') {
+              setTimeout(triggerPrint, 100);
+            } else {
+              w.onload = () => setTimeout(triggerPrint, 100);
+            }
           }} data-testid="button-print-medications">
             <Printer className="w-4 h-4" /> Print
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-medication">
+              <Button size="sm" className="gradient-primary h-11 text-white border-none gap-1" data-testid="button-add-medication">
                 <Plus className="w-4 h-4" /> Add Medication
               </Button>
             </DialogTrigger>
             <DialogContent className={MED_DIALOG_CLASS}>
-              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                 <DialogTitle className="font-heading text-2xl font-bold text-white">
                   New Medication
                 </DialogTitle>
@@ -726,8 +737,8 @@ export default function Medications() {
 
       <Tabs defaultValue="active">
         <TabsList>
-          <TabsTrigger value="active" className="font-body text-sm font-semibold">Active ({active.length})</TabsTrigger>
-          <TabsTrigger value="inactive" className="font-body text-sm font-semibold">Inactive ({inactive.length})</TabsTrigger>
+          <TabsTrigger value="active" className="min-h-11 font-body text-sm font-semibold">Active ({active.length})</TabsTrigger>
+          <TabsTrigger value="inactive" className="min-h-11 font-body text-sm font-semibold">Inactive ({inactive.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="space-y-3 mt-3">
           {isLoading ? (
@@ -767,7 +778,7 @@ export default function Medications() {
               { name: "RxList Interaction Checker", url: "https://www.rxlist.com/drug-interaction-checker.htm" },
             ].map((link) => (
               <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
                 data-testid={`link-interaction-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
                 <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                 {link.name}
@@ -794,7 +805,7 @@ export default function Medications() {
               { name: "Medicare Extra Help", url: "https://www.ssa.gov/medicare/part-d-extra-help" },
             ].map((link) => (
               <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
                 data-testid={`link-discount-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
                 <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                 {link.name}

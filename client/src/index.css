@@ -152,6 +152,47 @@
   .text-base {
     line-height: 1.55;
   }
+
+  /* iOS Safari builds date/time fields out of a native control that has its
+     own intrinsic minimum width and will not shrink below it, so the field
+     renders wider than its siblings and spills out of the card. Dropping the
+     native control removes that floor; the rest pins the box to its container
+     in case a control is still instantiated. The field stays a real date
+     input, so the system picker and the entered value are unaffected. */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"] {
+    -webkit-appearance: none;
+    appearance: none;
+    /* max-width only contains the element if padding and border are inside it */
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="month"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="week"]::-webkit-date-and-time-value {
+    /* Without the native control iOS centres the value; keep it aligned with
+       every other field, and let it shrink rather than size the field. */
+    text-align: left;
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* Flex and grid items default to min-width:auto, which lets an
+     intrinsically wide date control push its own wrapper past the card edge. */
+  :where(div, section, fieldset, form, label):has(
+      > input[type="date"],
+      > input[type="datetime-local"],
+      > input[type="month"],
+      > input[type="time"],
+      > input[type="week"]
+    ) {
+    min-width: 0;
+  }
 }
 
 /* Cyan-to-Deep-Blue Gradient Utilities */

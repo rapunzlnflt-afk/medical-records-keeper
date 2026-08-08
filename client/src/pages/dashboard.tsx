@@ -5,14 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   CalendarDays,
+  CalendarClock,
   Pill,
   Stethoscope,
   FileText,
   HeartPulse,
   Phone,
-  Clock,
   AlertCircle,
-  Bell,
   Sparkles,
   ChevronRight,
   ChevronDown,
@@ -40,22 +39,28 @@ import {
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { PhoneRemindersCard } from "@/components/phone-reminders-card";
 import { BackupReminderCard, FirstVisitNoticeCard } from "@/components/backup-reminder-card";
+import { VisitNotesPromptCard } from "@/components/visit-notes-prompt-card";
 
 function StatCard({ title, value, icon: Icon, href, gradient }: {
   title: string; value: number; icon: any; href: string; gradient?: boolean;
 }) {
   return (
     <Link href={href} className="block h-full min-w-0">
-      <Card className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent shadow-md" : "shadow-sm"}`} data-testid={`stat-${title.toLowerCase().replace(/\\s+/g, "-")}`}>
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm font-body font-semibold leading-snug ${gradient ? "text-white/90" : "text-muted-foreground"}`}>{title}</p>
-              <p className={`text-3xl sm:text-4xl font-heading font-bold mt-1.5 leading-none tabular-nums ${gradient ? "text-white" : ""}`}>{value}</p>
-            </div>
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${gradient ? "bg-white/20" : "gradient-primary"}`}>
-              <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
+      <Card
+        className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent shadow-md" : "shadow-sm"}`}
+        data-testid={`stat-${title.toLowerCase().replace(/\s+/g, "-")}`}
+      >
+        <CardContent className="relative min-h-[96px] p-4 sm:p-5">
+          <p className={`text-[13px] sm:text-sm font-body font-semibold leading-snug pr-12 whitespace-nowrap ${gradient ? "text-white/90" : "text-muted-foreground"}`}>
+            {title}
+          </p>
+
+          <p className={`absolute left-4 bottom-4 text-3xl sm:text-4xl font-heading font-bold leading-none tabular-nums ${gradient ? "text-white" : ""}`}>
+            {value}
+          </p>
+
+          <div className={`absolute right-4 bottom-4 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${gradient ? "bg-white/20" : "gradient-primary"}`}>
+            <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
         </CardContent>
       </Card>
@@ -110,10 +115,12 @@ export default function Dashboard() {
     return appointmentStartMs(a) >= Date.now();
   };
   const upcomingAll = appointments.filter(isUpcoming);
-  const upcoming = upcomingAll
+  const soonestUpcoming = upcomingAll
     .slice()
-    .sort((a, b) => appointmentStartMs(a) - appointmentStartMs(b))
-    .slice(0, 5);
+    .sort((a, b) => appointmentStartMs(a) - appointmentStartMs(b))[0];
+  const soonestDoc = soonestUpcoming
+    ? physicians.find((p) => p.id === soonestUpcoming.physicianId)
+    : undefined;
 
   const activeMeds = medications.filter((m) => m.active === 1);
   const refillSoon = activeMeds.filter((m) => {
@@ -185,37 +192,6 @@ const reminders = appointments.filter((a) => {
     });
 }, [pid, reminders, soundPrefs, soundFiles]);
 
-  const getReminderDateTime = (appointment: Appointment) => {
-  if (!appointment.reminderDate) return null;
-
-  return new Date(
-    `${appointment.reminderDate}T${appointment.reminderTime || "09:00"}:00`
-  );
-};
-
-const getReminderStatusLabel = (appointment: Appointment) => {
-  const reminderDateTime = getReminderDateTime(appointment);
-  if (!reminderDateTime) return null;
-
-  const now = new Date();
-  const diffMs = reminderDateTime.getTime() - now.getTime();
-  const diffMinutes = Math.round(diffMs / (1000 * 60));
-
-  if (diffMinutes > 0) {
-    if (diffMinutes < 60) return `Upcoming in ${diffMinutes} min`;
-    const diffHours = Math.round(diffMinutes / 60);
-    return `Upcoming in ${diffHours} hr`;
-  }
-
-  if (diffMinutes > -60) {
-    return "Due now";
-  }
-
-  const pastHours = Math.round(Math.abs(diffMinutes) / 60);
-  if (pastHours < 1) return "Due now";
-  return `Due since ${pastHours} hr ago`;
-};
-
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
       <div className="min-w-0">
@@ -227,6 +203,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
 
       <FirstVisitNoticeCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
       <BackupReminderCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
+      <VisitNotesPromptCard appointments={appointments} physicians={physicians} patientId={pid} />
 
       {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
@@ -240,7 +217,7 @@ const getReminderStatusLabel = (appointment: Appointment) => {
                 <p className="text-sm text-muted-foreground mt-1.5 font-body leading-relaxed">
                   The best way to get started is to add your physicians first. Their names will then appear in dropdown menus when you add appointments, medications, and medical records.
                 </p>
-                <div className="mt-3 space-y-2">
+                <div className="mt-4 space-y-2">
                   <Link href="/physicians" className="flex items-center gap-2 text-sm font-semibold text-primary hover:underline" data-testid="link-get-started-physicians">
                     <Stethoscope className="w-4 h-4 flex-shrink-0" /> <span className="min-w-0">Step 1: Add your physicians</span> <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
                   </Link>
@@ -267,70 +244,27 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 items-start min-w-0">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              Upcoming Appointments
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2.5">
-            {upcoming.length === 0 ? (
-              <div className="text-center py-8">
-                <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-                <p className="text-base text-muted-foreground">No upcoming appointments</p>
-                <Link href="/appointments" className="text-sm font-semibold text-primary hover:underline mt-2 inline-block">
-                  Schedule one
-                </Link>
-              </div>
-            ) : (
-              upcoming.map((apt) => {
-                const doc = physicians.find((p) => p.id === apt.physicianId);
-                const hasFiredReminder = reminders.some((r) => r.id === apt.id);
-                const reminderStatus = hasFiredReminder ? getReminderStatusLabel(apt) : null;
-                return (
-                  <Link
-                    key={apt.id}
-                    href="/appointments"
-                    className="flex items-center gap-2.5 sm:gap-3 p-3 rounded-lg bg-secondary/50 hover-elevate min-w-0"
-                    data-testid={`upcoming-apt-${apt.id}`}
-                  >
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg gradient-primary flex flex-col items-center justify-center flex-shrink-0 relative">
-                      <span className="text-white text-[10px] font-heading font-bold leading-none uppercase tracking-wide">
-                        {format(parseISO(apt.date), "MMM")}
-                      </span>
-                      <span className="text-white text-lg sm:text-xl font-heading font-bold leading-none mt-0.5">
-                        {format(parseISO(apt.date), "dd")}
-                      </span>
-                      {hasFiredReminder && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary border-2 border-background flex items-center justify-center">
-                          <Bell className="w-2.5 h-2.5 text-white" />
-                        </span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
-                        <p className="text-base sm:text-lg font-semibold truncate min-w-0 flex-1 leading-tight">{apt.title}</p>
-                        <Badge variant="secondary" className="text-xs flex-shrink-0 font-medium px-2 py-0.5">{apt.type}</Badge>
-                      </div>
-                      {reminderStatus && (
-                        <span className="inline-flex items-center rounded-full bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5 mt-1.5 max-w-full truncate">
-                          {reminderStatus}
-                        </span>
-                      )}
-                      <p className="text-sm text-muted-foreground mt-1.5 truncate">
-                        {format(parseISO(apt.date), "EEE MMM d")} at {apt.time}
-                        {doc ? ` · ${doc.name}` : ""}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
+      {soonestUpcoming && (
+        <Link
+          href="/appointments"
+          className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 hover-elevate px-4 py-2.5 min-w-0"
+          data-testid="banner-next-appointment"
+        >
+          <span className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+            <CalendarClock className="w-4 h-4 text-white" />
+          </span>
+          <p className="text-sm text-foreground/90 truncate min-w-0">
+            <span className="font-semibold">Upcoming:</span>{" "}
+            {soonestUpcoming.title}
+            {soonestDoc ? ` with ${soonestDoc.name}` : ""}
+            {" "}on {format(parseISO(soonestUpcoming.date), "EEE MMM d")}
+            {soonestUpcoming.time ? ` at ${soonestUpcoming.time}` : ""}
+          </p>
+          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 ml-auto" />
+        </Link>
+      )}
 
+      <div className="grid gap-4 items-start min-w-0">
         <Card className="shadow-sm">
           <Collapsible open={medSummaryOpen} onOpenChange={setMedSummaryOpen}>
             <CollapsibleTrigger asChild>
@@ -416,7 +350,9 @@ const getReminderStatusLabel = (appointment: Appointment) => {
         <StatCard title="Emergency Contacts" value={contacts.length} icon={Phone} href="/emergency" />
       </div>
 
-      <PhoneRemindersCard />
+      <div className="min-[500px]:hidden">
+  <PhoneRemindersCard />
+</div>
     </div>
   );
 }

@@ -25,11 +25,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, CheckCircle2, XCircle, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
+import { Link } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
+import { appointmentHasNotes } from "@/lib/appointment-notes";
+import { AppointmentNotesDialog, FollowUpOfferDialog } from "@/components/appointment-notes-dialog";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
 const STATUSES = ["upcoming", "completed", "cancelled"];
+const mapHref = (address?: string) => {
+  if (!address) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+};
 
 // 15-minute interval time options (00:00 through 23:45) with 12-hour display labels.
 const TIME_OPTIONS: { value: string; label: string }[] = (() => {
@@ -381,6 +388,7 @@ export default function Appointments() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
@@ -425,6 +433,10 @@ export default function Appointments() {
   const historyList = appointments
     .filter((a) => a.status === "cancelled" || a.status === "completed" || hasAppointmentPassed(a))
     .sort((a, b) => -sortAscByDateTime(a, b));
+  // Visit timeline: ALL past appointments (notes or not), newest first.
+  const timelineList = appointments
+    .filter((a) => hasAppointmentPassed(a))
+    .sort((a, b) => -sortAscByDateTime(a, b));
 
   // Simple calendar view data
   const currentMonth = new Date();
@@ -437,12 +449,23 @@ export default function Appointments() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Appointments</h1>
           <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Manage your doctor visits and procedures</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            className="gap-1.5 h-10"
+            onClick={() => setTimelineOpen(true)}
+            data-testid="button-view-timeline"
+          >
+            <History className="w-4 h-4" /> View Timeline
+          </Button>
           <Button variant="outline" className="gap-1.5 h-10 print-button-area" onClick={() => {
             const printContent = document.querySelector('[data-testid="appointments-list"]');
             if (!printContent) return;
@@ -481,7 +504,7 @@ export default function Appointments() {
               </Button>
             </DialogTrigger>
             <DialogContent className={APT_DIALOG_CLASS}>
-              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+              <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                 <DialogTitle className="font-heading text-2xl sm:text-2xl font-bold text-white">
                   New Appointment
                 </DialogTitle>
@@ -547,35 +570,37 @@ export default function Appointments() {
           <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />)}</div>
         ) : (
           <>
-            {/* Upcoming */}
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <h2 className="font-heading text-lg font-semibold flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                Upcoming
-                <Badge variant="secondary" className="text-xs font-semibold">{activeList.length}</Badge>
-              </h2>
-            </div>
-
-            {activeList.length === 0 ? (
-              <Card className="shadow-sm">
-                <CardContent className="py-10 text-center">
-                  <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-                  <p className="text-base text-muted-foreground">No upcoming appointments</p>
-                </CardContent>
-              </Card>
-            ) : (
-              activeList.map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  apt={apt}
-                  physicians={physicians}
-                  editingId={editing?.id ?? null}
-                  setEditing={setEditing}
-                  onSave={(id, data) => updateMut.mutate({ id, data })}
-                  onDelete={(id) => deleteMut.mutate(id)}
-                />
-              ))
-            )}
+            {/* Upcoming (boxed card to match Appointment History) */}
+            <Card className="shadow-sm">
+              <CardHeader className="py-3.5">
+                <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-primary" />
+                  <span>Upcoming</span>
+                  <Badge variant="secondary" className="text-xs font-semibold">{activeList.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {activeList.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+                    <p className="text-base text-muted-foreground">No upcoming appointments</p>
+                  </div>
+                ) : (
+                  activeList.map((apt) => (
+                    <AppointmentCard
+                      key={apt.id}
+                      apt={apt}
+                      physicians={physicians}
+                      patientId={pid}
+                      editingId={editing?.id ?? null}
+                      setEditing={setEditing}
+                      onSave={(id, data) => updateMut.mutate({ id, data })}
+                      onDelete={(id) => deleteMut.mutate(id)}
+                    />
+                  ))
+                )}
+              </CardContent>
+            </Card>
 
             {/* History (collapsible) */}
             <Card className="mt-3 shadow-sm">
@@ -609,6 +634,7 @@ export default function Appointments() {
                           key={apt.id}
                           apt={apt}
                           physicians={physicians}
+                          patientId={pid}
                           editingId={editing?.id ?? null}
                           setEditing={setEditing}
                           onSave={(id, data) => updateMut.mutate({ id, data })}
@@ -624,56 +650,341 @@ export default function Appointments() {
           </>
         )}
       </div>
+
+      <TimelineDialog
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+        appointments={timelineList}
+        physicians={physicians}
+        patientId={pid}
+      />
     </div>
   );
 }
 
-function AppointmentCard({
-  apt, physicians, editingId, setEditing, onSave, onDelete, muted,
+// Near-full-screen sheet on mobile, roomy centered dialog on desktop — mirrors
+// the appointment/notes dialogs so the timeline feels consistent.
+const TIMELINE_DIALOG_CLASS =
+  "p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
+  "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(720px,calc(100vw-2rem))] sm:max-w-[720px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
+  "overflow-hidden flex flex-col";
+
+function TimelineDialog({
+  open, onOpenChange, appointments, physicians, patientId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  appointments: Appointment[];
+  physicians: Physician[];
+  patientId: number;
+}) {
+  // "all" (default) or a physician id as string. "none" gathers appointments
+  // with no physician set.
+  const [physicianFilter, setPhysicianFilter] = useState<string>("all");
+
+  // Only offer physicians that actually appear in the past appointments.
+  const timelinePhysicianIds = new Set(
+    appointments.map((a) => a.physicianId).filter((id): id is number => id != null),
+  );
+  const filterPhysicians = physicians.filter((p) => p.id != null && timelinePhysicianIds.has(p.id));
+  const hasUnassigned = appointments.some((a) => a.physicianId == null);
+
+  const filtered = appointments.filter((a) => {
+    if (physicianFilter === "all") return true;
+    if (physicianFilter === "none") return a.physicianId == null;
+    return String(a.physicianId) === physicianFilter;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={TIMELINE_DIALOG_CLASS}>
+        <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
+          <DialogTitle className="font-heading text-2xl font-bold text-white flex items-center gap-2">
+            <History className="w-6 h-6" />
+            Visit Timeline
+          </DialogTitle>
+          <DialogDescription className="text-white/85 text-sm">
+            Your past appointments, most recent first. Add or review notes for any visit.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="shrink-0 border-b bg-background px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Label htmlFor="timeline-physician" className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Stethoscope className="w-4 h-4 text-primary" />
+              Physician
+            </Label>
+            <Select value={physicianFilter} onValueChange={setPhysicianFilter}>
+              <SelectTrigger
+                id="timeline-physician"
+                className="h-10 w-full sm:w-64"
+                data-testid="select-timeline-physician"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="all">All physicians</SelectItem>
+                {filterPhysicians.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+                {hasUnassigned && <SelectItem value="none">No physician</SelectItem>}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 bg-muted/20">
+          <VisitTimeline appointments={filtered} physicians={physicians} patientId={patientId} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Structured note fields shown as sub-bullets, in clinical reading order.
+// Deliberately EXCLUDES questionsNextTime (a prep field, not a visit record).
+// followUpDate is handled separately so it can be prefixed "Follow-up:".
+const TIMELINE_NOTE_KEYS: (keyof Appointment)[] = [
+  "visitSummary",
+  "diagnosisFindings",
+  "providerInstructions",
+  "medicationChanges",
+  "testsOrdered",
+  "referrals",
+];
+
+// Build the ordered list of sub-bullet strings for a visit. Multi-line fields
+// split into one bullet per non-empty line; the follow-up date reads
+// "Follow-up: {date}" while every other bullet is clean prose (no field label).
+function visitSubBullets(apt: Appointment): string[] {
+  const bullets: string[] = [];
+  for (const key of TIMELINE_NOTE_KEYS) {
+    const raw = apt[key];
+    if (typeof raw !== "string") continue;
+    for (const line of raw.split("\n")) {
+      const t = line.trim();
+      if (t) bullets.push(t);
+    }
+  }
+  if (apt.followUpDate) {
+    bullets.push(`Follow-up: ${format(parseISO(apt.followUpDate), "MMM d, yyyy")}`);
+  }
+  return bullets;
+}
+
+// Visit title for the outline: explicit title, else the capitalized type.
+function visitTitle(apt: Appointment): string {
+  const t = (apt.title || "").trim();
+  if (t) return t;
+  const type = apt.type || "Visit";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function VisitTimeline({
+  appointments, physicians, patientId,
+}: {
+  appointments: Appointment[];
+  physicians: Physician[];
+  patientId: number;
+}) {
+  if (appointments.length === 0) {
+    return (
+      <div className="py-12 text-center" data-testid="visit-timeline-empty">
+        <NotebookPen className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+        <p className="text-base text-muted-foreground">No past appointments</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Once an appointment date has passed, it will appear here so you can add visit notes.
+        </p>
+      </div>
+    );
+  }
+
+  // Group by physician, preserving the incoming most-recent-first order so the
+  // group with the most recent visit surfaces first and visits stay ordered.
+  const groups: { key: string; heading: string; visits: Appointment[] }[] = [];
+  const byKey = new Map<string, typeof groups[number]>();
+  for (const apt of appointments) {
+    const doc = physicians.find((p) => p.id === apt.physicianId);
+    const key = doc ? `p-${doc.id}` : "none";
+    let group = byKey.get(key);
+    if (!group) {
+      const heading = doc
+        ? `${doc.name}${doc.specialty ? ` – ${doc.specialty}` : ""}`
+        : "No physician";
+      group = { key, heading, visits: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.visits.push(apt);
+  }
+
+  return (
+    <div className="space-y-6" data-testid="visit-timeline">
+      {groups.map((group) => (
+        <section key={group.key} data-testid={`visit-group-${group.key}`}>
+          <h3 className="font-heading text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-primary flex-shrink-0" />
+            <span className="break-words min-w-0">{group.heading}</span>
+          </h3>
+          <ul className="mt-2 space-y-4">
+            {group.visits.map((apt) => (
+              <VisitTimelineEntry
+                key={apt.id}
+                apt={apt}
+                physicians={physicians}
+                patientId={patientId}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function VisitTimelineEntry({
+  apt, physicians, patientId,
 }: {
   apt: Appointment;
   physicians: Physician[];
+  patientId: number;
+}) {
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
+  const hasNotes = appointmentHasNotes(apt);
+  const subBullets = visitSubBullets(apt);
+
+  return (
+    <li className="pl-1" data-testid={`visit-timeline-${apt.id}`}>
+      <div className="flex items-baseline gap-2 flex-wrap text-foreground">
+        <span className="text-primary" aria-hidden="true">•</span>
+        <span className="text-sm sm:text-base font-medium break-words min-w-0">
+          {format(parseISO(apt.date), "MMM d, yyyy")} – {visitTitle(apt)}
+        </span>
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2"
+          onClick={() => setNotesOpen(true)}
+          data-testid={`button-visit-${hasNotes ? "edit" : "add"}-notes-${apt.id}`}
+        >
+          {hasNotes ? "Edit" : "Add notes"}
+        </button>
+      </div>
+      {subBullets.length > 0 && (
+        <ul className="mt-1 ml-6 space-y-1">
+          {subBullets.map((text, i) => (
+            <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+              <span className="flex-shrink-0" aria-hidden="true">◦</span>
+              <span className="break-words min-w-0 whitespace-pre-wrap">{text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {notesOpen && (
+        <AppointmentNotesDialog
+          appointment={apt}
+          physicians={physicians}
+          patientId={patientId}
+          open={notesOpen}
+          onOpenChange={setNotesOpen}
+          onFollowUpRequested={(appointment, date) => setPendingFollowUp({ appointment, date })}
+        />
+      )}
+      <FollowUpOfferDialog
+        appointment={pendingFollowUp?.appointment ?? null}
+        date={pendingFollowUp?.date ?? null}
+        physicians={physicians}
+        patientId={patientId}
+        open={pendingFollowUp !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingFollowUp(null);
+        }}
+      />
+    </li>
+  );
+}
+
+function AppointmentCard({
+  apt, physicians, patientId, editingId, setEditing, onSave, onDelete, muted,
+}: {
+  apt: Appointment;
+  physicians: Physician[];
+  patientId: number;
   editingId: number | null;
   setEditing: (a: Appointment | null) => void;
   onSave: (id: number, data: any) => void;
   onDelete: (id: number) => void;
   muted?: boolean;
 }) {
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
   const doc = physicians.find((p) => p.id === apt.physicianId);
+  const canAddNotes = hasAppointmentPassed(apt) || appointmentHasNotes(apt);
+  const hasNotes = appointmentHasNotes(apt);
   return (
     <Card className={`hover-elevate shadow-sm ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
-            <span className={`text-[10px] sm:text-xs font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
-            <span className={`text-xl sm:text-2xl font-heading font-bold leading-none mt-1 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
+      <CardContent className="p-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${muted ? "bg-muted" : "gradient-primary"}`}>
+            <span className={`text-[9px] sm:text-[10px] font-heading font-bold leading-none uppercase tracking-wide ${muted ? "text-muted-foreground" : "text-white/90"}`}>{format(parseISO(apt.date), "MMM")}</span>
+            <span className={`text-lg sm:text-xl font-heading font-bold leading-none mt-0.5 ${muted ? "text-foreground" : "text-white"}`}>{format(parseISO(apt.date), "dd")}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
+              <h3 className="font-heading text-sm sm:text-base font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
               <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
-              <Badge className={`text-xs font-medium ${apt.status === "upcoming" ? "status-upcoming" : apt.status === "completed" ? "status-completed" : "status-cancelled"}`}>
-                {apt.status === "completed" && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                {apt.status === "cancelled" && <XCircle className="w-3 h-3 mr-1" />}
-                {apt.status}
-              </Badge>
+              {/* Status badge only makes sense for still-scheduled visits; past
+                  appointments default to "upcoming" so showing it there is noise. */}
+              {!hasAppointmentPassed(apt) && (
+                <Badge className="text-xs font-medium status-upcoming">upcoming</Badge>
+              )}
             </div>
-            <div className="flex items-center gap-x-3 sm:gap-x-4 gap-y-1 mt-1.5 text-sm text-foreground/75 flex-wrap min-w-0">
-              <span className="flex items-center gap-1.5 min-w-0"><Clock className="w-3.5 h-3.5 flex-shrink-0" />{apt.time}</span>
-              {doc && <span className="flex items-center gap-1.5 min-w-0 truncate"><Stethoscope className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{doc.name}</span></span>}
-              {apt.location && <span className="flex items-center gap-1.5 min-w-0 truncate"><MapPin className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{apt.location}</span></span>}
-            </div>
-            {apt.notes && <p className="text-sm text-foreground/70 mt-1.5 line-clamp-2 break-words">{apt.notes}</p>}
+           <div className="flex items-center gap-x-3 gap-y-0.5 mt-1 text-sm text-foreground/75 flex-wrap min-w-0">
+  <span className="flex items-center gap-1.5 min-w-0">
+    <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+    {apt.time}
+  </span>
+  {doc && (
+    <span className="flex items-center gap-1.5 min-w-0 truncate">
+      <Stethoscope className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="truncate">{doc.name}</span>
+    </span>
+  )}
+  {apt.location && (
+    <a
+      href={mapHref(apt.location)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1.5 min-w-0 truncate underline underline-offset-2"
+    >
+      <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="truncate">{apt.location}</span>
+    </a>
+  )}
+</div>
+            {apt.notes && <p className="text-sm text-foreground/70 mt-1 line-clamp-2 break-words">{apt.notes}</p>}
+            {canAddNotes && (
+              <Button
+                size="sm"
+                variant={hasNotes ? "ghost" : "outline"}
+                className={`h-8 mt-1.5 ${hasNotes ? "text-primary" : ""}`}
+                onClick={() => setNotesOpen(true)}
+                data-testid={`button-apt-notes-${apt.id}`}
+              >
+                <NotebookPen className="w-4 h-4 mr-1.5" />
+                {hasNotes ? "Edit Visit Notes" : "Add Visit Notes"}
+              </Button>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
             <Dialog open={editingId === apt.id} onOpenChange={(o) => !o && setEditing(null)}>
               <DialogTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
+                <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setEditing(apt)} data-testid={`button-edit-apt-${apt.id}`}>
                   <Edit2 className="w-5 h-5" />
                 </Button>
               </DialogTrigger>
               <DialogContent className={APT_DIALOG_CLASS}>
-                <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-5 pb-5 sm:pb-6 text-left space-y-1.5 shrink-0">
+                <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
                   <DialogTitle className="font-heading text-2xl sm:text-2xl font-bold text-white">
                     Edit Appointment
                   </DialogTitle>
@@ -695,7 +1006,7 @@ function AppointmentCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-10 w-10"
+                  className="h-9 w-9"
                   data-testid={`button-delete-apt-${apt.id}`}
                   aria-label={`Delete appointment ${apt.title}`}
                 >
@@ -738,6 +1049,26 @@ function AppointmentCard({
           </div>
         </div>
       </CardContent>
+      {notesOpen && (
+        <AppointmentNotesDialog
+          appointment={apt}
+          physicians={physicians}
+          patientId={patientId}
+          open={notesOpen}
+          onOpenChange={setNotesOpen}
+          onFollowUpRequested={(appointment, date) => setPendingFollowUp({ appointment, date })}
+        />
+      )}
+      <FollowUpOfferDialog
+        appointment={pendingFollowUp?.appointment ?? null}
+        date={pendingFollowUp?.date ?? null}
+        physicians={physicians}
+        patientId={patientId}
+        open={pendingFollowUp !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingFollowUp(null);
+        }}
+      />
     </Card>
   );
 }

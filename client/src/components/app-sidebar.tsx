@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
-  HeartPulse, Phone, Building2, Sun, Moon, Download, Upload,
+  HeartPulse, Phone, Building2, IdCard, Sun, Moon, Download, Upload,
   Plus, X, Check, ChevronDown, Pencil, Trash2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -39,6 +39,7 @@ function normalizePatientFields<T extends Partial<Patient>>(data: T): T {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Profile", url: "/profile", icon: IdCard },
   { title: "Appointments", url: "/appointments", icon: CalendarDays },
   { title: "Medications", url: "/medications", icon: Pill },
   { title: "Physicians", url: "/physicians", icon: Stethoscope },
@@ -395,13 +396,13 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3 border-t border-sidebar-border space-y-2">
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <Button
             variant="outline"
             size="sm"
             onClick={handleSaveData}
             disabled={saving}
-            className="flex-1 gap-1 font-body text-sm font-semibold px-2 h-10"
+            className="flex-1 gap-1 font-body text-[11px] font-semibold px-1 h-8"
             data-testid="button-save-data"
           >
             <Download className="w-4 h-4 flex-shrink-0" />
@@ -412,7 +413,7 @@ export function AppSidebar() {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex-1 gap-1 font-body text-sm font-semibold px-2 h-10"
+            className="flex-1 gap-1 font-body text-[11px] font-semibold px-1 h-8"
             data-testid="button-load-data"
           >
             <Upload className="w-4 h-4 flex-shrink-0" />
@@ -431,7 +432,7 @@ export function AppSidebar() {
           variant="outline"
           size="sm"
           onClick={toggle}
-          className="w-full gap-2 font-body text-sm font-semibold h-10"
+          className="w-full gap-1.5 font-body text-[11px] font-semibold h-8"
           data-testid="button-theme-toggle"
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
