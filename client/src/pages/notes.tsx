@@ -11,9 +11,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { createNote, deleteNote, getNotes, updateNote } from "@/lib/db";
+import {
+  createNote,
+  createNoteUpdate,
+  deleteNote,
+  deleteNoteUpdate,
+  getNotes,
+  getNoteUpdates,
+  updateNote,
+  updateNoteUpdate,
+} from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
-import type { Note } from "@shared/schema";
+import type { Note, NoteUpdate } from "@shared/schema";
 
 function localToday(): string {
   const now = new Date();
@@ -27,6 +36,7 @@ function formatDateMarker(date: string): string {
 }
 
 type NoteDraft = Pick<Note, "date" | "text">;
+type NoteUpdateDraft = Pick<NoteUpdate, "date" | "text">;
 
 function NoteEditor({
   initial,
@@ -95,18 +105,94 @@ function NoteEditor({
   );
 }
 
+function NoteUpdateEditor({
+  initial,
+  onSave,
+  onCancel,
+  saveLabel,
+}: {
+  initial: NoteUpdateDraft;
+  onSave: (draft: NoteUpdateDraft) => void;
+  onCancel: () => void;
+  saveLabel: string;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const canSave = Boolean(draft.date && draft.text.trim());
+
+  return (
+    <div className="min-w-0 border-l-2 border-primary/30 pl-3 sm:pl-4" data-testid="note-update-editor">
+      <div className="space-y-4 rounded-md bg-muted/45 p-3 sm:p-4">
+        <div className="space-y-2 min-w-0">
+          <Label htmlFor="update-date" className="text-sm font-semibold">Update date</Label>
+          <Input
+            id="update-date"
+            type="date"
+            value={draft.date}
+            onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
+            className="h-12 w-full max-w-full text-base"
+            data-testid="input-update-date"
+          />
+        </div>
+        <div className="space-y-2 min-w-0">
+          <Label htmlFor="update-text" className="text-sm font-semibold">Update</Label>
+          <Textarea
+            id="update-text"
+            value={draft.text}
+            onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))}
+            placeholder="What happened next?"
+            rows={4}
+            className="min-h-28 w-full max-w-full resize-y text-base break-words"
+            data-testid="input-update-text"
+          />
+        </div>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="h-12 w-full text-base sm:w-auto sm:min-w-28"
+            data-testid="button-cancel-update"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => onSave({ ...draft, text: draft.text.trim() })}
+            disabled={!canSave}
+            className="gradient-primary h-12 w-full border-none text-base font-semibold text-white sm:w-auto sm:min-w-36"
+            data-testid="button-save-update"
+          >
+            {saveLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Notes() {
   const { activePatientId } = usePatient();
   const { toast } = useToast();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [addingUpdateNoteId, setAddingUpdateNoteId] = useState<number | null>(null);
+  const [editingUpdateId, setEditingUpdateId] = useState<number | null>(null);
 
   const { data: notes = [], isLoading } = useQuery<Note[]>({
     queryKey: ["notes", activePatientId],
     queryFn: () => getNotes(activePatientId),
   });
+  const noteIds = notes.flatMap((note) => note.id === undefined ? [] : [note.id]);
+  const { data: noteUpdates = [] } = useQuery<NoteUpdate[]>({
+    queryKey: ["note-updates", activePatientId, noteIds],
+    queryFn: () => getNoteUpdates(noteIds),
+    enabled: noteIds.length > 0,
+  });
 
-  const invalidateNotes = () => queryClient.invalidateQueries({ queryKey: ["notes", activePatientId] });
+  const invalidateTimeline = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["notes", activePatientId] }),
+    queryClient.invalidateQueries({ queryKey: ["note-updates", activePatientId] }),
+  ]);
   const createMutation = useMutation({
     mutationFn: (draft: NoteDraft) => createNote({
       patientId: activePatientId,
@@ -114,7 +200,7 @@ export default function Notes() {
       createdAt: new Date().toISOString(),
     }),
     onSuccess: () => {
-      void invalidateNotes();
+      void invalidateTimeline();
       setAdding(false);
       toast({ title: "Note added" });
     },
@@ -122,7 +208,7 @@ export default function Notes() {
   const updateMutation = useMutation({
     mutationFn: ({ id, draft }: { id: number; draft: NoteDraft }) => updateNote(id, draft),
     onSuccess: () => {
-      void invalidateNotes();
+      void invalidateTimeline();
       setEditingId(null);
       toast({ title: "Note updated" });
     },
@@ -130,10 +216,41 @@ export default function Notes() {
   const deleteMutation = useMutation({
     mutationFn: deleteNote,
     onSuccess: () => {
-      void invalidateNotes();
+      void invalidateTimeline();
       toast({ title: "Note removed" });
     },
   });
+  const createUpdateMutation = useMutation({
+    mutationFn: ({ noteId, draft }: { noteId: number; draft: NoteUpdateDraft }) => createNoteUpdate({
+      noteId,
+      ...draft,
+      createdAt: new Date().toISOString(),
+    }),
+    onSuccess: () => {
+      void invalidateTimeline();
+      setAddingUpdateNoteId(null);
+      toast({ title: "Update added" });
+    },
+  });
+  const updateUpdateMutation = useMutation({
+    mutationFn: ({ id, draft }: { id: number; draft: NoteUpdateDraft }) => updateNoteUpdate(id, draft),
+    onSuccess: () => {
+      void invalidateTimeline();
+      setEditingUpdateId(null);
+      toast({ title: "Update saved" });
+    },
+  });
+  const deleteUpdateMutation = useMutation({
+    mutationFn: deleteNoteUpdate,
+    onSuccess: () => {
+      void invalidateTimeline();
+      toast({ title: "Update removed" });
+    },
+  });
+  const updatesByNote = noteUpdates.reduce<Record<number, NoteUpdate[]>>((all, update) => {
+    (all[update.noteId] ||= []).push(update);
+    return all;
+  }, {});
 
   const groups = notes.reduce<Array<{ date: string; entries: Note[] }>>((all, note) => {
     const group = all.find((item) => item.date === note.date);
@@ -204,8 +321,9 @@ export default function Notes() {
                 </div>
                 <div className="ml-1 border-l-2 border-primary/20 pl-4 sm:pl-5">
                   <div className="space-y-3">
-                    {group.entries.map((note) => (
-                      editingId === note.id ? (
+                    {group.entries.map((note) => {
+                      const updates = updatesByNote[note.id!] || [];
+                      return editingId === note.id ? (
                         <NoteEditor
                           key={note.id}
                           initial={{ date: note.date, text: note.text }}
@@ -220,11 +338,111 @@ export default function Notes() {
                               <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-foreground" data-testid={`note-text-${note.id}`}>
                                 {note.text}
                               </p>
-                              <div className="flex items-center justify-end gap-2 border-t border-border/70 pt-3">
+                              {updates.length > 0 && (
+                                <div className="min-w-0 space-y-3 border-t border-border/70 pt-3" data-testid={`note-updates-${note.id}`}>
+                                  {updates.map((update) => (
+                                    editingUpdateId === update.id ? (
+                                      <NoteUpdateEditor
+                                        key={update.id}
+                                        initial={{ date: update.date, text: update.text }}
+                                        onSave={(draft) => updateUpdateMutation.mutate({ id: update.id!, draft })}
+                                        onCancel={() => setEditingUpdateId(null)}
+                                        saveLabel="Save Update"
+                                      />
+                                    ) : (
+                                      <div
+                                        key={update.id}
+                                        className="min-w-0 border-l-2 border-primary/30 pl-3 sm:pl-4"
+                                        data-testid={`note-update-${update.id}`}
+                                      >
+                                        <div className="flex min-w-0 flex-col gap-2 rounded-md bg-muted/45 p-3 sm:p-4">
+                                          <p className="text-sm font-medium text-muted-foreground" data-testid={`note-update-date-${update.id}`}>
+                                            {formatDateMarker(update.date)}
+                                          </p>
+                                          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground" data-testid={`note-update-text-${update.id}`}>
+                                            {update.text}
+                                          </p>
+                                          <div className="flex items-center justify-end gap-2">
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => { setEditingUpdateId(update.id!); setAddingUpdateNoteId(null); setEditingId(null); }}
+                                              className="h-11 w-11 shrink-0"
+                                              aria-label={`Edit update for ${formatDateMarker(update.date)}`}
+                                              data-testid={`button-edit-update-${update.id}`}
+                                            >
+                                              <Edit2 className="h-4 w-4" />
+                                            </Button>
+                                            <AlertDialog>
+                                              <AlertDialogTrigger asChild>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  className="h-11 w-11 shrink-0"
+                                                  aria-label={`Delete update for ${formatDateMarker(update.date)}`}
+                                                  data-testid={`button-delete-update-${update.id}`}
+                                                >
+                                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                              </AlertDialogTrigger>
+                                              <AlertDialogContent className="max-w-md">
+                                                <AlertDialogHeader>
+                                                  <AlertDialogTitle className="font-heading flex items-center gap-2">
+                                                    <Trash2 className="h-5 w-5 text-destructive" /> Delete update?
+                                                  </AlertDialogTitle>
+                                                  <AlertDialogDescription>
+                                                    This update for <span className="font-medium text-foreground">{formatDateMarker(update.date)}</span> will be removed. This cannot be undone.
+                                                  </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter className="gap-2 sm:gap-2">
+                                                  <AlertDialogCancel
+                                                    className="mt-0 h-11 text-base sm:h-10 sm:text-sm"
+                                                    data-testid={`button-delete-update-cancel-${update.id}`}
+                                                  >
+                                                    Cancel
+                                                  </AlertDialogCancel>
+                                                  <AlertDialogAction
+                                                    onClick={() => deleteUpdateMutation.mutate(update.id!)}
+                                                    className="h-11 bg-destructive text-base font-semibold text-destructive-foreground hover:bg-destructive/90 sm:h-10 sm:text-sm"
+                                                    data-testid={`button-delete-update-confirm-${update.id}`}
+                                                  >
+                                                    Delete update
+                                                  </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                              </AlertDialogContent>
+                                            </AlertDialog>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  ))}
+                                </div>
+                              )}
+
+                              {addingUpdateNoteId === note.id && (
+                                <NoteUpdateEditor
+                                  key={`new-update-${note.id}`}
+                                  initial={{ date: localToday(), text: "" }}
+                                  onSave={(draft) => createUpdateMutation.mutate({ noteId: note.id!, draft })}
+                                  onCancel={() => setAddingUpdateNoteId(null)}
+                                  saveLabel="Save Update"
+                                />
+                              )}
+
+                              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/70 pt-3">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => { setAddingUpdateNoteId(note.id!); setEditingUpdateId(null); setAdding(false); setEditingId(null); }}
+                                  className="h-11 min-w-11 gap-1.5 px-3 text-sm"
+                                  data-testid={`button-add-update-${note.id}`}
+                                >
+                                  <Plus className="h-4 w-4" /> Add update
+                                </Button>
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  onClick={() => { setEditingId(note.id!); setAdding(false); }}
+                                  onClick={() => { setEditingId(note.id!); setAdding(false); setAddingUpdateNoteId(null); setEditingUpdateId(null); }}
                                   className="h-11 w-11"
                                   aria-label={`Edit note for ${formatDateMarker(note.date)}`}
                                   data-testid={`button-edit-note-${note.id}`}
@@ -249,7 +467,7 @@ export default function Notes() {
                                         <Trash2 className="h-5 w-5 text-destructive" /> Delete note?
                                       </AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This note for <span className="font-medium text-foreground">{formatDateMarker(note.date)}</span> will be removed. This cannot be undone.
+                                        This note for <span className="font-medium text-foreground">{formatDateMarker(note.date)}</span> will be removed{updates.length > 0 ? " along with its updates" : ""}. This cannot be undone.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter className="gap-2 sm:gap-2">
@@ -274,7 +492,7 @@ export default function Notes() {
                           </CardContent>
                         </Card>
                       )
-                    ))}
+                    })}
                   </div>
                 </div>
               </section>
