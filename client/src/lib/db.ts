@@ -2,6 +2,7 @@ import Dexie, { type Table } from "dexie";
 import type {
   Patient, Physician, Appointment, Medication, MedicationLog,
   MedicalRecord, Vital, EmergencyContact, Pharmacy, ReminderSoundPreferences, Note,
+  NoteUpdate,
 } from "@shared/schema";
 
 class MedicalRecordsDB extends Dexie {
@@ -16,6 +17,7 @@ class MedicalRecordsDB extends Dexie {
   pharmacies!: Table<Pharmacy, number>;
   reminderSoundPreferences!: Table<ReminderSoundPreferences, number>;
   notes!: Table<Note, number>;
+  noteUpdates!: Table<NoteUpdate, number>;
 
   constructor() {
     super("MedicalRecordsKeeper");
@@ -60,6 +62,23 @@ class MedicalRecordsDB extends Dexie {
       reminderSoundPreferences: "++id, patientId",
       notes: "++id, patientId, date",
     });
+
+    // This migration only adds the noteUpdates table. Existing stores and
+    // indexes intentionally match version 3 so local records remain intact.
+    this.version(4).stores({
+      patients: "++id",
+      physicians: "++id, patientId",
+      appointments: "++id, patientId",
+      medications: "++id, patientId",
+      medicationLogs: "++id, medicationId",
+      medicalRecords: "++id, patientId",
+      vitals: "++id, patientId",
+      emergencyContacts: "++id, patientId",
+      pharmacies: "++id, patientId",
+      reminderSoundPreferences: "++id, patientId",
+      notes: "++id, patientId, date",
+      noteUpdates: "++id, noteId, date",
+    });
   }
 }
 
@@ -103,6 +122,11 @@ export async function deletePatient(id: number): Promise<void> {
   await db.medications.where("patientId").equals(id).delete();
   await db.appointments.where("patientId").equals(id).delete();
   await db.physicians.where("patientId").equals(id).delete();
+  const notes = await db.notes.where("patientId").equals(id).toArray();
+  const noteIds = notes.flatMap((note) => note.id === undefined ? [] : [note.id]);
+  if (noteIds.length > 0) {
+    await db.noteUpdates.where("noteId").anyOf(noteIds).delete();
+  }
   await db.notes.where("patientId").equals(id).delete();
   await db.patients.delete(id);
 }
@@ -268,7 +292,31 @@ export async function updateNote(id: number, data: Partial<Note>): Promise<Note>
   return (await db.notes.get(id))!;
 }
 export async function deleteNote(id: number): Promise<void> {
-  await db.notes.delete(id);
+  await db.transaction("rw", db.notes, db.noteUpdates, async () => {
+    await db.noteUpdates.where("noteId").equals(id).delete();
+    await db.notes.delete(id);
+  });
+}
+
+// --- Note Updates ---
+export async function getNoteUpdates(noteIds: number[]): Promise<NoteUpdate[]> {
+  if (noteIds.length === 0) return [];
+  const list = await db.noteUpdates.where("noteId").anyOf(noteIds).toArray();
+  return list.sort((a, b) => {
+    const dateOrder = a.date.localeCompare(b.date);
+    return dateOrder || a.createdAt.localeCompare(b.createdAt);
+  });
+}
+export async function createNoteUpdate(data: Omit<NoteUpdate, "id">): Promise<NoteUpdate> {
+  const id = await db.noteUpdates.add(data as NoteUpdate);
+  return { ...data, id } as NoteUpdate;
+}
+export async function updateNoteUpdate(id: number, data: Partial<NoteUpdate>): Promise<NoteUpdate> {
+  await db.noteUpdates.update(id, data);
+  return (await db.noteUpdates.get(id))!;
+}
+export async function deleteNoteUpdate(id: number): Promise<void> {
+  await db.noteUpdates.delete(id);
 }
 
 // --- Reminder Sound Preferences ---
@@ -318,9 +366,9 @@ export async function updateReminderSoundPreferences(
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
-    // v6 adds the notes timeline. Older backups still import
+    // v7 adds follow-ups to the notes timeline. Older backups still import
     // cleanly since records are spread field-for-field on restore.
-    version: 6,
+    version: 7,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
@@ -333,6 +381,7 @@ export async function exportAllData() {
     pharmacies: await db.pharmacies.toArray(),
     reminderSoundPreferences: await db.reminderSoundPreferences.toArray(),
     notes: await db.notes.toArray(),
+    noteUpdates: await db.noteUpdates.toArray(),
   };
 }
 
@@ -454,12 +503,29 @@ export async function importAllData(data: any): Promise<void> {
     }
   }
 
-  // Import notes last because they only depend on the patient id mapping.
+  // Import notes before note updates so each follow-up can link to its
+  // newly assigned parent note id.
+  const noteIdMap: Record<number, number> = {};
   if (data.notes?.length) {
     for (const note of data.notes) {
+      const oldId = note.id;
       const { id, ...rest } = note;
       rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
-      await db.notes.add(rest as Note);
+      const newId = await db.notes.add(rest as Note);
+      noteIdMap[oldId] = newId;
+    }
+  }
+
+  // Follow-ups are imported last because their parent note ids are reassigned
+  // during restore. Skip a malformed orphan rather than restoring it without
+  // a valid parent note.
+  if (data.noteUpdates?.length) {
+    for (const update of data.noteUpdates) {
+      const { id, ...rest } = update;
+      const noteId = noteIdMap[rest.noteId];
+      if (noteId) {
+        await db.noteUpdates.add({ ...rest, noteId } as NoteUpdate);
+      }
     }
   }
 }

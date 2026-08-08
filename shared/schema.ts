@@ -187,3 +187,11 @@ export interface Note {
   text: string;
   createdAt: string;
 }
+
+export interface NoteUpdate {
+  id?: number;
+  noteId: number;
+  date: string;
+  text: string;
+  createdAt: string;
+}
