@@ -31,7 +31,6 @@ function normalizePhysicianFields<T extends Partial<Physician>>(data: T): T {
   return {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
-    specialty: data.specialty ? formatPersonName(data.specialty) : data.specialty,
     address: data.address ? formatStreetAddress(data.address) : data.address,
     city: data.city ? formatCity(data.city) : data.city,
     state: data.state ? formatState(data.state) : data.state,
@@ -257,7 +256,6 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
               className={physControlClass}
               value={form.specialty}
               onChange={(e) => setForm({ ...form, specialty: e.target.value })}
-              onBlur={(e) => setForm((prev) => ({ ...prev, specialty: formatPersonName(e.target.value) }))}
               placeholder="Cardiology"
               data-testid="input-doc-specialty"
             />

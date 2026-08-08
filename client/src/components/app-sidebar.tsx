@@ -33,7 +33,6 @@ function normalizePatientFields<T extends Partial<Patient>>(data: T): T {
   return {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
-    relationship: data.relationship ? formatPersonName(data.relationship) : data.relationship,
   };
 }
 
@@ -219,36 +218,35 @@ function PatientSwitcher() {
                 onChange={(e) => setNewName(e.target.value)}
                 onBlur={(e) => setNewName(formatPersonName(e.target.value))}
                 placeholder="Name"
-                className="h-7 text-xs"
+                className="h-11 text-sm"
                 data-testid="input-new-patient-name"
                 autoFocus
               />
               <Input
                 value={newRelationship}
                 onChange={(e) => setNewRelationship(e.target.value)}
-                onBlur={(e) => setNewRelationship(formatPersonName(e.target.value))}
                 placeholder="Relationship (e.g. Spouse, Child)"
-                className="h-7 text-xs"
+                className="h-11 text-sm"
                 data-testid="input-new-patient-relationship"
               />
-              <div className="flex gap-1.5 items-center">
-                <Label className="text-[10px] text-muted-foreground">Color:</Label>
+              <div className="flex flex-wrap gap-1 items-center">
+                <Label className="w-full text-[10px] text-muted-foreground">Color:</Label>
                 {AVATAR_COLORS.map((c) => (
                   <button
                     key={c}
                     onClick={() => setNewColor(c)}
-                    className={`w-5 h-5 rounded-full border-2 transition-all ${newColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    className={`w-11 h-11 rounded-full border-2 transition-all ${newColor === c ? "border-foreground scale-110" : "border-transparent"}`}
                     style={{ backgroundColor: c }}
                   />
                 ))}
               </div>
               <div className="flex gap-1.5 justify-end">
-                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setShowAdd(false)}>
+                <Button size="sm" variant="ghost" className="h-11 text-sm px-3" onClick={() => setShowAdd(false)}>
                   Cancel
                 </Button>
                 <Button
                   size="sm"
-                  className="h-6 text-xs px-2 gradient-primary text-white border-none"
+                  className="h-11 text-sm px-3 gradient-primary text-white border-none"
                   onClick={() => createMut.mutate({ name: newName, relationship: newRelationship || null, dateOfBirth: null, color: newColor })}
                   disabled={!newName.trim()}
                   data-testid="button-save-new-patient"

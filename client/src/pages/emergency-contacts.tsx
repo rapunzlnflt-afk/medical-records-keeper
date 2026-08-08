@@ -28,7 +28,6 @@ function normalizeEmergencyContactFields<T extends Partial<EmergencyContact>>(da
   return {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
-    relationship: data.relationship ? formatPersonName(data.relationship) : data.relationship,
   };
 }
 
@@ -111,7 +110,6 @@ function ContactForm({ initial, onSubmit, onCancel, isEdit }: {
               className={ecControlClass}
               value={form.relationship}
               onChange={(e) => setForm({ ...form, relationship: e.target.value })}
-              onBlur={(e) => setForm((prev) => ({ ...prev, relationship: formatPersonName(e.target.value) }))}
               placeholder="Spouse, Parent, Sibling..."
               data-testid="input-ec-relationship"
             />

@@ -36,7 +36,7 @@ import {
 import { Link } from "wouter";
 import type { Pharmacy } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
-import { formatPersonName, formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
+import { formatStreetAddress, formatCity, formatState } from "@/lib/format-name";
 const mapHref = (address?: string) => {
   if (!address) return "";
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -45,7 +45,6 @@ const mapHref = (address?: string) => {
 function normalizePharmacyFields<T extends Partial<Pharmacy>>(data: T): T {
   return {
     ...data,
-    name: data.name ? formatPersonName(data.name) : data.name,
     address: data.address ? formatStreetAddress(data.address) : data.address,
     city: data.city ? formatCity(data.city) : data.city,
     state: data.state ? formatState(data.state) : data.state,
@@ -123,7 +122,6 @@ function PharmacyForm({ initial, onSubmit, onCancel, isEdit }: {
               className={pharmControlClass}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              onBlur={(e) => setForm((prev) => ({ ...prev, name: formatPersonName(e.target.value) }))}
               placeholder="CVS Pharmacy"
               data-testid="input-pharm-name"
             />
