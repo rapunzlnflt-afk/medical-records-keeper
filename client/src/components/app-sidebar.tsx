@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
   HeartPulse, Phone, Building2, IdCard, Sun, Moon, Download, Upload,
-  Plus, X, Check, ChevronDown, Pencil, Trash2,
+  Plus, X, Check, ChevronDown, Pencil, Trash2, NotebookPen,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -44,6 +44,7 @@ const navItems = [
   { title: "Medications", url: "/medications", icon: Pill },
   { title: "Physicians", url: "/physicians", icon: Stethoscope },
   { title: "Medical Records", url: "/records", icon: FileText },
+  { title: "Notes", url: "/notes", icon: NotebookPen },
   { title: "Vitals", url: "/vitals", icon: HeartPulse },
   { title: "Pharmacies", url: "/pharmacies", icon: Building2 },
   { title: "Emergency Contacts", url: "/emergency", icon: Phone },

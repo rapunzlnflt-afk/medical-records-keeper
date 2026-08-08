@@ -179,3 +179,11 @@ export interface ReminderSoundPreferences {
   vitalsEnabled: number;
   vitalsSound: string;
 }
+
+export interface Note {
+  id?: number;
+  patientId: number;
+  date: string;
+  text: string;
+  createdAt: string;
+}
