@@ -26,7 +26,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar, ArrowLeft } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, XCircle, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar, ArrowLeft } from "lucide-react";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 import { Link, useLocation } from "wouter";
@@ -377,8 +377,11 @@ export default function Medications() {
     onSuccess: () => { invalidateMeds(); toast({ title: "Medication deleted" }); },
   });
   const logMut = useMutation({
-    mutationFn: (data: any) => createMedicationLog(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["medication-logs"] }); toast({ title: "Dose logged" }); },
+    mutationFn: (data: Omit<MedicationLog, "id">) => createMedicationLog(data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["medication-logs"] });
+      toast({ title: variables.taken ? "Dose taken" : "Dose skipped" });
+    },
   });
 
   const active = medications.filter((m) => m.active === 1);
@@ -391,6 +394,7 @@ export default function Medications() {
       date: today,
       taken: taken ? 1 : 0,
       time: format(new Date(), "HH:mm"),
+      notes: null,
     });
   };
 
@@ -452,17 +456,91 @@ export default function Medications() {
             <div className="flex items-center gap-2 flex-wrap">
               {med.active === 1 && (
                 todayLog ? (
-                  <Badge className="status-completed text-xs font-semibold h-9 px-3">
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Taken
-                  </Badge>
+                  todayLog.taken ? (
+                    <Badge className="status-completed text-xs font-semibold h-9 px-3" data-testid={`badge-taken-${med.id}`}>
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Taken
+                    </Badge>
+                  ) : (
+                    <Badge className="status-skipped text-xs font-semibold h-9 px-3" data-testid={`badge-skipped-${med.id}`}>
+                      <XCircle className="w-3.5 h-3.5 mr-1" />Skipped
+                    </Badge>
+                  )
                 ) : (
                   <>
-                    <Button size="sm" variant="outline" onClick={() => logDose(med.id!, true)} className="text-sm h-9 px-4" data-testid={`button-take-${med.id}`}>
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => logDose(med.id!, false)} className="text-sm h-9 px-3 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
-                      Skip
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-11 text-sm px-4" data-testid={`button-take-${med.id}`}>
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-md">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="font-heading flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            Mark as taken?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Record today's dose of{" "}
+                            <span className="font-medium text-foreground">{med.name}</span>
+                            {med.dosage ? ` (${med.dosage})` : ""}
+                            {med.frequency ? `, ${med.frequency}` : ""}
+                            {" "}as taken.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2 sm:gap-2">
+                          <AlertDialogCancel
+                            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                            data-testid={`button-take-cancel-${med.id}`}
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => logDose(med.id!, true)}
+                            className="h-11 text-base sm:h-10 sm:text-sm bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 font-semibold"
+                            data-testid={`button-take-confirm-${med.id}`}
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-1" /> Mark as taken
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-11 text-sm px-3 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
+                          Skip
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-md">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="font-heading flex items-center gap-2">
+                            <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                            Skip this dose?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Record today's dose of{" "}
+                            <span className="font-medium text-foreground">{med.name}</span>
+                            {med.dosage ? ` (${med.dosage})` : ""}
+                            {med.frequency ? `, ${med.frequency}` : ""}
+                            {" "}as skipped. It won't count as taken in your history.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2 sm:gap-2">
+                          <AlertDialogCancel
+                            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                            data-testid={`button-skip-cancel-${med.id}`}
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => logDose(med.id!, false)}
+                            className="h-11 text-base sm:h-10 sm:text-sm bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700 font-semibold"
+                            data-testid={`button-skip-confirm-${med.id}`}
+                          >
+                            <XCircle className="w-4 h-4 mr-1" /> Skip dose
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </>
                 )
               )}
@@ -470,7 +548,7 @@ export default function Medications() {
             <div className="flex items-center gap-1 ml-auto">
               <Dialog open={editing?.id === med.id} onOpenChange={(o) => !o && setEditing(null)}>
                 <DialogTrigger asChild>
-                  <Button size="icon" variant="ghost" onClick={() => setEditing(med)} data-testid={`button-edit-med-${med.id}`}>
+                  <Button size="icon" variant="ghost" className="h-11 w-11" onClick={() => setEditing(med)} data-testid={`button-edit-med-${med.id}`}>
                     <Edit2 className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
@@ -497,6 +575,7 @@ export default function Medications() {
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-11 w-11"
                     data-testid={`button-delete-med-${med.id}`}
                     aria-label={`Delete medication ${med.name}`}
                   >
@@ -541,7 +620,7 @@ export default function Medications() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl w-full min-w-0 overflow-x-hidden">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
+      <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary -ml-1 px-1 py-1.5" data-testid="link-back-to-dashboard">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
       <div className="flex items-center justify-between gap-3 flex-wrap min-w-0">
@@ -550,7 +629,7 @@ export default function Medications() {
           <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Track prescriptions, supplements, and daily doses</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1 print-button-area" onClick={() => {
+          <Button size="sm" variant="outline" className="h-11 gap-1 print-button-area" onClick={() => {
             const w = window.open('', '_blank', 'width=800,height=600');
             if (!w) return;
             w.document.write(`<!DOCTYPE html><html><head><title>Medications</title><style>
@@ -591,7 +670,7 @@ export default function Medications() {
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-medication">
+              <Button size="sm" className="gradient-primary h-11 text-white border-none gap-1" data-testid="button-add-medication">
                 <Plus className="w-4 h-4" /> Add Medication
               </Button>
             </DialogTrigger>
@@ -628,14 +707,26 @@ export default function Medications() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 min-w-0">
               {active.map((med) => {
                 const todayLog = logs.find((l) => l.medicationId === med.id && l.date === today);
+                const taken = !!todayLog && !!todayLog.taken;
+                const skipped = !!todayLog && !todayLog.taken;
                 return (
-                  <div key={med.id} className={`p-2.5 rounded-md text-center text-sm min-w-0 ${todayLog ? "bg-green-50 dark:bg-green-950/20" : "bg-secondary/50"}`}>
+                  <div
+                    key={med.id}
+                    className={`p-2.5 rounded-md text-center text-sm min-w-0 ${
+                      taken
+                        ? "bg-green-50 dark:bg-green-950/20"
+                        : skipped
+                          ? "bg-amber-50 dark:bg-amber-950/20"
+                          : "bg-secondary/50"
+                    }`}
+                  >
                     <div className="flex items-center justify-center gap-1 mb-1 min-w-0">
                       {timeIcon(med.timeOfDay)}
                       <span className="font-semibold truncate">{med.name}</span>
                     </div>
                     <span className="text-muted-foreground">{med.dosage}</span>
-                    {todayLog && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 mx-auto mt-1" />}
+                    {taken && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 mx-auto mt-1" />}
+                    {skipped && <XCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mx-auto mt-1" />}
                   </div>
                 );
               })}
@@ -646,8 +737,8 @@ export default function Medications() {
 
       <Tabs defaultValue="active">
         <TabsList>
-          <TabsTrigger value="active" className="font-body text-sm font-semibold">Active ({active.length})</TabsTrigger>
-          <TabsTrigger value="inactive" className="font-body text-sm font-semibold">Inactive ({inactive.length})</TabsTrigger>
+          <TabsTrigger value="active" className="min-h-11 font-body text-sm font-semibold">Active ({active.length})</TabsTrigger>
+          <TabsTrigger value="inactive" className="min-h-11 font-body text-sm font-semibold">Inactive ({inactive.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="space-y-3 mt-3">
           {isLoading ? (
@@ -687,7 +778,7 @@ export default function Medications() {
               { name: "RxList Interaction Checker", url: "https://www.rxlist.com/drug-interaction-checker.htm" },
             ].map((link) => (
               <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
                 data-testid={`link-interaction-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
                 <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                 {link.name}
@@ -714,7 +805,7 @@ export default function Medications() {
               { name: "Medicare Extra Help", url: "https://www.ssa.gov/medicare/part-d-extra-help" },
             ].map((link) => (
               <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
                 data-testid={`link-discount-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
                 <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                 {link.name}
