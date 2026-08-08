@@ -341,7 +341,7 @@ export default function Medications() {
   const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Medication | null>(null);
-  const [logOpen, setLogOpen] = useState<number | null>(null);
+  const [pendingDose, setPendingDose] = useState<{ medicationId: number; taken: boolean } | null>(null);
   const { toast } = useToast();
 
   const { data: medications = [], isLoading } = useQuery<Medication[]>({
@@ -378,9 +378,23 @@ export default function Medications() {
   });
   const logMut = useMutation({
     mutationFn: (data: Omit<MedicationLog, "id">) => createMedicationLog(data),
-    onSuccess: (_data, variables) => {
+    onSuccess: (created, variables) => {
+      // Update the active view immediately, then refetch to keep the cache
+      // authoritative. This avoids a successful IndexedDB write looking like
+      // a no-op while React Query is waiting to refetch.
+      queryClient.setQueryData<MedicationLog[]>(["medication-logs"], (current = []) => [
+        created,
+        ...current.filter((log) => !(log.medicationId === created.medicationId && log.date === created.date)),
+      ]);
       queryClient.invalidateQueries({ queryKey: ["medication-logs"] });
       toast({ title: variables.taken ? "Dose taken" : "Dose skipped" });
+    },
+    onError: () => {
+      toast({
+        title: "Couldn't log dose",
+        description: "Your dose was not saved. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -467,12 +481,19 @@ export default function Medications() {
                   )
                 ) : (
                   <>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="h-11 text-sm px-4" data-testid={`button-take-${med.id}`}>
-                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
-                        </Button>
-                      </AlertDialogTrigger>
+                    <AlertDialog
+                      open={pendingDose?.medicationId === med.id && pendingDose?.taken === true}
+                      onOpenChange={(isOpen) => !isOpen && setPendingDose(null)}
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-11 text-sm px-4"
+                        onClick={() => setPendingDose({ medicationId: med.id!, taken: true })}
+                        data-testid={`button-take-${med.id}`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
+                      </Button>
                       <AlertDialogContent className="max-w-md">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="font-heading flex items-center gap-2">
@@ -504,12 +525,19 @@ export default function Medications() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="h-11 text-sm px-3 text-muted-foreground" data-testid={`button-skip-${med.id}`}>
-                          Skip
-                        </Button>
-                      </AlertDialogTrigger>
+                    <AlertDialog
+                      open={pendingDose?.medicationId === med.id && pendingDose?.taken === false}
+                      onOpenChange={(isOpen) => !isOpen && setPendingDose(null)}
+                    >
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-11 text-sm px-3 text-muted-foreground"
+                        onClick={() => setPendingDose({ medicationId: med.id!, taken: false })}
+                        data-testid={`button-skip-${med.id}`}
+                      >
+                        Skip
+                      </Button>
                       <AlertDialogContent className="max-w-md">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="font-heading flex items-center gap-2">
@@ -725,8 +753,22 @@ export default function Medications() {
                       <span className="font-semibold truncate">{med.name}</span>
                     </div>
                     <span className="text-muted-foreground">{med.dosage}</span>
-                    {taken && <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400 mx-auto mt-1" />}
-                    {skipped && <XCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mx-auto mt-1" />}
+                    {taken && (
+                      <span
+                        className="inline-flex items-center justify-center gap-1 mt-1 text-xs font-semibold text-green-700 dark:text-green-300"
+                        data-testid={`schedule-taken-${med.id}`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Taken
+                      </span>
+                    )}
+                    {skipped && (
+                      <span
+                        className="inline-flex items-center justify-center gap-1 mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
+                        data-testid={`schedule-skipped-${med.id}`}
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Skipped
+                      </span>
+                    )}
                   </div>
                 );
               })}
