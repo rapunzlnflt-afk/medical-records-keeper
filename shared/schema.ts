@@ -190,6 +190,7 @@ export interface Note {
   // rewriting their existing IndexedDB rows.
   category?: string;
   flaggedForDoctor?: boolean;
+  flaggedPhysicianId?: number | null;
 }
 
 export interface NoteUpdate {

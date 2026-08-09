@@ -18,6 +18,7 @@ import {
   deleteNoteUpdate,
   getNotes,
   getNoteUpdates,
+  getPhysicians,
   NOTE_CATEGORIES,
   noteCategory,
   noteIsFlaggedForDoctor,
@@ -25,7 +26,7 @@ import {
   updateNoteUpdate,
 } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
-import type { Note, NoteUpdate } from "@shared/schema";
+import type { Note, NoteUpdate, Physician } from "@shared/schema";
 
 function localToday(): string {
   const now = new Date();
@@ -38,7 +39,7 @@ function formatDateMarker(date: string): string {
   return format(parseISO(date), "EEEE, MMMM d, yyyy");
 }
 
-type NoteDraft = Pick<Note, "date" | "text" | "category" | "flaggedForDoctor">;
+type NoteDraft = Pick<Note, "date" | "text" | "category" | "flaggedForDoctor" | "flaggedPhysicianId">;
 type NoteUpdateDraft = Pick<NoteUpdate, "date" | "text">;
 
 export function noteCategoryPillClass(category: string): string {
@@ -67,11 +68,13 @@ function NoteEditor({
   onSave,
   onCancel,
   saveLabel,
+  physicians,
 }: {
   initial: NoteDraft;
   onSave: (draft: NoteDraft) => void;
   onCancel: () => void;
   saveLabel: string;
+  physicians: Physician[];
 }) {
   const [draft, setDraft] = useState(initial);
   const canSave = Boolean(draft.date && draft.text.trim());
@@ -121,12 +124,36 @@ function NoteEditor({
             <input
               type="checkbox"
               checked={noteIsFlaggedForDoctor(draft)}
-              onChange={(event) => setDraft((current) => ({ ...current, flaggedForDoctor: event.target.checked }))}
+              onChange={(event) => setDraft((current) => ({
+                ...current,
+                flaggedForDoctor: event.target.checked,
+                flaggedPhysicianId: event.target.checked ? current.flaggedPhysicianId ?? null : null,
+              }))}
               className="h-5 w-5 shrink-0 accent-primary"
               data-testid="checkbox-note-flag"
             />
             <span>Mention at my next appointment</span>
           </label>
+          {noteIsFlaggedForDoctor(draft) && physicians.length > 0 && (
+            <div className="space-y-2 min-w-0">
+              <Label htmlFor="note-flag-physician" className="text-base font-semibold">Bring up with</Label>
+              <select
+                id="note-flag-physician"
+                value={draft.flaggedPhysicianId ?? ""}
+                onChange={(event) => setDraft((current) => ({
+                  ...current,
+                  flaggedPhysicianId: event.target.value ? Number(event.target.value) : null,
+                }))}
+                className="flex h-12 w-full max-w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                data-testid="select-note-flag-physician"
+              >
+                <option value="">Any doctor</option>
+                {physicians.map((physician) => (
+                  <option key={physician.id} value={physician.id}>{physician.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
@@ -139,7 +166,13 @@ function NoteEditor({
             </Button>
             <Button
               type="button"
-              onClick={() => onSave({ ...draft, text: draft.text.trim() })}
+              onClick={() => onSave({
+                ...draft,
+                text: draft.text.trim(),
+                flaggedPhysicianId: noteIsFlaggedForDoctor(draft) && physicians.some((physician) => physician.id === draft.flaggedPhysicianId)
+                  ? draft.flaggedPhysicianId
+                  : null,
+              })}
               disabled={!canSave}
               className="gradient-primary h-12 w-full border-none text-base font-semibold text-white sm:w-auto sm:min-w-36"
               data-testid="button-save-note"
@@ -229,6 +262,10 @@ export default function Notes() {
   const { data: notes = [], isLoading } = useQuery<Note[]>({
     queryKey: ["notes", activePatientId],
     queryFn: () => getNotes(activePatientId),
+  });
+  const { data: physicians = [] } = useQuery<Physician[]>({
+    queryKey: ["physicians", activePatientId],
+    queryFn: () => getPhysicians(activePatientId),
   });
   const noteIds = notes.flatMap((note) => note.id === undefined ? [] : [note.id]);
   const { data: noteUpdates = [] } = useQuery<NoteUpdate[]>({
@@ -340,10 +377,11 @@ export default function Notes() {
         {adding && (
           <NoteEditor
             key="new-note"
-            initial={{ date: localToday(), text: "", category: "Observation", flaggedForDoctor: false }}
+            initial={{ date: localToday(), text: "", category: "Observation", flaggedForDoctor: false, flaggedPhysicianId: null }}
             onSave={(draft) => createMutation.mutate(draft)}
             onCancel={() => setAdding(false)}
             saveLabel="Save Note"
+            physicians={physicians}
           />
         )}
 
@@ -379,10 +417,14 @@ export default function Notes() {
                             text: note.text,
                             category: noteCategory(note),
                             flaggedForDoctor: noteIsFlaggedForDoctor(note),
+                            flaggedPhysicianId: physicians.some((physician) => physician.id === note.flaggedPhysicianId)
+                              ? note.flaggedPhysicianId
+                              : null,
                           }}
                           onSave={(draft) => updateMutation.mutate({ id: note.id!, draft })}
                           onCancel={() => setEditingId(null)}
                           saveLabel="Save Changes"
+                          physicians={physicians}
                         />
                       ) : (
                         <Card key={note.id} className="min-w-0 overflow-hidden" data-testid={`note-${note.id}`}>
@@ -402,6 +444,14 @@ export default function Notes() {
                                   >
                                     <Flag className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                                     Next appointment
+                                  </span>
+                                )}
+                                {noteIsFlaggedForDoctor(note) && typeof note.flaggedPhysicianId === "number" && physicians.find((physician) => physician.id === note.flaggedPhysicianId) && (
+                                  <span
+                                    className="inline-flex min-h-7 items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                                    data-testid={`note-flag-physician-${note.id}`}
+                                  >
+                                    For {physicians.find((physician) => physician.id === note.flaggedPhysicianId)!.name}
                                   </span>
                                 )}
                               </div>

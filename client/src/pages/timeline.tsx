@@ -8,11 +8,12 @@ import {
   getAppointments,
   getNotes,
   getNoteUpdates,
+  getPhysicians,
   noteCategory,
   noteIsFlaggedForDoctor,
 } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
-import type { Appointment, Note, NoteUpdate } from "@shared/schema";
+import type { Appointment, Note, NoteUpdate, Physician } from "@shared/schema";
 
 type TimelineFilter = "all" | "appointments" | "notes" | "flagged";
 
@@ -119,6 +120,7 @@ function emptyMessage(filter: TimelineFilter): string {
 export default function Timeline() {
   const { activePatientId } = usePatient();
   const [filter, setFilter] = useState<TimelineFilter>("all");
+  const [flaggedPhysicianId, setFlaggedPhysicianId] = useState<number | null>(null);
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery<Appointment[]>({
     queryKey: ["appointments", activePatientId],
     queryFn: () => getAppointments(activePatientId),
@@ -126,6 +128,10 @@ export default function Timeline() {
   const { data: notes = [], isLoading: notesLoading } = useQuery<Note[]>({
     queryKey: ["notes", activePatientId],
     queryFn: () => getNotes(activePatientId),
+  });
+  const { data: physicians = [] } = useQuery<Physician[]>({
+    queryKey: ["physicians", activePatientId],
+    queryFn: () => getPhysicians(activePatientId),
   });
   const noteIds = notes.flatMap((note) => note.id === undefined ? [] : [note.id]);
   const { data: noteUpdates = [] } = useQuery<NoteUpdate[]>({
@@ -169,7 +175,11 @@ export default function Timeline() {
   const filteredEntries = entries.filter((entry) => {
     if (filter === "appointments") return entry.kind === "appointment";
     if (filter === "notes") return entry.kind === "note";
-    if (filter === "flagged") return entry.kind === "note" && noteIsFlaggedForDoctor(entry.note);
+    if (filter === "flagged") {
+      return entry.kind === "note"
+        && noteIsFlaggedForDoctor(entry.note)
+        && (flaggedPhysicianId === null || entry.note.flaggedPhysicianId === flaggedPhysicianId);
+    }
     return true;
   });
   const groups = filteredEntries.reduce<Array<{ dateKey: string; entries: TimelineEntry[] }>>((all, entry) => {
@@ -210,7 +220,10 @@ export default function Timeline() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setFilter(item.id)}
+                onClick={() => {
+                  setFilter(item.id);
+                  if (item.id !== "flagged") setFlaggedPhysicianId(null);
+                }}
                 className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors ${
                   filter === item.id
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
@@ -224,6 +237,25 @@ export default function Timeline() {
             ))}
           </div>
         </div>
+        {filter === "flagged" && physicians.length > 0 && (
+          <div className="flex min-w-0 items-center gap-2">
+            <label htmlFor="timeline-physician-filter" className="shrink-0 text-sm font-semibold text-muted-foreground">
+              Doctor
+            </label>
+            <select
+              id="timeline-physician-filter"
+              value={flaggedPhysicianId ?? ""}
+              onChange={(event) => setFlaggedPhysicianId(event.target.value ? Number(event.target.value) : null)}
+              className="h-11 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              data-testid="filter-timeline-physician"
+            >
+              <option value="">Any doctor</option>
+              {physicians.map((physician) => (
+                <option key={physician.id} value={physician.id}>{physician.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-4" data-testid="timeline-loading">
@@ -309,6 +341,14 @@ export default function Timeline() {
                                     >
                                       <Flag className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                                       Mention next appointment
+                                    </span>
+                                  )}
+                                  {noteIsFlaggedForDoctor(entry.note) && typeof entry.note.flaggedPhysicianId === "number" && physicians.find((physician) => physician.id === entry.note.flaggedPhysicianId) && (
+                                    <span
+                                      className="inline-flex min-h-7 items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                                      data-testid={`timeline-note-flag-physician-${entry.id}`}
+                                    >
+                                      For {physicians.find((physician) => physician.id === entry.note.flaggedPhysicianId)!.name}
                                     </span>
                                   )}
                                 </div>

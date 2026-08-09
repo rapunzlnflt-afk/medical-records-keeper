@@ -327,10 +327,14 @@ export async function getNotes(patientId: number): Promise<Note[]> {
   });
 }
 export async function createNote(data: Omit<Note, "id">): Promise<Note> {
+  const flaggedForDoctor = noteIsFlaggedForDoctor(data);
   const withDefaults: Note = {
     ...data,
     category: noteCategory(data),
-    flaggedForDoctor: noteIsFlaggedForDoctor(data),
+    flaggedForDoctor,
+    flaggedPhysicianId: flaggedForDoctor && typeof data.flaggedPhysicianId === "number"
+      ? data.flaggedPhysicianId
+      : null,
   };
   const id = await db.notes.add(withDefaults);
   return { ...withDefaults, id };
@@ -559,6 +563,9 @@ export async function importAllData(data: any): Promise<void> {
       const oldId = note.id;
       const { id, ...rest } = note;
       rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
+      if (typeof rest.flaggedPhysicianId === "number") {
+        rest.flaggedPhysicianId = physicianIdMap[rest.flaggedPhysicianId] ?? null;
+      }
       const newId = await db.notes.add(rest as Note);
       noteIdMap[oldId] = newId;
     }
