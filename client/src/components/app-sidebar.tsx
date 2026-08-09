@@ -3,6 +3,7 @@ import {
   LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
   HeartPulse, Phone, Building2, IdCard, Sun, Moon, Download, Upload,
   Plus, X, Check, ChevronDown, Pencil, Trash2, NotebookPen,
+  History,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -45,6 +46,7 @@ const navItems = [
   { title: "Physicians", url: "/physicians", icon: Stethoscope },
   { title: "Medical Records", url: "/records", icon: FileText },
   { title: "Notes", url: "/notes", icon: NotebookPen },
+  { title: "Timeline", url: "/timeline", icon: History },
   { title: "Vitals", url: "/vitals", icon: HeartPulse },
   { title: "Pharmacies", url: "/pharmacies", icon: Building2 },
   { title: "Emergency Contacts", url: "/emergency", icon: Phone },

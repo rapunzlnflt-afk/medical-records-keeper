@@ -5,6 +5,32 @@ import type {
   NoteUpdate,
 } from "@shared/schema";
 
+export const NOTE_CATEGORIES = [
+  "Observation",
+  "Symptom",
+  "Injury",
+  "Illness",
+  "Medication reaction",
+  "Behavior / mood",
+  "Appetite / diet",
+  "Sleep",
+  "Digestion",
+  "Skin",
+  "Other",
+] as const;
+
+export type NoteCategory = (typeof NOTE_CATEGORIES)[number];
+
+export function noteCategory(note: Pick<Note, "category">): NoteCategory {
+  return NOTE_CATEGORIES.includes(note.category as NoteCategory)
+    ? note.category as NoteCategory
+    : "Observation";
+}
+
+export function noteIsFlaggedForDoctor(note: Pick<Note, "flaggedForDoctor">): boolean {
+  return note.flaggedForDoctor === true;
+}
+
 class MedicalRecordsDB extends Dexie {
   patients!: Table<Patient, number>;
   physicians!: Table<Physician, number>;
@@ -77,6 +103,23 @@ class MedicalRecordsDB extends Dexie {
       pharmacies: "++id, patientId",
       reminderSoundPreferences: "++id, patientId",
       notes: "++id, patientId, date",
+      noteUpdates: "++id, noteId, date",
+    });
+
+    // This migration adds only the flagged-note index. Existing stores and
+    // indexes intentionally match version 4 so no local data is rewritten.
+    this.version(5).stores({
+      patients: "++id",
+      physicians: "++id, patientId",
+      appointments: "++id, patientId",
+      medications: "++id, patientId",
+      medicationLogs: "++id, medicationId",
+      medicalRecords: "++id, patientId",
+      vitals: "++id, patientId",
+      emergencyContacts: "++id, patientId",
+      pharmacies: "++id, patientId",
+      reminderSoundPreferences: "++id, patientId",
+      notes: "++id, patientId, date, flaggedForDoctor",
       noteUpdates: "++id, noteId, date",
     });
   }
@@ -284,8 +327,17 @@ export async function getNotes(patientId: number): Promise<Note[]> {
   });
 }
 export async function createNote(data: Omit<Note, "id">): Promise<Note> {
-  const id = await db.notes.add(data as Note);
-  return { ...data, id } as Note;
+  const flaggedForDoctor = noteIsFlaggedForDoctor(data);
+  const withDefaults: Note = {
+    ...data,
+    category: noteCategory(data),
+    flaggedForDoctor,
+    flaggedPhysicianId: flaggedForDoctor && typeof data.flaggedPhysicianId === "number"
+      ? data.flaggedPhysicianId
+      : null,
+  };
+  const id = await db.notes.add(withDefaults);
+  return { ...withDefaults, id };
 }
 export async function updateNote(id: number, data: Partial<Note>): Promise<Note> {
   await db.notes.update(id, data);
@@ -366,9 +418,9 @@ export async function updateReminderSoundPreferences(
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
-    // v7 adds follow-ups to the notes timeline. Older backups still import
+    // v8 adds note categories and appointment flags. Older backups still import
     // cleanly since records are spread field-for-field on restore.
-    version: 7,
+    version: 8,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
@@ -511,6 +563,9 @@ export async function importAllData(data: any): Promise<void> {
       const oldId = note.id;
       const { id, ...rest } = note;
       rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
+      if (typeof rest.flaggedPhysicianId === "number") {
+        rest.flaggedPhysicianId = physicianIdMap[rest.flaggedPhysicianId] ?? null;
+      }
       const newId = await db.notes.add(rest as Note);
       noteIdMap[oldId] = newId;
     }
