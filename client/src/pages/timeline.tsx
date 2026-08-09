@@ -224,9 +224,9 @@ export default function Timeline() {
                   setFilter(item.id);
                   if (item.id !== "flagged") setFlaggedPhysicianId(null);
                 }}
-                className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${
                   filter === item.id
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
                     : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
                 }`}
                 aria-pressed={filter === item.id}
