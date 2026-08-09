@@ -186,6 +186,10 @@ export interface Note {
   date: string;
   text: string;
   createdAt: string;
+  // Optional so notes created before category support remain readable without
+  // rewriting their existing IndexedDB rows.
+  category?: string;
+  flaggedForDoctor?: boolean;
 }
 
 export interface NoteUpdate {

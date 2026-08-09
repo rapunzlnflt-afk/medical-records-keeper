@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, Edit2, FileText, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit2, FileText, Flag, Plus, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ import {
   deleteNoteUpdate,
   getNotes,
   getNoteUpdates,
+  NOTE_CATEGORIES,
+  noteCategory,
+  noteIsFlaggedForDoctor,
   updateNote,
   updateNoteUpdate,
 } from "@/lib/db";
@@ -35,8 +38,29 @@ function formatDateMarker(date: string): string {
   return format(parseISO(date), "EEEE, MMMM d, yyyy");
 }
 
-type NoteDraft = Pick<Note, "date" | "text">;
+type NoteDraft = Pick<Note, "date" | "text" | "category" | "flaggedForDoctor">;
 type NoteUpdateDraft = Pick<NoteUpdate, "date" | "text">;
+
+export function noteCategoryPillClass(category: string): string {
+  switch (category) {
+    case "Symptom":
+    case "Injury":
+    case "Illness":
+      return "border-rose-500/25 bg-rose-500/10 text-rose-800 dark:border-rose-300/35 dark:bg-rose-300/15 dark:text-rose-100";
+    case "Medication reaction":
+      return "border-amber-600/25 bg-amber-500/10 text-amber-800 dark:border-amber-300/35 dark:bg-amber-300/15 dark:text-amber-100";
+    case "Behavior / mood":
+    case "Sleep":
+      return "border-violet-500/25 bg-violet-500/10 text-violet-800 dark:border-violet-300/35 dark:bg-violet-300/15 dark:text-violet-100";
+    case "Appetite / diet":
+    case "Digestion":
+      return "border-emerald-600/25 bg-emerald-500/10 text-emerald-800 dark:border-emerald-300/35 dark:bg-emerald-300/15 dark:text-emerald-100";
+    case "Skin":
+      return "border-sky-600/25 bg-sky-500/10 text-sky-800 dark:border-sky-300/35 dark:bg-sky-300/15 dark:text-sky-100";
+    default:
+      return "border-primary/25 bg-primary/10 text-primary dark:border-primary/40 dark:bg-primary/20 dark:text-primary";
+  }
+}
 
 function NoteEditor({
   initial,
@@ -68,6 +92,20 @@ function NoteEditor({
             />
           </div>
           <div className="space-y-2 min-w-0">
+            <Label htmlFor="note-category" className="text-base font-semibold">Category</Label>
+            <select
+              id="note-category"
+              value={noteCategory(draft)}
+              onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}
+              className="flex h-12 w-full max-w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              data-testid="select-note-category"
+            >
+              {NOTE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2 min-w-0">
             <Label htmlFor="note-text" className="text-base font-semibold">Note</Label>
             <Textarea
               id="note-text"
@@ -79,6 +117,16 @@ function NoteEditor({
               data-testid="input-note-text"
             />
           </div>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border bg-muted/35 px-3 py-2 text-base font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={noteIsFlaggedForDoctor(draft)}
+              onChange={(event) => setDraft((current) => ({ ...current, flaggedForDoctor: event.target.checked }))}
+              className="h-5 w-5 shrink-0 accent-primary"
+              data-testid="checkbox-note-flag"
+            />
+            <span>Mention at my next appointment</span>
+          </label>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
@@ -292,7 +340,7 @@ export default function Notes() {
         {adding && (
           <NoteEditor
             key="new-note"
-            initial={{ date: localToday(), text: "" }}
+            initial={{ date: localToday(), text: "", category: "Observation", flaggedForDoctor: false }}
             onSave={(draft) => createMutation.mutate(draft)}
             onCancel={() => setAdding(false)}
             saveLabel="Save Note"
@@ -326,7 +374,12 @@ export default function Notes() {
                       return editingId === note.id ? (
                         <NoteEditor
                           key={note.id}
-                          initial={{ date: note.date, text: note.text }}
+                          initial={{
+                            date: note.date,
+                            text: note.text,
+                            category: noteCategory(note),
+                            flaggedForDoctor: noteIsFlaggedForDoctor(note),
+                          }}
                           onSave={(draft) => updateMutation.mutate({ id: note.id!, draft })}
                           onCancel={() => setEditingId(null)}
                           saveLabel="Save Changes"
@@ -335,6 +388,23 @@ export default function Notes() {
                         <Card key={note.id} className="min-w-0 overflow-hidden" data-testid={`note-${note.id}`}>
                           <CardContent className="p-4 sm:p-5">
                             <div className="flex flex-col gap-3 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-semibold leading-tight ${noteCategoryPillClass(noteCategory(note))}`}
+                                  data-testid={`note-category-${note.id}`}
+                                >
+                                  {noteCategory(note)}
+                                </span>
+                                {noteIsFlaggedForDoctor(note) && (
+                                  <span
+                                    className="inline-flex min-h-7 items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                                    data-testid={`note-doctor-flag-${note.id}`}
+                                  >
+                                    <Flag className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                                    Next appointment
+                                  </span>
+                                )}
+                              </div>
                               <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-foreground" data-testid={`note-text-${note.id}`}>
                                 {note.text}
                               </p>
