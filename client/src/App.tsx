@@ -14,6 +14,7 @@ import Dashboard from "@/pages/dashboard";
 import Profile from "@/pages/profile";
 import Appointments from "@/pages/appointments";
 import Medications from "@/pages/medications";
+import MedicationHistory from "@/pages/medication-history";
 import Physicians from "@/pages/physicians";
 import MedicalRecords from "@/pages/medical-records";
 import Vitals from "@/pages/vitals";
@@ -29,6 +30,7 @@ function AppRouter() {
       <Route path="/" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/appointments" component={Appointments} />
+      <Route path="/medications/:id" component={MedicationHistory} />
       <Route path="/medications" component={Medications} />
       <Route path="/physicians" component={Physicians} />
       <Route path="/records" component={MedicalRecords} />
