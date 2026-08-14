@@ -201,9 +201,115 @@ export async function disablePhoneReminders(): Promise<void> {
   const supabase = getSupabase();
   if (supabase) {
     const deviceId = getOrCreateDeviceId();
+    // Delete the daily rule first so delivery stops server-side even if a
+    // later delete fails. (The devices FK also cascades, this is belt-and-
+    // braces for the ordering.)
+    await supabase.from("daily_nudges").delete().eq("device_id", deviceId);
     await supabase.from("devices").delete().eq("device_id", deviceId);
     await supabase.from("reminders").delete().eq("device_id", deviceId);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Daily "Log today's meds?" nudge.
+//
+// A single general daily reminder, opt-in and off by default. It is NOT
+// per-medication and NOT schedule-aware: the medication form has no dose-time
+// or frequency field, so the app genuinely cannot know when a dose is due.
+// The notification carries no medication name and no medical detail.
+//
+// Only the *rule* (enabled + local HH:MM) is stored, in Supabase, per device.
+// The Edge Function expands it into one occurrence per local day, so the
+// schedule cannot run out while the app goes unopened. Nothing about this
+// feature is persisted locally, so Dexie and export/import are untouched.
+// ---------------------------------------------------------------------------
+
+export const DAILY_MEDS_NUDGE_DEFAULT_TIME = "20:00"; // 8:00 PM local
+
+export interface DailyMedsNudgeSettings {
+  enabled: boolean;
+  /** Local wall-clock time, 24h "HH:MM". */
+  time: string;
+}
+
+export const DAILY_MEDS_NUDGE_DEFAULTS: DailyMedsNudgeSettings = {
+  enabled: false,
+  time: DAILY_MEDS_NUDGE_DEFAULT_TIME,
+};
+
+function isValidLocalTime(value: string): boolean {
+  return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(value);
+}
+
+/**
+ * Read this device's daily-nudge rule. Returns defaults (off, 8:00 PM) when
+ * there is no row, no session, or Supabase isn't configured — the caller can
+ * always render a sane control.
+ */
+export async function getDailyMedsNudge(): Promise<DailyMedsNudgeSettings> {
+  const supabase = getSupabase();
+  if (!supabase) return { ...DAILY_MEDS_NUDGE_DEFAULTS };
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) return { ...DAILY_MEDS_NUDGE_DEFAULTS };
+    const deviceId = getOrCreateDeviceId();
+    const { data, error } = await supabase
+      .from("daily_nudges")
+      .select("enabled, local_time")
+      .eq("device_id", deviceId)
+      .maybeSingle();
+    if (error || !data) return { ...DAILY_MEDS_NUDGE_DEFAULTS };
+    const time = typeof data.local_time === "string" && isValidLocalTime(data.local_time)
+      ? data.local_time
+      : DAILY_MEDS_NUDGE_DEFAULT_TIME;
+    return { enabled: Boolean(data.enabled), time };
+  } catch {
+    return { ...DAILY_MEDS_NUDGE_DEFAULTS };
+  }
+}
+
+/**
+ * Write this device's daily-nudge rule. Also refreshes `devices.timezone`,
+ * which is the single source of truth the Edge Function uses to decide what
+ * "today" and "8:00 PM" mean for this device (it can change when travelling).
+ *
+ * Requires phone reminders to already be enabled on this device, since the
+ * rule row is keyed to the device's push subscription.
+ */
+export async function setDailyMedsNudge(
+  next: DailyMedsNudgeSettings,
+): Promise<DailyMedsNudgeSettings> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+
+  const time = isValidLocalTime(next.time) ? next.time : DAILY_MEDS_NUDGE_DEFAULT_TIME;
+  const userId = await ensureAnonAuth();
+  const deviceId = getOrCreateDeviceId();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const { error: tzErr } = await supabase
+    .from("devices")
+    .update({ timezone })
+    .eq("device_id", deviceId);
+  if (tzErr) throw new Error(`timezone refresh failed: ${tzErr.message}`);
+
+  const { data, error } = await supabase
+    .from("daily_nudges")
+    .upsert(
+      { user_id: userId, device_id: deviceId, enabled: next.enabled, local_time: time },
+      { onConflict: "user_id,device_id" },
+    )
+    .select("enabled, local_time");
+  if (error) throw new Error(`daily nudge save failed: ${error.message}`);
+  if (!data || data.length === 0) {
+    throw new Error("daily nudge save returned no rows (RLS may have hidden it from select)");
+  }
+  return { enabled: Boolean(data[0].enabled), time: data[0].local_time ?? time };
+}
+
+/** "20:00" -> "8:00 PM", for display only. */
+export function formatLocalTimeLabel(time: string): string {
+  return formatTime12Hour(time);
 }
 
 export interface PhoneReminderDiagnostics {
@@ -521,10 +627,14 @@ export async function syncRemindersToSupabase(opts: {
 
   const deviceId = getOrCreateDeviceId();
 
+  // Scoped to the sources this function owns. The daily "log meds" nudge is
+  // materialised server-side from a rule, so wiping it here would delete
+  // today's occurrence out from under the Edge Function.
   const { error: delErr } = await supabase
     .from("reminders")
     .delete()
     .eq("device_id", deviceId)
+    .in("source", ["appointment", "medication"])
     .is("delivered_at", null);
   if (delErr) {
     stamp(false, `reminder delete failed: ${delErr.message}`, 0, "delete");

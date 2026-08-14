@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { BellRing, AlertTriangle, Loader2, ChevronDown, ChevronRight, RefreshCw, CheckCircle2 } from "lucide-react";
 import {
   detectPhoneReminderState,
@@ -13,6 +15,11 @@ import {
   syncRemindersToSupabase,
   collectPhoneReminderDiagnostics,
   requestRemindersSync,
+  getDailyMedsNudge,
+  setDailyMedsNudge,
+  formatLocalTimeLabel,
+  DAILY_MEDS_NUDGE_DEFAULTS,
+  type DailyMedsNudgeSettings,
   type PhoneReminderState,
   type PhoneReminderDiagnostics,
   type SyncStatusRecord,
@@ -106,6 +113,15 @@ export function PhoneRemindersCard() {
   const [busy, setBusy] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Daily "log today's meds?" nudge. Off by default; the rule lives in
+  // Supabase per device so the server keeps sending while the app is closed.
+  const [nudge, setNudge] = useState<DailyMedsNudgeSettings>(DAILY_MEDS_NUDGE_DEFAULTS);
+  const [nudgeLoaded, setNudgeLoaded] = useState(false);
+  const [nudgeBusy, setNudgeBusy] = useState(false);
+  const [nudgeError, setNudgeError] = useState<string | null>(null);
+  // Last value known to be persisted, so the time field can be edited freely
+  // (including transiently empty) and only committed when it's valid.
+  const savedNudgeRef = useRef<DailyMedsNudgeSettings>(DAILY_MEDS_NUDGE_DEFAULTS);
   const queryClient = useQueryClient();
 
   const refreshDiagnostics = useCallback(async () => {
@@ -144,6 +160,54 @@ export function PhoneRemindersCard() {
   }, [refreshDiagnostics]);
 
   const subscribed = state.status === "subscribed";
+
+  // Load the saved rule once this device is actually subscribed.
+  useEffect(() => {
+    if (!subscribed) {
+      setNudgeLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const saved = await getDailyMedsNudge();
+      if (cancelled) return;
+      savedNudgeRef.current = saved;
+      setNudge(saved);
+      setNudgeLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [subscribed]);
+
+  const saveNudge = useCallback(async (next: DailyMedsNudgeSettings) => {
+    const previous = nudge;
+    setNudge(next); // optimistic
+    setNudgeBusy(true);
+    setNudgeError(null);
+    try {
+      const saved = await setDailyMedsNudge(next);
+      savedNudgeRef.current = saved;
+      setNudge(saved);
+    } catch (err: any) {
+      setNudge(previous); // roll back so the control never lies about server state
+      setNudgeError(err?.message ?? String(err));
+    } finally {
+      setNudgeBusy(false);
+    }
+  }, [nudge]);
+
+  // Commit the time only once it's a complete, valid HH:MM. Native time inputs
+  // report intermediate and empty values while the user is picking.
+  const commitNudgeTime = useCallback(() => {
+    const candidate = nudge.time;
+    if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(candidate)) {
+      setNudge({ ...nudge, time: savedNudgeRef.current.time }); // revert display
+      return;
+    }
+    if (candidate === savedNudgeRef.current.time) return; // nothing changed
+    void saveNudge({ ...nudge, time: candidate });
+  }, [nudge, saveNudge]);
 
   // Pull *all* upcoming reminders across patients so we sync regardless of
   // which patient is active in the UI.
@@ -402,6 +466,64 @@ export function PhoneRemindersCard() {
                 </p>
               </div>
             )}
+            <div
+              className="rounded-md border border-border/60 p-3 space-y-2"
+              data-testid="section-daily-meds-nudge"
+            >
+              {/* The whole label is the tap target, giving a >=44px row. */}
+              <label
+                htmlFor="switch-daily-meds-nudge"
+                className="flex min-h-[44px] items-center justify-between gap-3 cursor-pointer"
+              >
+                <span className="min-w-0 text-xs font-medium text-foreground">
+                  Daily reminder to log meds
+                </span>
+                <Switch
+                  id="switch-daily-meds-nudge"
+                  checked={nudge.enabled}
+                  disabled={!nudgeLoaded || nudgeBusy}
+                  onCheckedChange={(checked) => void saveNudge({ ...nudge, enabled: checked })}
+                  className="flex-shrink-0"
+                  data-testid="switch-daily-meds-nudge"
+                />
+              </label>
+
+              <p className="text-[11px] text-muted-foreground">
+                {nudge.enabled
+                  ? `One reminder every day at ${formatLocalTimeLabel(savedNudgeRef.current.time)}, your time.`
+                  : "One general reminder a day, at a time you pick."}{" "}
+                It doesn't name any medication.
+              </p>
+
+              {nudge.enabled && (
+                <div className="flex min-h-[44px] items-center gap-2">
+                  <label
+                    htmlFor="input-daily-meds-nudge-time"
+                    className="text-[11px] text-muted-foreground flex-shrink-0"
+                  >
+                    Time
+                  </label>
+                  <Input
+                    id="input-daily-meds-nudge-time"
+                    type="time"
+                    value={nudge.time}
+                    disabled={nudgeBusy}
+                    onChange={(e) => setNudge({ ...nudge, time: e.target.value })}
+                    onBlur={commitNudgeTime}
+                    className="h-11 w-[7.5rem] text-sm"
+                    data-testid="input-daily-meds-nudge-time"
+                  />
+                  {nudgeBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                </div>
+              )}
+
+              {nudgeError && (
+                <p className="text-[11px] text-destructive" data-testid="text-daily-meds-nudge-error">
+                  We couldn't save this setting. It stays off until it saves.
+                </p>
+              )}
+            </div>
+
             <Button
               variant="outline"
               size="sm"
