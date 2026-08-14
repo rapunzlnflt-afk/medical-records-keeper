@@ -288,8 +288,33 @@ button.gradient-primary[disabled] {
   @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300;
 }
 
+.print-history-heading {
+  display: none;
+}
+
 /* Print styles */
 @media print {
+  @page {
+    margin: 0.55in;
+  }
+
+  .print-history-heading {
+    display: block !important;
+    margin: 0 0 1.25rem !important;
+    color: #000 !important;
+  }
+
+  .print-history-heading h1 {
+    margin: 0 0 0.25rem !important;
+    font-size: 20px !important;
+    color: #000 !important;
+  }
+
+  .print-history-heading p {
+    margin: 0.1rem 0 !important;
+    font-size: 13px !important;
+    color: #000 !important;
+  }
   /* Hide non-essential UI */
   [data-sidebar],
   [data-testid="button-add-appointment"],
@@ -308,11 +333,32 @@ button.gradient-primary[disabled] {
   }
 
   /* Reset backgrounds for paper */
-  body {
+  html,
+  body,
+  #root,
+  main {
     background: white !important;
     color: black !important;
+  }
+
+  body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .print-history-entry,
+  .print-history-entry *,
+  [data-testid="text-adherence-summary"],
+  [data-testid="text-adherence-summary"] * {
+    color: black !important;
+    background: white !important;
+    border-color: #777 !important;
+    box-shadow: none !important;
+  }
+
+  .print-history-entry {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   /* Ensure cards print cleanly */

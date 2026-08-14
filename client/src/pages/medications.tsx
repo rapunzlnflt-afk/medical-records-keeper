@@ -400,7 +400,7 @@ export default function Medications() {
 
   const active = medications.filter((m) => m.active === 1);
   const inactive = medications.filter((m) => m.active !== 1);
-  const today = new Date().toISOString().split("T")[0];
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const logDose = (medId: number, taken: boolean) => {
     logMut.mutate({
@@ -425,9 +425,13 @@ export default function Medications() {
               <Pill className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words">
+              <Link
+                href={`/medications/${med.id}`}
+                className="inline-flex min-h-11 items-center break-words rounded-sm font-heading text-base font-semibold leading-tight text-foreground hover:text-primary sm:text-lg"
+                data-testid={`link-medication-history-${med.id}`}
+              >
                 {med.name}
-              </h3>
+              </Link>
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 <Badge variant="secondary" className="text-xs font-medium">{med.type}</Badge>
                 {!med.active && <Badge variant="outline" className="text-xs font-medium">Inactive</Badge>}

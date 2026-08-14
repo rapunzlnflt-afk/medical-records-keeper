@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { ArrowLeft, CalendarDays, ClipboardPenLine, Flag, NotebookPen } from "lucide-react";
+import { HistoryActions, HistoryPrintHeading } from "@/components/history-actions";
+import { formatHistoryDate, localDateKey, localSortKey, type HistoryCopyDocument } from "@/lib/history-actions";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -32,6 +33,7 @@ type TimelineEntry =
     sortKey: number;
     note: Note;
     updateCount: number;
+    updates: NoteUpdate[];
   };
 
 const FILTERS: Array<{ id: TimelineFilter; label: string }> = [
@@ -41,45 +43,8 @@ const FILTERS: Array<{ id: TimelineFilter; label: string }> = [
   { id: "flagged", label: "Flagged for doctor" },
 ];
 
-function localDateParts(value: string): { year: number; month: number; day: number } | null {
-  const isoMatch = value.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (isoMatch) {
-    return { year: Number(isoMatch[1]), month: Number(isoMatch[2]), day: Number(isoMatch[3]) };
-  }
-
-  const usMatch = value.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
-  if (usMatch) {
-    return { year: Number(usMatch[3]), month: Number(usMatch[1]), day: Number(usMatch[2]) };
-  }
-
-  return null;
-}
-
-function localDateKey(value: string): string {
-  const parts = localDateParts(value);
-  if (!parts) return value.trim();
-  const pad = (number: number) => String(number).padStart(2, "0");
-  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
-}
-
-function localSortKey(date: string, time?: string): number {
-  const parts = localDateParts(date);
-  if (!parts) return Number.NEGATIVE_INFINITY;
-
-  const timeMatch = (time || "").trim().match(/^(\d{1,2}):(\d{1,2})/);
-  const hours = timeMatch ? Math.min(23, Math.max(0, Number(timeMatch[1]))) : 0;
-  const minutes = timeMatch ? Math.min(59, Math.max(0, Number(timeMatch[2]))) : 0;
-  return new Date(parts.year, parts.month - 1, parts.day, hours, minutes, 0, 0).getTime();
-}
-
-function formatTimelineDate(dateKey: string): string {
-  const parts = localDateParts(dateKey);
-  if (!parts) return dateKey || "Date unavailable";
-  return format(new Date(parts.year, parts.month - 1, parts.day), "EEEE, MMMM d, yyyy");
-}
-
 function formatAppointmentTime(appointment: Appointment): string {
-  const dateLabel = formatTimelineDate(localDateKey(appointment.date));
+  const dateLabel = formatHistoryDate(localDateKey(appointment.date));
   return appointment.time?.trim() ? `${dateLabel} · ${appointment.time.trim()}` : dateLabel;
 }
 
@@ -118,7 +83,7 @@ function emptyMessage(filter: TimelineFilter): string {
 }
 
 export default function Timeline() {
-  const { activePatientId } = usePatient();
+  const { activePatientId, activePatient } = usePatient();
   const [filter, setFilter] = useState<TimelineFilter>("all");
   const [flaggedPhysicianId, setFlaggedPhysicianId] = useState<number | null>(null);
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery<Appointment[]>({
@@ -166,6 +131,7 @@ export default function Timeline() {
           sortKey: localSortKey(note.date),
           note,
           updateCount: updateCounts[note.id] || 0,
+          updates: noteUpdates.filter((update) => update.noteId === note.id),
         }]
     ));
 
@@ -192,19 +158,65 @@ export default function Timeline() {
     return all;
   }, []);
   const isLoading = appointmentsLoading || notesLoading;
+  const physicianName = (id: number | null | undefined) => physicians.find((physician) => physician.id === id)?.name;
+  const filterLabel = filter === "flagged" && flaggedPhysicianId !== null
+    ? `Flagged for doctor — ${physicianName(flaggedPhysicianId) || "selected doctor"}`
+    : FILTERS.find((item) => item.id === filter)?.label || "All";
+  const historyDocument: HistoryCopyDocument = {
+    title: "Timeline",
+    profileName: activePatient?.name || "Patient profile",
+    filterLabel,
+    blocks: groups.map((group) => ({
+      date: formatHistoryDate(group.dateKey),
+      lines: group.entries.flatMap((entry) => {
+        if (entry.kind === "appointment") {
+          const appointment = entry.appointment;
+          return [
+            "Appointment",
+            appointment.title,
+            appointment.type ? `Type: ${appointment.type}` : "",
+            appointment.time ? `Time: ${appointment.time}` : "",
+            appointment.location ? `Location: ${appointment.location}` : "",
+            appointment.status ? `Status: ${appointment.status}` : "",
+            appointment.notes ? `Notes: ${appointment.notes}` : "",
+            appointment.visitSummary ? `Visit summary: ${appointment.visitSummary}` : "",
+            appointment.diagnosisFindings ? `Diagnosis / findings: ${appointment.diagnosisFindings}` : "",
+            appointment.providerInstructions ? `Provider instructions: ${appointment.providerInstructions}` : "",
+            appointment.medicationChanges ? `Medication changes: ${appointment.medicationChanges}` : "",
+            appointment.testsOrdered ? `Tests ordered: ${appointment.testsOrdered}` : "",
+            appointment.referrals ? `Referrals: ${appointment.referrals}` : "",
+            appointment.followUpDate ? `Follow-up: ${formatHistoryDate(localDateKey(appointment.followUpDate))}` : "",
+            appointment.questionsNextTime ? `Questions for next time: ${appointment.questionsNextTime}` : "",
+          ].filter(Boolean);
+        }
+        const note = entry.note;
+        const doctor = physicianName(note.flaggedPhysicianId);
+        return [
+          `Note — ${noteCategory(note)}`,
+          note.text,
+          noteIsFlaggedForDoctor(note) ? `Flagged for doctor: Yes${doctor ? ` — ${doctor}` : ""}` : "",
+          ...entry.updates.flatMap((update) => [
+            `Follow-up (${formatHistoryDate(localDateKey(update.date))}):`,
+            update.text,
+          ]),
+        ].filter(Boolean);
+      }),
+    })),
+  };
 
   return (
     <div className="w-full max-w-4xl min-w-0 overflow-x-hidden p-4 md:p-6" data-testid="timeline-page">
       <div className="space-y-6 min-w-0">
         <Link
           href="/"
-          className="inline-flex min-h-11 items-center gap-1.5 px-1 py-1.5 text-sm font-semibold text-muted-foreground hover:text-primary"
+          className="no-print inline-flex min-h-11 items-center gap-1.5 px-1 py-1.5 text-sm font-semibold text-muted-foreground hover:text-primary"
           data-testid="link-timeline-back-to-dashboard"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
         </Link>
 
-        <div className="min-w-0">
+        <HistoryPrintHeading document={historyDocument} />
+        <div className="no-print min-w-0">
           <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">Timeline</h1>
           <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
             Appointments and notes together, newest first.
@@ -212,10 +224,10 @@ export default function Timeline() {
         </div>
 
         <div
-          className="max-w-full overflow-x-auto overscroll-x-contain pb-1"
+          className="no-print max-w-full"
           data-testid="timeline-filter-row"
         >
-          <div className="flex w-max min-w-full gap-2" role="group" aria-label="Filter timeline">
+          <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="Filter timeline">
             {FILTERS.map((item) => (
               <button
                 key={item.id}
@@ -238,7 +250,7 @@ export default function Timeline() {
           </div>
         </div>
         {filter === "flagged" && physicians.length > 0 && (
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="no-print flex min-w-0 items-center gap-2">
             <label htmlFor="timeline-physician-filter" className="shrink-0 text-sm font-semibold text-muted-foreground">
               Doctor
             </label>
@@ -257,6 +269,8 @@ export default function Timeline() {
           </div>
         )}
 
+        <HistoryActions document={historyDocument} />
+
         {isLoading ? (
           <div className="space-y-4" data-testid="timeline-loading">
             {[1, 2].map((item) => <div key={item} className="h-28 animate-pulse rounded-lg bg-muted" />)}
@@ -274,7 +288,7 @@ export default function Timeline() {
               <section key={group.dateKey} className="min-w-0" data-testid={`timeline-date-group-${group.dateKey}`}>
                 <div className="mb-3 flex items-center gap-3">
                   <div className="h-3 w-3 shrink-0 rounded-full bg-primary ring-4 ring-primary/15" aria-hidden="true" />
-                  <h2 className="text-base font-semibold text-foreground sm:text-lg">{formatTimelineDate(group.dateKey)}</h2>
+                  <h2 className="text-base font-semibold text-foreground sm:text-lg">{formatHistoryDate(group.dateKey)}</h2>
                   <div className="h-px min-w-0 flex-1 bg-border" aria-hidden="true" />
                 </div>
                 <div className="ml-1 border-l-2 border-primary/20 pl-4 sm:pl-5">
@@ -284,10 +298,10 @@ export default function Timeline() {
                         <Link
                           key={`appointment-${entry.id}`}
                           href="/appointments"
-                          className="block min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="block min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring print-history-entry"
                           data-testid={`timeline-item-appointment-${entry.id}`}
                         >
-                          <Card className="min-w-0 overflow-hidden transition-colors hover:border-primary/35">
+                          <Card className="min-w-0 overflow-hidden transition-colors hover:border-primary/35 print-history-entry">
                             <CardContent className="flex min-w-0 gap-3 p-4 sm:p-5">
                               <span
                                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-800 ring-1 ring-sky-500/20 dark:bg-sky-300/15 dark:text-sky-100 dark:ring-sky-300/30"
@@ -315,10 +329,10 @@ export default function Timeline() {
                         <Link
                           key={`note-${entry.id}`}
                           href="/notes"
-                          className="block min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="block min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring print-history-entry"
                           data-testid={`timeline-item-note-${entry.id}`}
                         >
-                          <Card className="min-w-0 overflow-hidden transition-colors hover:border-primary/35">
+                          <Card className="min-w-0 overflow-hidden transition-colors hover:border-primary/35 print-history-entry">
                             <CardContent className="flex min-w-0 gap-3 p-4 sm:p-5">
                               <span
                                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ${noteTone(noteCategory(entry.note))}`}
