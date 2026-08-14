@@ -75,7 +75,7 @@ export default function MedicationHistory() {
         ) : medication && (
           <>
             <HistoryPrintHeading document={historyDocument} />
-            <div className="min-w-0">
+            <div className="no-print min-w-0">
               <div className="flex min-w-0 items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full gradient-primary"><Pill className="h-5 w-5 text-white" /></span>
                 <div className="min-w-0">

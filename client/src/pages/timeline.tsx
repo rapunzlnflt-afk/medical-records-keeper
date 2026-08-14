@@ -209,14 +209,14 @@ export default function Timeline() {
       <div className="space-y-6 min-w-0">
         <Link
           href="/"
-          className="inline-flex min-h-11 items-center gap-1.5 px-1 py-1.5 text-sm font-semibold text-muted-foreground hover:text-primary"
+          className="no-print inline-flex min-h-11 items-center gap-1.5 px-1 py-1.5 text-sm font-semibold text-muted-foreground hover:text-primary"
           data-testid="link-timeline-back-to-dashboard"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
         </Link>
 
         <HistoryPrintHeading document={historyDocument} />
-        <div className="min-w-0">
+        <div className="no-print min-w-0">
           <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">Timeline</h1>
           <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
             Appointments and notes together, newest first.
@@ -224,10 +224,10 @@ export default function Timeline() {
         </div>
 
         <div
-          className="no-print max-w-full overflow-x-auto overscroll-x-contain pb-1"
+          className="no-print max-w-full"
           data-testid="timeline-filter-row"
         >
-          <div className="flex w-max min-w-full gap-2" role="group" aria-label="Filter timeline">
+          <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="Filter timeline">
             {FILTERS.map((item) => (
               <button
                 key={item.id}
