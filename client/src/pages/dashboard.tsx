@@ -50,16 +50,17 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
         className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent shadow-md" : "shadow-sm"}`}
         data-testid={`stat-${title.toLowerCase().replace(/\s+/g, "-")}`}
       >
-        <CardContent className="relative min-h-[96px] p-4 sm:p-5">
+        {/* Taller box + lower number/icon so the count and its tile aren't crowding the label. */}
+        <CardContent className="relative min-h-[112px] sm:min-h-[124px] p-4 sm:p-5">
           <p className={`text-[13px] sm:text-sm font-body font-semibold leading-snug pr-12 whitespace-nowrap ${gradient ? "text-white/90" : "text-muted-foreground"}`}>
             {title}
           </p>
 
-          <p className={`absolute left-4 bottom-4 text-3xl sm:text-4xl font-heading font-bold leading-none tabular-nums ${gradient ? "text-white" : ""}`}>
+          <p className={`absolute left-4 bottom-3 sm:left-5 sm:bottom-4 text-3xl sm:text-4xl font-heading font-bold leading-none tabular-nums ${gradient ? "text-white" : ""}`}>
             {value}
           </p>
 
-          <div className={`absolute right-4 bottom-4 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${gradient ? "bg-white/20" : "gradient-primary"}`}>
+          <div className={`absolute right-4 bottom-3 sm:right-5 sm:bottom-4 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${gradient ? "bg-white/20" : "gradient-primary"}`}>
             <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
         </CardContent>

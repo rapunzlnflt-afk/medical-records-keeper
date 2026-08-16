@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { BellRing, AlertTriangle, Loader2, ChevronDown, ChevronRight, RefreshCw, CheckCircle2 } from "lucide-react";
+import { BellRing, AlertTriangle, Loader2, ChevronDown, ChevronRight, RefreshCw, CheckCircle2, Pencil } from "lucide-react";
 import {
   detectPhoneReminderState,
   enablePhoneReminders,
@@ -487,12 +487,27 @@ export function PhoneRemindersCard() {
 
             {state.status === "subscribed" && (
               <>
-                <div className="flex items-start gap-2 rounded-md bg-primary/5 p-3">
-                  <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                  <p className="text-xs text-muted-foreground min-w-0">
-                    <span className="block text-foreground font-medium text-sm">
+                {/* "Turn off" lives in this block, right next to the on/off status,
+                    instead of as a lone button at the bottom of the card. */}
+                <div className="rounded-md bg-primary/5 p-3 space-y-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-primary" />
+                    <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
                       On for this device
                     </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDisable}
+                      disabled={busy}
+                      className="h-9 px-3 flex-shrink-0 bg-background text-xs"
+                      data-testid="button-disable-phone-reminders"
+                    >
+                      {busy ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                      Turn off
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">
                     Alerts you set in Appointments and Medications sync here automatically.
                   </p>
                 </div>
@@ -536,13 +551,18 @@ export function PhoneRemindersCard() {
                     It doesn't name any medication.
                   </p>
 
+                  {/* The time is editable, so the row says so and the field is styled
+                      like a control rather than a read-only value. */}
                   {nudge.enabled && (
-                    <div className="flex min-h-[44px] items-center gap-2">
+                    <div className="flex min-h-[44px] items-center gap-3">
                       <label
                         htmlFor="input-daily-meds-nudge-time"
-                        className="text-xs text-muted-foreground flex-shrink-0"
+                        className="min-w-0 flex-1 cursor-pointer"
                       >
-                        Time
+                        <span className="block text-xs font-medium text-foreground">Reminder time</span>
+                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Pencil className="w-3 h-3 flex-shrink-0" /> tap to change
+                        </span>
                       </label>
                       <Input
                         id="input-daily-meds-nudge-time"
@@ -551,10 +571,10 @@ export function PhoneRemindersCard() {
                         disabled={nudgeBusy}
                         onChange={(e) => setNudge({ ...nudge, time: e.target.value })}
                         onBlur={commitNudgeTime}
-                        className="h-11 w-[7.5rem] text-sm"
+                        className="h-11 w-[7.5rem] flex-shrink-0 text-sm bg-background border-primary/40 font-medium"
                         data-testid="input-daily-meds-nudge-time"
                       />
-                      {nudgeBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                      {nudgeBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />}
                     </div>
                   )}
 
@@ -565,17 +585,6 @@ export function PhoneRemindersCard() {
                   )}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDisable}
-                  disabled={busy}
-                  className="h-11 w-full sm:w-auto"
-                  data-testid="button-disable-phone-reminders"
-                >
-                  {busy ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : null}
-                  Turn off on this device
-                </Button>
               </>
             )}
 
