@@ -573,7 +573,10 @@ export function PhoneRemindersCard() {
                         disabled={nudgeBusy}
                         onChange={(e) => setNudge({ ...nudge, time: e.target.value })}
                         onBlur={commitNudgeTime}
-                        className="h-11 w-[7.5rem] flex-shrink-0 text-sm bg-background border-primary/40 font-medium"
+                        // Snug around the value on a phone, where Safari draws the
+                        // time field as plain text. Desktop browsers add a clock
+                        // widget inside the field, so they need the extra room.
+                        className="h-11 w-[6.25rem] md:w-[9.75rem] flex-shrink-0 text-sm bg-background border-primary/40 font-medium"
                         data-testid="input-daily-meds-nudge-time"
                       />
                       {nudgeBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />}
