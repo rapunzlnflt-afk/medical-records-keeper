@@ -38,7 +38,12 @@ import {
 } from "@/lib/db";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { PhoneRemindersCard } from "@/components/phone-reminders-card";
-import { BackupReminderCard, FirstVisitNoticeCard } from "@/components/backup-reminder-card";
+import {
+  BackupReminderCard,
+  FirstVisitNoticeCard,
+  backupNoticeVisible,
+  firstVisitNoticeVisible,
+} from "@/components/backup-reminder-card";
 import { VisitNotesPromptCard } from "@/components/visit-notes-prompt-card";
 
 /** First word of a saved name, so the dashboard greeting stays first-name only. */
@@ -53,29 +58,41 @@ function possessive(name: string): string {
   return name.endsWith("s") || name.endsWith("S") ? `${name}'` : `${name}'s`;
 }
 
-function StatCard({ title, value, icon: Icon, href, gradient }: {
-  title: string; value: number; icon: any; href: string; gradient?: boolean;
+/**
+ * Small uppercase group heading. Gives the page a few clear divisions instead of
+ * one undifferentiated stack of cards.
+ */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="font-body text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+      {children}
+    </h2>
+  );
+}
+
+function StatCard({ title, value, icon: Icon, href }: {
+  title: string; value: number; icon: any; href: string;
 }) {
   return (
     <Link href={href} className="block h-full min-w-0">
+      {/* Every tile gets the same neutral treatment. The accent colour is spent
+          once per screen (the next-appointment banner) instead of on six tiles. */}
       <Card
-        className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent shadow-md" : "shadow-sm"}`}
+        className="hover-elevate cursor-pointer h-full"
         data-testid={`stat-${title.toLowerCase().replace(/\s+/g, "-")}`}
       >
-        {/* Label on top, then the count and its icon sitting together as one unit
-            near the bottom — no wide gap across the tile, and the icon stays small
-            relative to the label and number. */}
-        <CardContent className="min-h-[116px] sm:min-h-[124px] p-4 sm:p-5 flex flex-col justify-between gap-3">
-          <p className={`text-sm sm:text-[15px] font-body font-semibold leading-tight tracking-tight break-words ${gradient ? "text-white/90" : "text-muted-foreground"}`}>
+        {/* Compact tile. The earlier 116px-tall version meant six tiles filled a
+            whole phone screen. */}
+        <CardContent className="p-3 flex flex-col gap-2 min-w-0">
+          {/* The label gets the full tile width so words never break apart, then
+              the count and its icon share one short row underneath. */}
+          <p className="text-sm font-body font-semibold leading-tight tracking-tight text-muted-foreground truncate">
             {title}
           </p>
-
-          <div className="flex items-center gap-2.5">
-            <span className={`text-3xl sm:text-[2rem] font-heading font-bold leading-none tabular-nums min-w-[1.4ch] ${gradient ? "text-white" : ""}`}>
-              {value}
-            </span>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${gradient ? "bg-white/20" : "gradient-primary"}`}>
-              <Icon className="w-[18px] h-[18px] text-white" />
+          <div className="flex items-end justify-between gap-2 mt-auto min-w-0">
+            <span className="text-2xl font-heading font-bold leading-none tabular-nums">{value}</span>
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Icon className="w-4 h-4 text-primary" />
             </div>
           </div>
         </CardContent>
@@ -146,6 +163,20 @@ export default function Dashboard() {
   });
 
   const [medSummaryOpen, setMedSummaryOpen] = useState(false);
+  // Bumped when a notice is dismissed or acted on, so the next one in priority
+  // order can take the single notice slot.
+  const [noticeTick, setNoticeTick] = useState(0);
+  const advanceNotice = () => setNoticeTick((t) => t + 1);
+  const hasAnyData =
+    physicians.length + appointments.length + medications.length + records.length > 0;
+  const showFirstVisitNotice = useMemo(
+    () => firstVisitNoticeVisible(hasAnyData),
+    [hasAnyData, noticeTick],
+  );
+  const showBackupNotice = useMemo(
+    () => !showFirstVisitNotice && backupNoticeVisible(hasAnyData),
+    [hasAnyData, showFirstVisitNotice, noticeTick],
+  );
 
   const now = new Date();
 
@@ -219,16 +250,28 @@ const reminders = appointments.filter((a) => {
         </p>
       </div>
 
-      <FirstVisitNoticeCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
-      <BackupReminderCard hasData={physicians.length + appointments.length + medications.length + records.length > 0} />
-      <VisitNotesPromptCard appointments={appointments} physicians={physicians} patientId={pid} />
+      {/* One notice at a time, highest priority first, so prompts can't stack up
+          and push the actual overview below the fold. Dismissing one reveals the
+          next on the following render. */}
+      {showFirstVisitNotice ? (
+        <FirstVisitNoticeCard hasData={hasAnyData} onResolved={advanceNotice} />
+      ) : showBackupNotice ? (
+        <BackupReminderCard hasData={hasAnyData} onResolved={advanceNotice} />
+      ) : (
+        <VisitNotesPromptCard
+          appointments={appointments}
+          physicians={physicians}
+          patientId={pid}
+          onResolved={advanceNotice}
+        />
+      )}
 
       {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+        <Card>
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="font-heading text-base sm:text-lg font-bold">Welcome to Medical Records Keeper</h2>
@@ -255,12 +298,17 @@ const reminders = appointments.filter((a) => {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 min-w-0">
-        <StatCard title="Appointments" value={upcomingAll.length} icon={CalendarDays} href="/appointments" gradient />
-        <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
-        <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
-        <StatCard title="Medical Records" value={records.length} icon={FileText} href="/records" />
-      </div>
+      {/* Four most-used counts. Vitals and Emergency Contacts live in the menu
+          only, so the grid stays near the top of the screen on a phone. */}
+      <section className="space-y-3 min-w-0">
+        <SectionLabel>Overview</SectionLabel>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+          <StatCard title="Appointments" value={upcomingAll.length} icon={CalendarDays} href="/appointments" />
+          <StatCard title="Active Meds" value={activeMeds.length} icon={Pill} href="/medications" />
+          <StatCard title="Physicians" value={physicians.length} icon={Stethoscope} href="/physicians" />
+          <StatCard title="Records" value={records.length} icon={FileText} href="/records" />
+        </div>
+      </section>
 
       {soonestUpcoming && (
         <Link
@@ -282,8 +330,9 @@ const reminders = appointments.filter((a) => {
         </Link>
       )}
 
-      <div className="grid gap-4 items-start min-w-0">
-        <Card className="shadow-sm">
+      <section className="space-y-3 min-w-0">
+        <SectionLabel>Medications</SectionLabel>
+        <Card>
           <Collapsible open={medSummaryOpen} onOpenChange={setMedSummaryOpen}>
             <CollapsibleTrigger asChild>
               <button
@@ -345,8 +394,8 @@ const reminders = appointments.filter((a) => {
                 ) : (
                   activeMeds.slice(0, 5).map((med) => (
                     <div key={med.id} className="flex items-center gap-3 p-2.5 rounded-md bg-secondary/50 min-w-0" data-testid={`med-summary-${med.id}`}>
-                      <div className="w-9 h-9 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
-                        <Pill className="w-4 h-4 text-white" />
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Pill className="w-4 h-4 text-primary" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-base font-semibold truncate leading-tight">{med.name}</p>
@@ -361,16 +410,12 @@ const reminders = appointments.filter((a) => {
             </CollapsibleContent>
           </Collapsible>
         </Card>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3 min-w-0">
-        <StatCard title="Vitals Logged" value={vitals.length} icon={HeartPulse} href="/vitals" />
-        <StatCard title="Emergency Contacts" value={contacts.length} icon={Phone} href="/emergency" />
-      </div>
-
-      <div className="min-[500px]:hidden">
-  <PhoneRemindersCard />
-</div>
+      <section className="space-y-3 min-[500px]:hidden min-w-0">
+        <SectionLabel>Reminders</SectionLabel>
+        <PhoneRemindersCard />
+      </section>
     </div>
   );
 }
