@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
+import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, BellOff, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
 import { Link } from "wouter";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
@@ -62,6 +62,52 @@ function snapTo15(time: string): string {
   let m = Math.round(Number(mStr) / 15) * 15;
   if (m === 60) { m = 0; h = (h + 1) % 24; }
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Appointment alerts.
+//
+// An appointment only produces a phone reminder when `reminderDate` is set —
+// see `appointmentReminders()` in lib/reminder-sync.ts. Because the alert used
+// to be fully opt-in behind a collapsed control, an appointment could be saved
+// with no alert and never announce that fact. New appointments now default to
+// the day before at 9:00 AM, and cards say so out loud when no alert exists.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_REMINDER_TIME = "09:00";
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * The calendar day before `date` ("YYYY-MM-DD"), computed with date-only local
+ * math so a DST boundary can never shift the result by a day.
+ */
+function dayBefore(date: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "";
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return "";
+  dt.setDate(dt.getDate() - 1);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+
+/** An appointment produces a reminder only when it carries an alert date. */
+function hasAlert(a: Appointment): boolean {
+  return Boolean(a.reminderDate);
+}
+
+/** "2026-08-13" + "09:00" -> "Aug 13 at 9:00 AM". */
+function formatAlertLabel(date: string, time: string): string {
+  const effectiveTime = time || DEFAULT_REMINDER_TIME;
+  const parsed = parseISO(`${date}T${effectiveTime}:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return format(parsed, "MMM d 'at' h:mm a");
+}
+
+function alertHasPassed(date: string, time: string): boolean {
+  const parsed = new Date(`${date}T${time || DEFAULT_REMINDER_TIME}:00`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.getTime() < Date.now();
 }
 
 const labelClass = "text-base font-body font-semibold text-foreground";
@@ -118,6 +164,29 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
 
   const [showReminderOptions, setShowReminderOptions] = useState(
     Boolean(initial?.reminderDate || initial?.reminderTime)
+  );
+
+  // New appointments get a day-before 9:00 AM alert for free, derived from the
+  // appointment date as soon as one is picked. Once the user touches the alert
+  // fields themselves (including clearing them) we stop overwriting their
+  // choice. Editing an existing appointment never re-derives the alert.
+  const [reminderTouched, setReminderTouched] = useState(
+    isEdit || Boolean(initial?.reminderDate || initial?.reminderTime)
+  );
+
+  const handleDateChange = (date: string) => {
+    setForm((prev) => {
+      const next = { ...prev, date };
+      if (!isEdit && !reminderTouched) {
+        next.reminderDate = dayBefore(date);
+        next.reminderTime = DEFAULT_REMINDER_TIME;
+      }
+      return next;
+    });
+  };
+
+  const alertIsPast = Boolean(
+    form.reminderDate && alertHasPassed(form.reminderDate, form.reminderTime)
   );
 
   const canSubmit = Boolean(form.title && form.date && form.time);
@@ -211,7 +280,7 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
                 type="date"
                 className={controlClass}
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                onChange={(e) => handleDateChange(e.target.value)}
                 data-testid="input-apt-date"
               />
             </div>
@@ -234,16 +303,30 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
         <FieldSection
           icon={BellRing}
           title="Reminder"
-          description="Optional alert so this appointment shows up ahead of time."
+          description="Phone reminder for this appointment. New appointments default to the day before at 9:00 AM."
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm text-muted-foreground flex-1 min-w-[160px]">
-              {showReminderOptions
-                ? "Set both an alert date and time."
-                : (form.reminderDate || form.reminderTime)
-                  ? "Alert is configured."
-                  : "No alert set."}
-            </p>
+            <div className="flex-1 min-w-[160px] space-y-1">
+              {form.reminderDate ? (
+                <p className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                  <BellRing className="w-4 h-4 flex-shrink-0" />
+                  <span>Alert {formatAlertLabel(form.reminderDate, form.reminderTime)}</span>
+                </p>
+              ) : (
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-500 flex items-center gap-1.5">
+                  <BellOff className="w-4 h-4 flex-shrink-0" />
+                  <span>No alert set — no phone reminder</span>
+                </p>
+              )}
+              {alertIsPast && (
+                <p className="text-sm text-amber-700 dark:text-amber-500">
+                  That alert time has already passed, so no reminder will be sent.
+                </p>
+              )}
+              {showReminderOptions && (
+                <p className="text-sm text-muted-foreground">Set both an alert date and time.</p>
+              )}
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -264,7 +347,10 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
                   type="date"
                   className={controlClass}
                   value={form.reminderDate || ""}
-                  onChange={(e) => setForm({ ...form, reminderDate: e.target.value })}
+                  onChange={(e) => {
+                    setReminderTouched(true);
+                    setForm({ ...form, reminderDate: e.target.value });
+                  }}
                   data-testid="input-apt-reminder"
                 />
               </div>
@@ -272,7 +358,10 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
                 <Label className={labelClass}>Alert Time</Label>
                 <Select
                   value={form.reminderTime || ""}
-                  onValueChange={(v) => setForm({ ...form, reminderTime: v })}
+                  onValueChange={(v) => {
+                    setReminderTouched(true);
+                    setForm({ ...form, reminderTime: v });
+                  }}
                 >
                   <SelectTrigger className={controlClass} data-testid="input-apt-reminder-time">
                     <SelectValue placeholder="Select time" />
@@ -291,13 +380,14 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
                     variant="ghost"
                     size="sm"
                     className="h-10 -ml-2"
-                    onClick={() =>
+                    onClick={() => {
+                      setReminderTouched(true);
                       setForm({
                         ...form,
                         reminderDate: "",
                         reminderTime: "",
-                      })
-                    }
+                      });
+                    }}
                   >
                     Clear alert
                   </Button>
@@ -921,6 +1011,12 @@ function AppointmentCard({
   const doc = physicians.find((p) => p.id === apt.physicianId);
   const canAddNotes = hasAppointmentPassed(apt) || appointmentHasNotes(apt);
   const hasNotes = appointmentHasNotes(apt);
+  // Alert state is only actionable while the visit is still on the schedule —
+  // showing "no alert set" on a completed or past appointment is just noise.
+  const isScheduled =
+    !hasAppointmentPassed(apt) && apt.status !== "cancelled" && apt.status !== "completed";
+  const alertSet = hasAlert(apt);
+  const alertPast = alertSet && alertHasPassed(apt.reminderDate!, apt.reminderTime || "");
   return (
     <Card className={`hover-elevate shadow-sm ${muted ? "opacity-90" : ""}`} data-testid={`appointment-${apt.id}`}>
       <CardContent className="p-3">
@@ -962,6 +1058,32 @@ function AppointmentCard({
     </a>
   )}
 </div>
+            {isScheduled && (
+              alertSet ? (
+                <p
+                  className={`flex items-center gap-1.5 mt-1 text-sm min-w-0 ${
+                    alertPast ? "text-amber-700 dark:text-amber-500" : "text-primary"
+                  }`}
+                  data-testid={`apt-alert-set-${apt.id}`}
+                >
+                  <BellRing className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">
+                    Alert {formatAlertLabel(apt.reminderDate!, apt.reminderTime || "")}
+                    {alertPast ? " (passed)" : ""}
+                  </span>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditing(apt)}
+                  className="flex items-center gap-1.5 mt-1 text-sm font-semibold text-amber-700 dark:text-amber-500 underline underline-offset-2 min-w-0"
+                  data-testid={`apt-no-alert-${apt.id}`}
+                >
+                  <BellOff className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">No alert set</span>
+                </button>
+              )
+            )}
             {apt.notes && <p className="text-sm text-foreground/70 mt-1 line-clamp-2 break-words">{apt.notes}</p>}
             {canAddNotes && (
               <Button

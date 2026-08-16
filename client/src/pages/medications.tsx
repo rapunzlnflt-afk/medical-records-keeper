@@ -26,10 +26,63 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, XCircle, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar, ArrowLeft } from "lucide-react";
+import { Pill, Plus, Trash2, Edit2, Clock, AlertCircle, CheckCircle2, XCircle, Sunrise, Sun, Sunset, Moon, Printer, ExternalLink, Tag, ShieldAlert, FileText, Stethoscope, Calendar, ArrowLeft, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 import { Link, useLocation } from "wouter";
+
+
+/**
+ * A collapsible card holding a short list of outside links (interaction checkers,
+ * discount programs). Starts closed so the medication list stays the focus, and the
+ * whole header is the tap target.
+ */
+function LinkListCard({ title, icon: Icon, iconClass, description, links, testIdPrefix }: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconClass: string;
+  description: string;
+  links: { name: string; url: string }[];
+  testIdPrefix: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="h-fit">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="w-full text-left px-4 py-3 flex items-center gap-3 min-h-[56px] hover-elevate rounded-lg"
+            data-testid={`button-toggle-${testIdPrefix}`}
+          >
+            <Icon className={`w-5 h-5 flex-shrink-0 ${iconClass}`} />
+            <span className="flex-1 min-w-0">
+              <span className="block font-heading text-base font-semibold leading-tight">{title}</span>
+              <span className="block text-xs text-muted-foreground mt-0.5 break-words">{description}</span>
+            </span>
+            <span className="flex items-center gap-1.5 flex-shrink-0 text-muted-foreground">
+              <Badge variant="secondary" className="text-[10px] font-medium">{links.length}</Badge>
+              <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+            </span>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="px-4 pb-3 pt-0 space-y-1">
+            {links.map((link) => (
+              <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
+                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body px-1.5 py-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                data-testid={`link-${testIdPrefix}-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="min-w-0 break-words">{link.name}</span>
+              </a>
+            ))}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
 const MED_TYPES = ["prescription", "otc", "supplement", "vitamin"];
 const FREQUENCIES = ["daily", "twice-daily", "three-times-daily", "weekly", "bi-weekly", "monthly", "as-needed"];
 const TIMES_OF_DAY = ["morning", "afternoon", "evening", "bedtime"];
@@ -805,60 +858,35 @@ export default function Medications() {
         </TabsContent>
       </Tabs>
 
-      {/* Helpful Links */}
+      {/* Helpful Links — collapsed by default so the medication list stays the focus. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Drug Interaction Checkers */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-destructive" />
-              Drug Interaction Checkers
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground mb-3">Check if your medications interact with each other</p>
-            {[
-              { name: "Drugs.com Interaction Checker", url: "https://www.drugs.com/drug_interactions.html" },
-              { name: "WebMD Interaction Checker", url: "https://www.webmd.com/interaction-checker/default.htm" },
-              { name: "Medscape Drug Interaction Checker", url: "https://reference.medscape.com/drug-interactionchecker" },
-              { name: "RxList Interaction Checker", url: "https://www.rxlist.com/drug-interaction-checker.htm" },
-            ].map((link) => (
-              <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
-                data-testid={`link-interaction-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
-                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-                {link.name}
-              </a>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Prescription Discounts */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="font-heading text-lg font-semibold flex items-center gap-2">
-              <Tag className="w-5 h-5 text-green-600 dark:text-green-400" />
-              Prescription Discounts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground mb-3">Save money on your prescriptions</p>
-            {[
-              { name: "GoodRx", url: "https://www.goodrx.com" },
-              { name: "RxSaver by RetailMeNot", url: "https://www.rxsaver.com" },
-              { name: "NeedyMeds", url: "https://www.needymeds.org" },
-              { name: "RxAssist", url: "https://www.rxassist.org" },
-              { name: "Medicare Extra Help", url: "https://www.ssa.gov/medicare/part-d-extra-help" },
-            ].map((link) => (
-              <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
-                className="flex min-h-11 items-center gap-2 text-sm text-primary hover:underline font-body p-1.5 rounded-md hover:bg-primary/5 transition-colors"
-                data-testid={`link-discount-${link.name.toLowerCase().replace(/\s+/g, "-")}`}>
-                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-                {link.name}
-              </a>
-            ))}
-          </CardContent>
-        </Card>
+        <LinkListCard
+          title="Drug Interaction Checkers"
+          icon={ShieldAlert}
+          iconClass="text-destructive"
+          description="Check if your medications interact with each other"
+          testIdPrefix="interaction"
+          links={[
+            { name: "Drugs.com Interaction Checker", url: "https://www.drugs.com/drug_interactions.html" },
+            { name: "WebMD Interaction Checker", url: "https://www.webmd.com/interaction-checker/default.htm" },
+            { name: "Medscape Drug Interaction Checker", url: "https://reference.medscape.com/drug-interactionchecker" },
+            { name: "RxList Interaction Checker", url: "https://www.rxlist.com/drug-interaction-checker.htm" },
+          ]}
+        />
+        <LinkListCard
+          title="Prescription Discounts"
+          icon={Tag}
+          iconClass="text-green-600 dark:text-green-400"
+          description="Save money on your prescriptions"
+          testIdPrefix="discount"
+          links={[
+            { name: "GoodRx", url: "https://www.goodrx.com" },
+            { name: "RxSaver by RetailMeNot", url: "https://www.rxsaver.com" },
+            { name: "NeedyMeds", url: "https://www.needymeds.org" },
+            { name: "RxAssist", url: "https://www.rxassist.org" },
+            { name: "Medicare Extra Help", url: "https://www.ssa.gov/medicare/part-d-extra-help" },
+          ]}
+        />
       </div>
     </div>
   );

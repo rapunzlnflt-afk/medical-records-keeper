@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText, Contact, Building2, IdCard, ArrowLeft } from "lucide-react";
+import { Stethoscope, Plus, Trash2, Edit2, Phone, Mail, MapPin, FileText, Contact, Building2, IdCard, ArrowLeft, Globe, Printer } from "lucide-react";
 import { Link } from "wouter";
 import type { Physician } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
@@ -32,6 +32,7 @@ function normalizePhysicianFields<T extends Partial<Physician>>(data: T): T {
     ...data,
     name: data.name ? formatPersonName(data.name) : data.name,
     specialty: data.specialty ? formatTitleCase(data.specialty) : data.specialty,
+    website: data.website ? String(data.website).trim() : data.website,
     address: data.address ? formatStreetAddress(data.address) : data.address,
     city: data.city ? formatCity(data.city) : data.city,
     state: data.state ? formatState(data.state) : data.state,
@@ -192,6 +193,36 @@ const mapHref = (address?: string) => {
   if (!address) return "";
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 };
+/** Turn a typed-in domain into a real link. Blank stays blank so no empty row renders. */
+const webHref = (url?: string | null) => {
+  const u = String(url || "").trim();
+  if (!u) return "";
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`;
+};
+/** Show the domain without the scheme so long URLs stay readable on a phone. */
+const displayWebsite = (url?: string | null) =>
+  String(url || "").trim().replace(/^https?:\/\//i, "").replace(/\/$/, "");
+
+/**
+ * One contact line on a physician card: icon, value, and an optional grey hint.
+ * The hint flows inline right after the value so it never lands on its own
+ * left-aligned line when a long address or URL wraps.
+ */
+function ContactRow({ icon: Icon, hint, children }: {
+  icon: React.ComponentType<{ className?: string }>;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2 min-w-0 text-sm">
+      <Icon className="w-4 h-4 flex-shrink-0 text-muted-foreground mt-[3px]" />
+      <p className="min-w-0 break-words leading-snug">
+        {children}
+        {hint && <span className="ml-1.5 text-[11px] text-muted-foreground/70 whitespace-nowrap">{hint}</span>}
+      </p>
+    </div>
+  );
+}
 
 function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
   initial?: Partial<Physician>;
@@ -205,6 +236,7 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
     phone: initial?.phone || "",
     fax: initial?.fax || "",
     email: initial?.email || "",
+    website: initial?.website || "",
     address: initial?.address || "",
     city: initial?.city || "",
     state: initial?.state || "",
@@ -307,6 +339,21 @@ function PhysicianForm({ initial, onSubmit, onCancel, isEdit }: {
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="doctor@clinic.com"
               data-testid="input-doc-email"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="doc-website" className={physLabelClass}>Website</Label>
+            <Input
+              id="doc-website"
+              type="url"
+              inputMode="url"
+              className={physControlClass}
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={form.website || ""}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+              placeholder="clinicname.com"
+              data-testid="input-doc-website"
             />
           </div>
         </PhysFieldSection>
@@ -502,129 +549,144 @@ export default function Physicians() {
             </CardContent>
           </Card>
         ) : (
-          filtered.map((doc) => (
+          filtered.map((doc) => {
+            const addressLine = [doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ");
+            const tel = doc.phone ? `tel:${doc.phone.replace(/[^\d+]/g, "")}` : "";
+            const site = webHref(doc.website);
+            return (
             <Card key={doc.id} className="hover-elevate w-full min-w-0 max-w-full overflow-hidden" data-testid={`physician-${doc.id}`}>
               <CardContent className="p-4 space-y-3 min-w-0">
-                {/* Header row: icon + full-width name & specialty (no buttons squeezing the right) */}
+                {/* Header: avatar + name/specialty on the left, edit/delete pinned right (Pawfolio vet-card layout). */}
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
-                    <Stethoscope className="w-6 h-6 text-white" />
+                  <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
+                    <Stethoscope className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-heading text-base sm:text-lg font-semibold leading-tight break-words">{doc.name}</h3>
-                    <p className="text-sm text-primary font-semibold mt-0.5 break-words">{doc.specialty}</p>
+                    <h3 className="font-heading text-base sm:text-lg font-bold text-primary leading-tight break-words">{doc.name}</h3>
+                    {doc.specialty && (
+                      <p className="text-sm text-muted-foreground font-semibold mt-0.5 break-words">{doc.specialty}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-0.5 flex-shrink-0 -mr-1.5 -mt-1">
+                    <Dialog open={editing?.id === doc.id} onOpenChange={(o) => !o && setEditing(null)}>
+                      <DialogTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setEditing(doc)} aria-label={`Edit physician ${doc.name}`} data-testid={`button-edit-doc-${doc.id}`}>
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className={PHYS_DIALOG_CLASS}>
+                        <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
+                          <DialogTitle className="font-heading text-2xl font-bold text-white">
+                            Edit Physician
+                          </DialogTitle>
+                          <DialogDescription className="text-white/85 text-sm">
+                            Update this provider's details. Changes save when you press Update.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <PhysicianForm
+                          initial={doc}
+                          isEdit={true}
+                          onSubmit={(data) => updateMut.mutate({ id: doc.id!, data })}
+                          onCancel={() => setEditing(null)}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-9 w-9"
+                          data-testid={`button-delete-doc-${doc.id}`}
+                          aria-label={`Delete physician ${doc.name}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-md">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="font-heading flex items-center gap-2">
+                            <Trash2 className="w-5 h-5 text-destructive" />
+                            Delete physician?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            <span className="font-medium text-foreground">{doc.name}</span>
+                            {doc.specialty ? ` (${doc.specialty})` : ""}
+                            {" "}will be removed from your provider directory. This cannot be undone.
+                            Existing appointments and medications referencing this physician will be kept but will no longer auto-link.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2 sm:gap-2">
+                          <AlertDialogCancel
+                            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                            data-testid={`button-delete-doc-cancel-${doc.id}`}
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMut.mutate(doc.id!)}
+                            className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
+                            data-testid={`button-delete-doc-confirm-${doc.id}`}
+                          >
+                            Delete physician
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 
-                {/* Contact details: span full card width, wrap safely */}
-                <div className="space-y-1.5 min-w-0">
-                  {doc.phone && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                      <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                      <a
-                        href={`tel:${doc.phone.replace(/[^\d+]/g, "")}`}
-                        className="truncate min-w-0 underline underline-offset-2"
-                      >
-                        {doc.phone}
-                      </a>
-                    </p>
-                  )}
-                  {doc.email && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                      <Mail className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate min-w-0">{doc.email}</span>
-                    </p>
-                  )}
-                  {(doc.address || doc.city) && (
-                    <p className="text-sm text-muted-foreground flex items-start gap-1.5 min-w-0">
-                      <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                      <a
-                        href={mapHref([doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", "))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="break-words min-w-0 underline underline-offset-2"
-                      >
-                  {[doc.address, doc.city, doc.state, doc.zip].filter(Boolean).join(", ")}
-                      </a>
-                    </p>
-                  )}
-                  {doc.npi && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 min-w-0">
-                      <FileText className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate min-w-0">NPI: {doc.npi}</span>
-                    </p>
-                  )}
-                </div>
-                {doc.notes && <p className="text-sm text-muted-foreground italic line-clamp-2 break-words min-w-0">{doc.notes}</p>}
+                {/* Contact rows: icon + tappable value + a small hint that wraps as its own unit. */}
+                {(doc.phone || doc.email || doc.website || addressLine || doc.fax || doc.npi) && (
+                  <div className="space-y-2.5 min-w-0 pt-1 border-t border-border/50">
+                    {doc.phone && (
+                      <ContactRow icon={Phone} hint={tel ? "tap to call" : undefined}>
+                        {tel ? (
+                          <a href={tel} className="font-semibold text-primary break-words" data-testid={`link-doc-phone-${doc.id}`}>{doc.phone}</a>
+                        ) : (
+                          <span className="text-muted-foreground break-words">{doc.phone}</span>
+                        )}
+                      </ContactRow>
+                    )}
+                    {doc.email && (
+                      <ContactRow icon={Mail} hint="tap to email">
+                        <a href={`mailto:${doc.email}`} className="text-primary break-all" data-testid={`link-doc-email-${doc.id}`}>{doc.email}</a>
+                      </ContactRow>
+                    )}
+                    {site && (
+                      <ContactRow icon={Globe} hint="opens website">
+                        <a href={site} target="_blank" rel="noopener noreferrer" className="text-primary break-all" data-testid={`link-doc-website-${doc.id}`}>
+                          {displayWebsite(doc.website)}
+                        </a>
+                      </ContactRow>
+                    )}
+                    {addressLine && (
+                      <ContactRow icon={MapPin} hint="open in maps">
+                        <a href={mapHref(addressLine)} target="_blank" rel="noopener noreferrer" className="text-primary break-words leading-snug" data-testid={`link-doc-map-${doc.id}`}>
+                          {addressLine}
+                        </a>
+                      </ContactRow>
+                    )}
+                    {doc.fax && (
+                      <ContactRow icon={Printer}>
+                        <span className="text-muted-foreground break-words">Fax {doc.fax}</span>
+                      </ContactRow>
+                    )}
+                    {doc.npi && (
+                      <ContactRow icon={FileText}>
+                        <span className="text-muted-foreground break-words">NPI {doc.npi}</span>
+                      </ContactRow>
+                    )}
+                  </div>
+                )}
 
-                {/* Action row: edit/delete on the right, no longer competing with content */}
-                <div className="flex items-center justify-end gap-1 pt-1 border-t border-border/50">
-                  <Dialog open={editing?.id === doc.id} onOpenChange={(o) => !o && setEditing(null)}>
-                    <DialogTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => setEditing(doc)} data-testid={`button-edit-doc-${doc.id}`}>
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className={PHYS_DIALOG_CLASS}>
-                      <DialogHeader className="gradient-primary text-white px-5 sm:px-6 pt-3 pb-3 sm:pt-4 sm:pb-4 text-left space-y-1 shrink-0">
-                        <DialogTitle className="font-heading text-2xl font-bold text-white">
-                          Edit Physician
-                        </DialogTitle>
-                        <DialogDescription className="text-white/85 text-sm">
-                          Update this provider's details. Changes save when you press Update.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <PhysicianForm
-                        initial={doc}
-                        isEdit={true}
-                        onSubmit={(data) => updateMut.mutate({ id: doc.id!, data })}
-                        onCancel={() => setEditing(null)}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        data-testid={`button-delete-doc-${doc.id}`}
-                        aria-label={`Delete physician ${doc.name}`}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="max-w-md">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="font-heading flex items-center gap-2">
-                          <Trash2 className="w-5 h-5 text-destructive" />
-                          Delete physician?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          <span className="font-medium text-foreground">{doc.name}</span>
-                          {doc.specialty ? ` (${doc.specialty})` : ""}
-                          {" "}will be removed from your provider directory. This cannot be undone.
-                          Existing appointments and medications referencing this physician will be kept but will no longer auto-link.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter className="gap-2 sm:gap-2">
-                        <AlertDialogCancel
-                          className="h-11 text-base sm:h-10 sm:text-sm mt-0"
-                          data-testid={`button-delete-doc-cancel-${doc.id}`}
-                        >
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteMut.mutate(doc.id!)}
-                          className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
-                          data-testid={`button-delete-doc-confirm-${doc.id}`}
-                        >
-                          Delete physician
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                {doc.notes && (
+                  <p className="text-sm text-muted-foreground italic break-words min-w-0 pt-1 border-t border-border/50">{doc.notes}</p>
+                )}
               </CardContent>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
     </div>

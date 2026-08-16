@@ -51,6 +51,8 @@ export interface Physician {
   phone: string | null;
   fax: string | null;
   email: string | null;
+  /** Practice website. Optional; older records saved before v-website simply omit it. */
+  website?: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
