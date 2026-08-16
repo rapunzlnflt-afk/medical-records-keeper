@@ -93,8 +93,9 @@ export function BackupReminderCard({ hasData }: { hasData: boolean }) {
       const outcome = await saveJsonBackup({
         filename,
         json: JSON.stringify(data, null, 2),
-        shareTitle: "Medical Records Backup",
-        shareText: "My Medical Records Keeper backup file.",
+        // File only, no title or text: extras make iOS put message contacts
+        // ahead of "Save to Files" in the share sheet.
+        filesOnly: true,
       });
       if (outcome.kind === "shared" || outcome.kind === "downloaded") {
         localStorage.setItem(LAST_EXPORT_KEY, todayISO());
@@ -102,11 +103,12 @@ export function BackupReminderCard({ hasData }: { hasData: boolean }) {
         setState(computeState(hasData));
       }
       if (outcome.kind === "shared") {
+        // Fires after the share sheet completes, so keep it past tense.
         toast({
-          title: "Backup ready",
+          title: "Backup saved",
           description: isIosLike()
-            ? "Choose Save to Files (or Mail it to yourself) to keep it safe."
-            : "Choose where to save your backup file.",
+            ? "Your backup went to the app you picked."
+            : "Your backup went to the destination you chose.",
         });
       } else if (outcome.kind === "downloaded") {
         toast({ title: "Backup saved", description: `Downloaded ${filename}.` });

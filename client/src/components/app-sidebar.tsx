@@ -298,18 +298,21 @@ export function AppSidebar() {
       const outcome = await saveJsonBackup({
         filename,
         json: JSON.stringify(data, null, 2),
-        shareTitle: "Medical Records Backup",
-        shareText: "My Medical Records Keeper backup file.",
+        // File only, no title or text: extras make iOS put message contacts
+        // ahead of "Save to Files" in the share sheet.
+        filesOnly: true,
       });
       if (outcome.kind === "shared" || outcome.kind === "downloaded") {
         recordBackupExport();
       }
       if (outcome.kind === "shared") {
+        // navigator.share only resolves once the user has finished choosing a
+        // destination, so this fires after the save — past tense, not advice.
         toast({
-          title: "Backup ready",
+          title: "Data Saved",
           description: isIosLike()
-            ? "Choose Save to Files (or Mail it to yourself) to keep it safe."
-            : "Choose where to save your backup file.",
+            ? "Your backup went to the app you picked."
+            : "Your backup went to the destination you chose.",
         });
       } else if (outcome.kind === "downloaded") {
         toast({ title: "Data Saved", description: `Downloaded ${filename}.` });

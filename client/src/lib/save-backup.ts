@@ -12,6 +12,17 @@
 // includes "Save to Files", "Mail", "AirDrop", iCloud Drive, etc. — the
 // same UX pawfolio uses. Desktop browsers and Android Chrome fall back to
 // the existing anchor-download path, which already works for them.
+//
+// One caveat learned from real-device testing: for backups, share the File
+// and nothing else (`filesOnly`). Text or a title alongside it nudges iOS
+// toward "you're sending this to a person", which favors Messages and contact
+// suggestions; iOS ignores `title` on file shares anyway. `shareTitle` and
+// `shareText` remain supported for genuine person-to-person shares.
+//
+// What this canNOT fix, because no web API controls it: the row of suggested
+// contacts at the top of the sheet (iOS Siri Suggestions — Settings > Siri &
+// Search > Show When Sharing) and where "Save to Files" sits in the app row
+// (the user can pin it via Share > More > Edit > Add to Favorites).
 
 export type SaveBackupOutcome =
   | { kind: "shared" }            // iOS / Android share sheet completed
@@ -23,11 +34,15 @@ interface SaveBackupOptions {
   filename: string;       // e.g. "medical-records-backup-2026-05-12.json"
   json: string;           // already-stringified payload
   shareTitle?: string;    // shown on the share sheet
-  shareText?: string;     // optional descriptive text
+  /** Descriptive text. Omit for backups — it makes iOS surface message
+   *  contacts ahead of "Save to Files". See the note at the top of the file. */
+  shareText?: string;
+  /** Share the File alone, with no title or text. Use for backups. */
+  filesOnly?: boolean;
 }
 
 export async function saveJsonBackup(opts: SaveBackupOptions): Promise<SaveBackupOutcome> {
-  const { filename, json, shareTitle = "Medical Records Backup", shareText } = opts;
+  const { filename, json, shareTitle = "Medical Records Backup", shareText, filesOnly } = opts;
   const blob = new Blob([json], { type: "application/json" });
 
   // Prefer the native share sheet when available — this is the iOS path.
@@ -41,11 +56,15 @@ export async function saveJsonBackup(opts: SaveBackupOptions): Promise<SaveBacku
 
   if (canShareFiles) {
     try {
-      await navigator.share({
-        files: [file],
-        title: shareTitle,
-        ...(shareText ? { text: shareText } : {}),
-      });
+      await navigator.share(
+        filesOnly
+          ? { files: [file] }
+          : {
+              files: [file],
+              title: shareTitle,
+              ...(shareText ? { text: shareText } : {}),
+            }
+      );
       return { kind: "shared" };
     } catch (err) {
       // User cancelled — Safari throws AbortError. Treat as a normal cancel
