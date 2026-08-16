@@ -109,13 +109,13 @@
   }
   /* Root font-size scaling: phones get a noticeably larger base so every
      rem-based utility (text-sm, text-base, text-lg, padding, gaps) grows
-     together. Desktop returns to the 16px default. */
+     together. Desktop is a notch above the 16px default for the same reason. */
   html {
-    font-size: 18px;
+    font-size: 19px;
   }
   @media (min-width: 768px) {
     html {
-      font-size: 16px;
+      font-size: 17px;
     }
   }
   body {
@@ -134,7 +134,7 @@
   }
   @media (min-width: 768px) {
     .text-xs {
-      font-size: 0.78rem;
+      font-size: 0.8125rem;
       line-height: 1.45;
     }
   }

@@ -41,6 +41,18 @@ import { PhoneRemindersCard } from "@/components/phone-reminders-card";
 import { BackupReminderCard, FirstVisitNoticeCard } from "@/components/backup-reminder-card";
 import { VisitNotesPromptCard } from "@/components/visit-notes-prompt-card";
 
+/** First word of a saved name, so the dashboard greeting stays first-name only. */
+function firstNameOnly(fullName: string): string {
+  const first = String(fullName || "").trim().split(/\s+/)[0] || "";
+  return first;
+}
+
+/** "Shauna" -> "Shauna's"; "Charles" -> "Charles'" for names already ending in s. */
+function possessive(name: string): string {
+  if (!name) return "";
+  return name.endsWith("s") || name.endsWith("S") ? `${name}'` : `${name}'s`;
+}
+
 function StatCard({ title, value, icon: Icon, href, gradient }: {
   title: string; value: number; icon: any; href: string; gradient?: boolean;
 }) {
@@ -50,18 +62,21 @@ function StatCard({ title, value, icon: Icon, href, gradient }: {
         className={`hover-elevate cursor-pointer h-full ${gradient ? "gradient-primary text-white border-transparent shadow-md" : "shadow-sm"}`}
         data-testid={`stat-${title.toLowerCase().replace(/\s+/g, "-")}`}
       >
-        {/* Taller box + lower number/icon so the count and its tile aren't crowding the label. */}
-        <CardContent className="relative min-h-[112px] sm:min-h-[124px] p-4 sm:p-5">
-          <p className={`text-[13px] sm:text-sm font-body font-semibold leading-snug pr-12 whitespace-nowrap ${gradient ? "text-white/90" : "text-muted-foreground"}`}>
+        {/* Label on top, then the count and its icon sitting together as one unit
+            near the bottom — no wide gap across the tile, and the icon stays small
+            relative to the label and number. */}
+        <CardContent className="min-h-[116px] sm:min-h-[124px] p-4 sm:p-5 flex flex-col justify-between gap-3">
+          <p className={`text-sm sm:text-[15px] font-body font-semibold leading-tight tracking-tight break-words ${gradient ? "text-white/90" : "text-muted-foreground"}`}>
             {title}
           </p>
 
-          <p className={`absolute left-4 bottom-3 sm:left-5 sm:bottom-4 text-3xl sm:text-4xl font-heading font-bold leading-none tabular-nums ${gradient ? "text-white" : ""}`}>
-            {value}
-          </p>
-
-          <div className={`absolute right-4 bottom-3 sm:right-5 sm:bottom-4 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${gradient ? "bg-white/20" : "gradient-primary"}`}>
-            <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <div className="flex items-center gap-2.5">
+            <span className={`text-3xl sm:text-[2rem] font-heading font-bold leading-none tabular-nums min-w-[1.4ch] ${gradient ? "text-white" : ""}`}>
+              {value}
+            </span>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${gradient ? "bg-white/20" : "gradient-primary"}`}>
+              <Icon className="w-[18px] h-[18px] text-white" />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -198,7 +213,9 @@ const reminders = appointments.filter((a) => {
       <div className="min-w-0">
         <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">
-          {activePatient ? `${activePatient.name.endsWith('s') ? activePatient.name + "'" : activePatient.name + "'s"} health overview` : "Your health overview at a glance"}
+          {activePatient && firstNameOnly(activePatient.name)
+            ? `${possessive(firstNameOnly(activePatient.name))} health overview`
+            : "Your health overview at a glance"}
         </p>
       </div>
 
