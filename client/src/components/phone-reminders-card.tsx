@@ -500,7 +500,9 @@ export function PhoneRemindersCard() {
                       size="sm"
                       onClick={handleDisable}
                       disabled={busy}
-                      className="h-7 px-2.5 flex-shrink-0 bg-background text-[11px] font-medium"
+                      // size="sm" applies min-h-8, so a bare h-7 gets floored at
+                      // 2rem. min-h-7 has to come with it for the height to change.
+                      className="min-h-7 h-7 px-2.5 flex-shrink-0 bg-background text-[11px] font-medium"
                       data-testid="button-disable-phone-reminders"
                     >
                       {busy ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
