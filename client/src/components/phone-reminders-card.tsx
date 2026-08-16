@@ -500,7 +500,7 @@ export function PhoneRemindersCard() {
                       size="sm"
                       onClick={handleDisable}
                       disabled={busy}
-                      className="h-8 px-2.5 flex-shrink-0 bg-background text-[11px] font-medium"
+                      className="h-7 px-2.5 flex-shrink-0 bg-background text-[11px] font-medium"
                       data-testid="button-disable-phone-reminders"
                     >
                       {busy ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
