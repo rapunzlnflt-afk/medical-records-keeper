@@ -1,8 +1,9 @@
 // Supabase Edge Function (Deno runtime).
-// Schedule this on a 1-minute cron via Supabase Scheduled Triggers or
-// pg_cron. It looks up reminders whose fire_at has passed and have not yet
-// been delivered, sends a Web Push to every device the owning user has
-// registered, and stamps delivered_at.
+// Schedule this on a 2-minute cron via pg_cron (see
+// supabase/migrations/0003_reminder_cron_and_maintenance.sql). It looks up
+// reminders whose fire_at has passed and have not yet been delivered, sends
+// a Web Push to every device the owning user has registered, and stamps
+// delivered_at.
 //
 // Required environment variables (set with `supabase secrets set ...`):
 //   SUPABASE_URL                — auto-populated for Edge Functions
@@ -13,8 +14,10 @@
 //
 // Deploy:   supabase functions deploy send-reminders --no-verify-jwt
 // Secrets:  supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:...
-// Schedule: in the Supabase dashboard, add a Scheduled Trigger that POSTs
-//           to this function every minute, or use pg_cron + pg_net.
+// Schedule: run supabase/migrations/0003_reminder_cron_and_maintenance.sql.
+//           Always pass timeout_milliseconds to net.http_post -- an
+//           unbounded call keeps pg_net's transaction open, which blocks
+//           autovacuum and trips the project's Disk IO budget.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
