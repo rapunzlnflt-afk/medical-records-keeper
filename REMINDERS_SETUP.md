@@ -93,26 +93,48 @@ supabase functions deploy send-reminders --no-verify-jwt
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are populated
 automatically for deployed functions.
 
-## 5. Schedule the function (every minute)
+## 5. Schedule the function (every 2 minutes)
 
-In the Supabase dashboard, **Database → Cron / Scheduled Triggers**, add
-a job that POSTs to the function every minute. Equivalent SQL:
+Enable the **pg_cron** and **pg_net** extensions under **Database →
+Extensions**, then run:
+
+```
+supabase/migrations/0003_reminder_cron_and_maintenance.sql
+```
+
+That file schedules the delivery job and the log-retention jobs together,
+and explains the reasoning inline. The delivery job is:
 
 ```sql
 select cron.schedule(
   'send-reminders-every-minute',
-  '* * * * *',
-  $$ select net.http_post(
-       url := 'https://<project>.functions.supabase.co/send-reminders',
-       headers := jsonb_build_object(
-         'Content-Type', 'application/json',
-         'Authorization', 'Bearer <anon or service-role key>'
-       )
-     ) $$
+  '*/2 * * * *',
+  $job$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/send-reminders',
+    headers := jsonb_build_object('Content-Type', 'application/json'),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 10000
+  );
+  $job$
 );
 ```
 
-Granularity: every minute is fine; reminders fire on `fire_at <= now()`.
+Three things matter here:
+
+- **Granularity.** Reminders fire on `fire_at <= now()`, so a 2-minute tick
+  delays delivery slightly but never drops a reminder. It halves the write
+  volume compared to every minute.
+- **`timeout_milliseconds` is not optional.** pg_net holds an open
+  transaction while a request is in flight, and an open transaction stops
+  autovacuum from reclaiming dead rows *anywhere* in the database. Without a
+  timeout, one hung call can bloat the project into a Disk IO budget
+  warning. See step 7.
+- **Even minutes.** If the same project also runs Pawfolio's
+  `send-pet-reminders`, put that one on `1-59/2 * * * *`. Small compute
+  instances have only a handful of background worker slots, and two jobs
+  firing on the same minute can fail with `job startup timeout` — a silently
+  missed notification.
 
 ## 6. Try it
 
@@ -124,7 +146,37 @@ Granularity: every minute is fine; reminders fire on `fire_at <= now()`.
    permission prompt.
 5. Set a reminder a couple of minutes in the future on an appointment.
    Background the app or lock the phone.
-6. The push should arrive within ~1 minute of the fire time.
+6. The push should arrive within ~2 minutes of the fire time.
+
+## 7. Keep the cron logs trimmed
+
+Both pg_cron and pg_net keep append-only logs that nothing prunes by
+default: `cron.job_run_details` gets a row per job per run, and
+`net._http_response` gets a row per HTTP call. A reminder job running around
+the clock generates hundreds of thousands of rows per week. Once those
+tables grow past the instance's `shared_buffers`, ordinary maintenance
+starts hitting disk and the project trips a **Disk IO Budget** warning even
+though the app itself stores barely any data.
+
+Migration `0003` schedules two jobs that handle this: `purge-cron-history`
+(daily, keeps 2 days) and `db-maintenance` (every 15 minutes, trims pg_net
+responses to the last hour and restarts the pg_net worker if it is stuck on
+a transaction older than 5 minutes).
+
+To check the current state:
+
+```sql
+select pg_size_pretty(pg_database_size(current_database()));
+
+select jobid, status, count(*)
+from cron.job_run_details
+where start_time > now() - interval '15 minutes'
+group by 1, 2;
+```
+
+Low tens of MB and no `failed` rows is healthy. Hundreds of MB means the
+retention jobs are not running. Multi-second job durations mean the HTTP
+call is blocking and the timeout is missing.
 
 ## What gets stored where
 
@@ -161,8 +213,8 @@ How it works:
 - On each run the Edge Function computes *today* in the device's own
   timezone and materializes one `reminders` row whose `source_id` is that
   local date as `YYYYMMDD`. The unique partial index makes a second
-  insert for the same (device, local date) fail harmlessly, so a cron
-  firing every minute still produces exactly one notification per day.
+  insert for the same (device, local date) fail harmlessly, so a
+  frequently-firing cron still produces exactly one notification per day.
 - It is delivered only to the device that opted in, not to every device
   on the account.
 - It is **not** suppressed when doses are already logged. iOS requires a
