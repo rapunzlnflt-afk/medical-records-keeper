@@ -117,7 +117,9 @@ create trigger dose_schedules_set_updated_at
   for each row execute function public.set_updated_at();
 
 create or replace function public.dose_schedules_set_user_id() returns trigger
-language plpgsql as $$
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   if new.user_id is null then
     new.user_id := auth.uid();
@@ -266,6 +268,7 @@ create or replace function public.dose_next_due(
 ) returns timestamptz
 language plpgsql
 stable
+set search_path = public, pg_temp
 as $$
 declare
   v_tz         text := coalesce(nullif(p_schedule.timezone, ''), 'UTC');
@@ -377,6 +380,7 @@ create or replace function public.log_dose(
 ) returns jsonb
 language plpgsql
 security invoker
+set search_path = public, pg_temp
 as $$
 declare
   v_event    public.dose_events;
