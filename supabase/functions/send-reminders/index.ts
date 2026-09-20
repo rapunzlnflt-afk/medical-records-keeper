@@ -35,7 +35,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-type ReminderSource = "appointment" | "medication" | "daily_meds";
+type ReminderSource = "appointment" | "medication" | "daily_meds" | "dose";
 
 interface ReminderRow {
   id: string;
@@ -48,6 +48,7 @@ interface ReminderRow {
   body: string | null;
   fire_at: string;
   sound: string | null;
+  dose_event_id: string | null;
 }
 
 interface DeviceRow {
@@ -253,6 +254,145 @@ async function materializeDailyNudges(
   return { created, skipped, errors };
 }
 
+// ---------------------------------------------------------------------------
+// Dose schedules — actual-time rescheduling (0004_dose_schedules.sql).
+//
+// Two steps per tick, both cheap and both idempotent:
+//
+//   1. dose_sweep() retires pending doses past due_at + grace_min as 'missed'
+//      and guarantees every enabled schedule has exactly one pending dose.
+//      All of that logic is SQL so it stays in one transaction.
+//
+//   2. materializeDoseReminders() turns pending doses whose due_at has passed
+//      into `reminders` rows, which the existing delivery pass then sends. The
+//      unique index on reminders(dose_event_id) where source='dose' makes the
+//      insert safe to attempt every tick, the same way the daily nudge works.
+//
+// Deliberately no second cron job: a third pg_cron entry would compete for the
+// same handful of background worker slots that 0003 was written to protect.
+// ---------------------------------------------------------------------------
+
+interface DueDoseRow {
+  id: string;
+  schedule_id: string;
+  due_at: string;
+  dose_schedules: {
+    user_id: string;
+    source_id: number;
+    label: string;
+    subject_name: string | null;
+    timezone: string | null;
+  };
+}
+
+/** "2:14 PM" in the schedule's own timezone. */
+function formatLocalClock(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(instant);
+}
+
+async function sweepDoses(): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.rpc("dose_sweep", { p_limit: 500 });
+  if (error) return { error: error.message };
+  return (data ?? {}) as Record<string, unknown>;
+}
+
+async function materializeDoseReminders(
+  now: Date,
+): Promise<{ created: number; skipped: number; errors: string[] }> {
+  const errors: string[] = [];
+  let created = 0;
+  let skipped = 0;
+
+  const { data: dueDoses, error: dueErr } = await supabase
+    .from("dose_events")
+    .select(
+      "id, schedule_id, due_at, dose_schedules!inner(user_id, source_id, label, subject_name, timezone)",
+    )
+    .eq("status", "pending")
+    .is("notified_at", null)
+    .lte("due_at", now.toISOString())
+    .eq("dose_schedules.enabled", true)
+    .order("due_at", { ascending: true })
+    .limit(200);
+
+  if (dueErr) return { created, skipped, errors: [`due dose lookup: ${dueErr.message}`] };
+  if (!dueDoses || dueDoses.length === 0) return { created, skipped, errors };
+
+  const rows = dueDoses as unknown as DueDoseRow[];
+
+  // `reminders.device_id` is NOT NULL. For a dose it is informational only —
+  // delivery fans out to every device the user owns (see deliverOne) — so any
+  // current device of theirs is a valid stamp. Most recently updated wins.
+  const userIds = [...new Set(rows.map((r) => r.dose_schedules.user_id))];
+  const { data: devices, error: devErr } = await supabase
+    .from("devices")
+    .select("user_id, device_id, updated_at")
+    .in("user_id", userIds)
+    .order("updated_at", { ascending: false });
+  if (devErr) return { created, skipped, errors: [`device lookup: ${devErr.message}`] };
+
+  const deviceByUser = new Map<string, string>();
+  for (const d of (devices ?? []) as Array<{ user_id: string; device_id: string }>) {
+    if (!deviceByUser.has(d.user_id)) deviceByUser.set(d.user_id, d.device_id);
+  }
+
+  for (const row of rows) {
+    const schedule = row.dose_schedules;
+    const deviceId = deviceByUser.get(schedule.user_id);
+    if (!deviceId) {
+      // Phone reminders were turned off (device row deleted). The schedule is
+      // still valid and still tracked in-app; there is simply nowhere to push.
+      skipped++;
+      continue;
+    }
+
+    const timeZone = isValidTimeZone(schedule.timezone) ? schedule.timezone : "UTC";
+    const dueAt = new Date(row.due_at);
+
+    const { error: insErr } = await supabase.from("reminders").insert({
+      user_id: schedule.user_id,
+      device_id: deviceId,
+      source: "dose",
+      source_id: schedule.source_id,
+      patient_name: schedule.subject_name,
+      title: schedule.label,
+      // Rendered here, not client-side, because a dose reminder is generated
+      // server-side and may never have been seen by the app. The schedule's
+      // own timezone is used explicitly so this cannot fall back to a
+      // server locale.
+      body: `Due ${formatLocalClock(dueAt, timeZone)}`,
+      fire_at: row.due_at,
+      sound: null,
+      dose_event_id: row.id,
+    });
+
+    if (insErr) {
+      // 23505 = already queued on an earlier tick. Expected, and exactly what
+      // keeps this idempotent.
+      if ((insErr as any).code === "23505" || /duplicate key/i.test(insErr.message)) {
+        skipped++;
+      } else {
+        errors.push(`dose ${row.id}: insert failed: ${insErr.message}`);
+        continue;
+      }
+    } else {
+      created++;
+    }
+
+    const { error: stampErr } = await supabase
+      .from("dose_events")
+      .update({ notified_at: new Date().toISOString() })
+      .eq("id", row.id);
+    if (stampErr) errors.push(`dose ${row.id}: notified_at failed: ${stampErr.message}`);
+  }
+
+  return { created, skipped, errors };
+}
+
 async function deliverOne(reminder: ReminderRow): Promise<{ ok: boolean; error?: string }> {
   // The daily nudge is a per-device opt-in, so it goes only to the device that
   // asked for it. Appointment/refill reminders are per-user and still fan out
@@ -280,6 +420,28 @@ async function deliverOne(reminder: ReminderRow): Promise<{ ok: boolean; error?:
       url: "./#/medications",
       source: reminder.source,
       sourceId: reminder.source_id,
+    }));
+  }
+
+  // A dose reminder names the medication the user chose to label it with and
+  // the time it was due. Unlike a refill, it is actionable right now, so the
+  // title says so.
+  if (reminder.source === "dose") {
+    const label = reminder.title?.trim() || "medication";
+    const subject = reminder.patient_name?.trim() ?? "";
+    const detail = reminder.body?.trim() ?? "";
+    return await sendToDevices(devices as DeviceRow[], JSON.stringify({
+      title: subject ? `Dose due: ${label} (${subject})` : `Dose due: ${label}`,
+      body: detail || "Tap to record this dose.",
+      tag: `dose-${reminder.dose_event_id ?? reminder.source_id}`,
+      // PR 2 points this at ./#/dose/<eventId>, a one-tap confirm sheet. Until
+      // that route exists this must stay on a page that actually loads —
+      // iOS ignores notification action buttons, so the tap target is the
+      // only way to record a dose on iPhone and it cannot 404.
+      url: "./#/medications",
+      source: reminder.source,
+      sourceId: reminder.source_id,
+      doseEventId: reminder.dose_event_id,
     }));
   }
 
@@ -357,10 +519,18 @@ Deno.serve(async (_req) => {
   // the delivery pass below can treat them like any other due reminder.
   const nudges = await materializeDailyNudges(now);
 
+  // Step 2: retire overdue doses and keep every enabled schedule stocked with
+  // exactly one pending dose. Runs before materialising, so a dose that just
+  // went past its grace period is never queued for push.
+  const sweep = await sweepDoses();
+
+  // Step 3: queue pushes for doses that are now due.
+  const doses = await materializeDoseReminders(now);
+
   const nowIso = now.toISOString();
   const { data: due, error } = await supabase
     .from("reminders")
-    .select("id, user_id, device_id, source, source_id, patient_name, title, body, fire_at, sound")
+    .select("id, user_id, device_id, source, source_id, patient_name, title, body, fire_at, sound, dose_event_id")
     .is("delivered_at", null)
     .lte("fire_at", nowIso)
     .order("fire_at", { ascending: true })
@@ -369,13 +539,36 @@ Deno.serve(async (_req) => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
   if (!due || due.length === 0) {
-    return new Response(JSON.stringify({ delivered: 0, nudges }), { status: 200 });
+    return new Response(JSON.stringify({ delivered: 0, nudges, sweep, doses }), { status: 200 });
   }
 
   let delivered = 0;
   let failed = 0;
   let expired = 0;
+  let superseded = 0;
   for (const reminder of due as ReminderRow[]) {
+    // A queued dose push is only valid while its dose is still pending. If the
+    // dose was logged or missed between ticks, sending would tell the user to
+    // take something they have already taken.
+    if (reminder.source === "dose" && reminder.dose_event_id) {
+      const { data: event } = await supabase
+        .from("dose_events")
+        .select("status")
+        .eq("id", reminder.dose_event_id)
+        .maybeSingle();
+      if (!event || (event as { status: string }).status !== "pending") {
+        superseded++;
+        await supabase
+          .from("reminders")
+          .update({
+            delivered_at: new Date().toISOString(),
+            delivery_error: `superseded: dose ${(event as { status: string } | null)?.status ?? "deleted"}`,
+          })
+          .eq("id", reminder.id);
+        continue;
+      }
+    }
+
     // A daily nudge that is long overdue (function outage, subscription
     // trouble) must not surface hours later as an out-of-context ping. Retire
     // it instead; tomorrow's occurrence is generated independently.
@@ -407,7 +600,7 @@ Deno.serve(async (_req) => {
     }
   }
 
-  return new Response(JSON.stringify({ delivered, failed, expired, considered: due.length, nudges }), {
+  return new Response(JSON.stringify({ delivered, failed, expired, superseded, considered: due.length, nudges, sweep, doses }), {
     headers: { "content-type": "application/json" },
     status: 200,
   });

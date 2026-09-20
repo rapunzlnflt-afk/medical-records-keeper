@@ -186,6 +186,7 @@ call is blocking and the timeout is missing.
 | Reminder fire time, title, body, patient first name            | Supabase `reminders` |
 | Browser push endpoint + keys                                   | Supabase `devices`   |
 | Daily nudge on/off + chosen local time (no names)              | Supabase `daily_nudges` |
+| Dose schedule rule (label, interval, window) + dose times       | Supabase `dose_schedules` / `dose_events` |
 
 The Edge Function never touches medical records — it only knows the
 short string used in the notification.
@@ -225,6 +226,112 @@ How it works:
 - Turning it off sets `enabled = false`, which stops materialization
   **server-side** — it is not merely hidden in the UI.
 
+## Dose schedules (every-N-hours medications)
+
+Migration: `supabase/migrations/0004_dose_schedules.sql`.
+
+A dose schedule reschedules from the **actual** time a dose was given.
+Record a dose at 2:14 PM on a 4-hour medication and the next one is due
+at 6:14 PM, not at whatever fixed time the original plan said.
+
+Two tables:
+
+- **`dose_schedules`** — the rule. One row per medication that opts in:
+  label, optional first name, `interval_min`, `anchor`, daily window,
+  `max_per_day`, `grace_min`, `ends_on`, `timezone`.
+- **`dose_events`** — the occurrences: `due_at`, `taken_at`, `status`
+  (`pending` / `taken` / `skipped` / `missed`).
+
+### The two anchor modes
+
+| `anchor` | Next dose is | Use for |
+| --- | --- | --- |
+| `fixed` | the next entry in `fixed_times` | once- and twice-daily meds, where the clock time should never drift |
+| `from_last_dose` | actual `taken_at` + `interval_min` | "every N hours" meds |
+
+`fixed` is the default. Existing refill reminders are untouched by this
+migration.
+
+### Why there is only ever one pending dose
+
+A partial unique index (`dose_events_one_open`) allows at most one
+`pending` event per schedule. This is the invariant that makes relative
+scheduling safe: a phone that was off for two days cannot come back to a
+queue of stale doses all firing at once.
+
+### Drift guardrails
+
+An every-4-hours medication anchored to real times walks later every
+day — forty minutes late, three times, and a dose lands at 2 AM. Three
+limits are applied in order by `dose_next_due()`:
+
+1. **Daily window** (`window_start` / `window_end`) — a dose computed
+   past the end of the window moves to the start of the next day's
+   window. This is the daily reset that stops drift accumulating.
+2. **`max_per_day`** — a hard ceiling per local day.
+3. **`ends_on`** — past the end date, nothing more is scheduled and the
+   schedule disables itself.
+
+A window crossing midnight is rejected by a check constraint; v1 does
+not support it.
+
+### Recording a dose
+
+Call the `log_dose` function — never update `dose_events` directly:
+
+```sql
+select public.log_dose(
+  p_event_id => '<uuid>',
+  p_taken    => true
+);
+```
+
+It records the dose and queues the next one in **one transaction**, and
+returns an `outcome`:
+
+| `outcome` | Meaning |
+| --- | --- |
+| `logged` | recorded; `next_due_at` is the next dose (null if the course ended) |
+| `already_logged` | another tab or device got there first; includes `taken_at` and `actor_label` so the caller can say so instead of erroring |
+| `too_soon` | a dose was logged less than half an interval ago — re-call with `p_force => true` after showing the user when |
+
+The update is conditional on the event still being `pending`, so two
+callers can never both log the same dose. Solo users rarely hit that;
+it is the foundation the shared version needs.
+
+A **skip** schedules the next dose from the original `due_at`, not from
+now, so skipping a dose does not stretch the day's spacing.
+
+### What the worker does each tick
+
+The same `send-reminders` function, on the same 2-minute cron. **No new
+cron job** — a third `pg_cron` entry would compete for the same few
+background worker slots that step 7 above exists to protect.
+
+1. `dose_sweep()` marks pending doses past `due_at + grace_min` as
+   `missed`, and makes sure every enabled schedule has one pending dose.
+   After a miss the next dose comes from the **rule**, not from the stale
+   due time.
+2. Due doses are materialized into `reminders` rows with `source='dose'`
+   and `dose_event_id` set. The unique index on that column makes the
+   insert safe to attempt every tick, exactly like the daily nudge.
+3. Before sending, a queued dose push is re-checked against its event. If
+   the dose was logged or missed in between, the reminder is retired as
+   `superseded` rather than telling you to take something you already
+   took.
+
+`dose_sweep()` is `security definer` and walks every user's rows, so
+execute is revoked from `anon` and `authenticated`. It is worker-only.
+
+### Privacy
+
+A dose notification does name the medication label you chose and,
+optionally, a first name — more than the deliberately blank daily nudge.
+That is why a dose schedule is **opt-in per medication**. The label is
+your own text, so "Morning pill" works just as well as a drug name, and
+`subject_name` can be left empty. No records, dosages, or diagnoses are
+ever stored server-side.
+
 ## Limitations
 
 - **iOS**: Push notifications work only when the PWA has been "Added to
@@ -236,9 +343,14 @@ How it works:
 - **Sound**: Custom alert sounds (`soft-chime`, `clear-bell`,
   `urgent-tone`) play only while the app is open. The OS plays the
   default notification sound for closed-app pushes.
-- **Recurring medications**: Only refill-date reminders sync to
-  Supabase. Time-of-day dosing reminders remain in-app only because
-  expanding them server-side would replicate too much patient context.
+- **Recurring medications**: Refill-date reminders and opted-in dose
+  schedules sync to Supabase (see **Dose schedules** above). Any
+  medication without a dose schedule stays in-app only.
+- **Not an alarm**: nothing here can guarantee a dose notification at an
+  exact minute. Web Push is best-effort and is subject to Do Not Disturb
+  and Focus modes. The in-app next-due time is always the source of
+  truth, so a missed push is recoverable. This is a reminder tool, not a
+  medical device.
 
 ## Turning it off
 
