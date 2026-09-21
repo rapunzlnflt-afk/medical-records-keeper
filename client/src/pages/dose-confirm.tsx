@@ -281,7 +281,11 @@ export default function DoseConfirm() {
   }
 
   // === Open dose: the main case ===
-  const overdue = new Date(event.due_at).getTime() < Date.now();
+  // A dose one second past due is not "late" in any sense the user cares about,
+  // and the relative line under the time already reads "now" — so a bare
+  // timestamp comparison here makes the two lines contradict each other. Only
+  // call it overdue once it is late by more than the minute it is displayed in.
+  const overdue = new Date(event.due_at).getTime() < Date.now() - 60_000;
 
   return (
     <Shell back={backLink}>
