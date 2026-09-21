@@ -83,7 +83,12 @@ export function detectPhoneReminderState(): PhoneReminderState {
   return { status: "permission-default" }; // caller should refresh once subscribed
 }
 
-async function ensureAnonAuth(): Promise<string> {
+/**
+ * Sign this device in anonymously (or reuse its session) and return the user
+ * id. Exported so dose-schedule.ts can share one identity per device rather
+ * than creating a second anonymous user.
+ */
+export async function ensureAnonAuth(): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
   const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
