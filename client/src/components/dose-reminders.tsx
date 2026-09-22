@@ -239,15 +239,13 @@ function DoseExplainerDialog({
               <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
               <span>
                 <span className="font-semibold">
-                  Your reminder times get saved online.
+                  For dose reminders to function properly they must go through
+                  the internet.
                 </span>{" "}
-                This app can only run while it is open on your screen. Switch to
-                another app, lock your phone, or close the tab and it stops — so
-                your reminder has to come from the internet instead. Only two
-                things are saved there: this reminder's name and its times.
-                Everything else — dosage, prescriber, pharmacy, notes — stays in
-                this browser. Rather not store a medication name? Call it
-                "morning pill".
+                The only two things saved there are the reminder name and time.
+                Everything else — dosage, prescriber, pharmacy, notes — stays
+                here in your app. Give the reminder any name you prefer —
+                "aspirin", "A.M. dose", "Time to pop a Pez", etc.
               </span>
             </li>
             <li className="flex gap-2">
