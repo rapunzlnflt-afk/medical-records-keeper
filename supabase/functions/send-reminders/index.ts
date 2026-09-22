@@ -434,11 +434,14 @@ async function deliverOne(reminder: ReminderRow): Promise<{ ok: boolean; error?:
       title: subject ? `Dose due: ${label} (${subject})` : `Dose due: ${label}`,
       body: detail || "Tap to record this dose.",
       tag: `dose-${reminder.dose_event_id ?? reminder.source_id}`,
-      // PR 2 points this at ./#/dose/<eventId>, a one-tap confirm sheet. Until
-      // that route exists this must stay on a page that actually loads —
-      // iOS ignores notification action buttons, so the tap target is the
-      // only way to record a dose on iPhone and it cannot 404.
-      url: "./#/medications",
+      // The confirm sheet now exists, so the tap lands where the dose can be
+      // recorded in one more tap. iOS ignores notification action buttons, so
+      // this URL is the only way to record a dose from a push on iPhone — it
+      // must never 404, hence the fall back to the medication list when a
+      // reminder somehow carries no event id.
+      url: reminder.dose_event_id
+        ? `./#/dose/${reminder.dose_event_id}`
+        : "./#/medications",
       source: reminder.source,
       sourceId: reminder.source_id,
       doseEventId: reminder.dose_event_id,
