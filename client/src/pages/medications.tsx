@@ -82,7 +82,7 @@ import {
 } from "@/components/dose-reminders";
 import { deleteDoseSchedule } from "@/lib/dose-schedule";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { Link, useLocation } from "wouter";
 
 /**
@@ -174,6 +174,45 @@ const timeIcon = (t: string | null) => {
   if (t === "bedtime") return <Moon className="w-3 h-3" />;
   return <Clock className="w-3 h-3" />;
 };
+
+/**
+ * Refill colour has to earn its alarm. A date months out rendered in amber
+ * shouted louder than the medication's own name, so this stays plain until the
+ * refill is close, turns amber inside two weeks, and goes destructive once the
+ * date has passed.
+ */
+function refillTone(date?: string | null, active = true) {
+  if (!date) return null;
+  const when = parseISO(date);
+  const days = differenceInCalendarDays(when, new Date());
+  const on = format(when, "MMM d, yyyy");
+  // A discontinued medication does not need refilling, so its date stays quiet
+  // however far past it is.
+  if (!active)
+    return {
+      label: `Refill ${on}`,
+      className: "text-muted-foreground",
+      urgent: false,
+    };
+  if (days < 0)
+    return {
+      label: `Refill overdue \u2014 ${on}`,
+      className: "text-destructive",
+      urgent: true,
+    };
+  if (days <= 14)
+    return {
+      label: `Refill ${on}`,
+      className:
+        "rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+      urgent: true,
+    };
+  return {
+    label: `Refill ${on}`,
+    className: "text-muted-foreground",
+    urgent: false,
+  };
+}
 
 const medLabelClass = "text-base font-body font-semibold text-foreground";
 const medControlClass = "h-12 text-base";
@@ -678,220 +717,29 @@ export default function Medications() {
     // wrong the moment the second dose came round.
     const scheduled = useHasDoseReminders(med.id);
 
+    const meta = [med.dosage, med.type].filter(Boolean).join(" · ");
+    const reference = [
+      med.prescribedBy ? `Rx ${med.prescribedBy}` : null,
+      med.pharmacy,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const refill = refillTone(med.refillDate, med.active === 1);
+
     return (
       <Card className="hover-elevate" data-testid={`medication-${med.id}`}>
-        <CardContent className="p-4 space-y-3">
-          {/* Header row: icon + full-width title that wraps naturally */}
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
-              <Pill className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <Link
-                href={`/medications/${med.id}`}
-                className="inline-flex min-h-11 items-center break-words rounded-sm font-heading text-base font-semibold leading-tight text-foreground hover:text-primary sm:text-lg"
-                data-testid={`link-medication-history-${med.id}`}
-              >
-                {med.name}
-              </Link>
-              <div className="flex items-center gap-2 flex-wrap mt-1">
-                <Badge variant="secondary" className="text-xs font-medium">
-                  {med.type}
-                </Badge>
-                {!med.active && (
-                  <Badge variant="outline" className="text-xs font-medium">
-                    Inactive
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Details row: reads across the card, wraps cleanly on narrow widths */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-foreground/80 min-w-0">
-            <span className="font-medium">{med.dosage}</span>
-            <span className="text-muted-foreground/40" aria-hidden="true">
-              •
-            </span>
-            <span className="flex items-center gap-1">
-              {timeIcon(med.timeOfDay)}
-              {med.frequency}
-            </span>
-            {med.purpose && (
-              <>
-                <span className="text-muted-foreground/40" aria-hidden="true">
-                  •
-                </span>
-                <span className="text-muted-foreground">{med.purpose}</span>
-              </>
-            )}
-            {med.prescribedBy && (
-              <>
-                <span className="text-muted-foreground/40" aria-hidden="true">
-                  •
-                </span>
-                <span className="text-muted-foreground">
-                  Rx: {med.prescribedBy}
-                </span>
-              </>
-            )}
-            {med.pharmacy && (
-              <>
-                <span className="text-muted-foreground/40" aria-hidden="true">
-                  •
-                </span>
-                <span className="text-muted-foreground">
-                  Pharmacy: {med.pharmacy}
-                </span>
-              </>
-            )}
-            {med.refillDate && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-semibold px-2 py-0.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Refill: {format(parseISO(med.refillDate), "MMM d, yyyy")}
-              </span>
-            )}
-          </div>
-
-          {/* Action row: Take/Skip on the left, edit/delete on the right */}
-          <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-border/50">
-            <div className="flex items-center gap-2 flex-wrap">
-              {med.active === 1 && <DoseReminderButton med={med} />}
-              {med.active === 1 && scheduled ? (
-                <DoseNextDue med={med} />
-              ) : (
-                med.active === 1 &&
-                (todayLog ? (
-                  todayLog.taken ? (
-                    <Badge
-                      className="status-completed text-xs font-semibold h-9 px-3"
-                      data-testid={`badge-taken-${med.id}`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                      Taken
-                    </Badge>
-                  ) : (
-                    <Badge
-                      className="status-skipped text-xs font-semibold h-9 px-3"
-                      data-testid={`badge-skipped-${med.id}`}
-                    >
-                      <XCircle className="w-3.5 h-3.5 mr-1" />
-                      Skipped
-                    </Badge>
-                  )
-                ) : (
-                  <>
-                    <AlertDialog
-                      open={
-                        pendingDose?.medicationId === med.id &&
-                        pendingDose?.taken === true
-                      }
-                      onOpenChange={(isOpen) => !isOpen && setPendingDose(null)}
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-11 text-sm px-4"
-                        onClick={() =>
-                          setPendingDose({ medicationId: med.id!, taken: true })
-                        }
-                        data-testid={`button-take-${med.id}`}
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Take
-                      </Button>
-                      <AlertDialogContent className="max-w-md">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-heading flex items-center gap-2">
-                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                            Mark as taken?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Record today's dose of{" "}
-                            <span className="font-medium text-foreground">
-                              {med.name}
-                            </span>
-                            {med.dosage ? ` (${med.dosage})` : ""}
-                            {med.frequency ? `, ${med.frequency}` : ""} as
-                            taken.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="gap-2 sm:gap-2">
-                          <AlertDialogCancel
-                            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
-                            data-testid={`button-take-cancel-${med.id}`}
-                          >
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => logDose(med.id!, true)}
-                            className="h-11 text-base sm:h-10 sm:text-sm bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 font-semibold"
-                            data-testid={`button-take-confirm-${med.id}`}
-                          >
-                            <CheckCircle2 className="w-4 h-4 mr-1" /> Mark as
-                            taken
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    <AlertDialog
-                      open={
-                        pendingDose?.medicationId === med.id &&
-                        pendingDose?.taken === false
-                      }
-                      onOpenChange={(isOpen) => !isOpen && setPendingDose(null)}
-                    >
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-11 text-sm px-3 text-muted-foreground"
-                        onClick={() =>
-                          setPendingDose({
-                            medicationId: med.id!,
-                            taken: false,
-                          })
-                        }
-                        data-testid={`button-skip-${med.id}`}
-                      >
-                        Skip
-                      </Button>
-                      <AlertDialogContent className="max-w-md">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-heading flex items-center gap-2">
-                            <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                            Skip this dose?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Record today's dose of{" "}
-                            <span className="font-medium text-foreground">
-                              {med.name}
-                            </span>
-                            {med.dosage ? ` (${med.dosage})` : ""}
-                            {med.frequency ? `, ${med.frequency}` : ""} as
-                            skipped. It won't count as taken in your history.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="gap-2 sm:gap-2">
-                          <AlertDialogCancel
-                            className="h-11 text-base sm:h-10 sm:text-sm mt-0"
-                            data-testid={`button-skip-cancel-${med.id}`}
-                          >
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => logDose(med.id!, false)}
-                            className="h-11 text-base sm:h-10 sm:text-sm bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700 font-semibold"
-                            data-testid={`button-skip-confirm-${med.id}`}
-                          >
-                            <XCircle className="w-4 h-4 mr-1" /> Skip dose
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                ))
-              )}
-            </div>
-            <div className="flex items-center gap-1 ml-auto">
+        <CardContent className="space-y-2 p-4">
+          {/* The name owns the first line and edit/delete ride at its right,
+              so the actions no longer need a row of their own. */}
+          <div className="flex items-start gap-1">
+            <Link
+              href={`/medications/${med.id}`}
+              className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words rounded-sm font-heading text-base font-semibold leading-tight text-foreground hover:text-primary sm:text-lg"
+              data-testid={`link-medication-history-${med.id}`}
+            >
+              {med.name}
+            </Link>
+            <div className="flex shrink-0 items-center">
               <Dialog
                 open={editing?.id === med.id}
                 onOpenChange={(o) => !o && setEditing(null)}
@@ -931,11 +779,11 @@ export default function Medications() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-11 w-11"
+                    className="h-11 w-11 text-muted-foreground hover:text-destructive"
                     data-testid={`button-delete-med-${med.id}`}
                     aria-label={`Delete medication ${med.name}`}
                   >
-                    <Trash2 className="w-4 h-4 text-destructive" />
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="max-w-md">
@@ -972,6 +820,183 @@ export default function Medications() {
               </AlertDialog>
             </div>
           </div>
+
+          {/* `meta` is one string rather than a row of spans and bullet
+              elements: separators that are their own elements wrap like words
+              and strand a bullet at the end of a line. */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="font-medium text-foreground/80">{meta}</span>
+            {med.frequency && (
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                {timeIcon(med.timeOfDay)}
+                {med.frequency}
+              </span>
+            )}
+            {!med.active && (
+              <Badge variant="outline" className="text-xs font-medium">
+                Inactive
+              </Badge>
+            )}
+          </div>
+
+          {med.purpose && (
+            <p className="text-sm text-muted-foreground">{med.purpose}</p>
+          )}
+
+          {reference && (
+            <p className="text-xs text-muted-foreground">{reference}</p>
+          )}
+
+          {refill && (
+            <p
+              className={`inline-flex items-center gap-1.5 text-xs font-medium ${refill.className}`}
+              data-testid={`text-refill-${med.id}`}
+            >
+              {refill.urgent ? (
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <Calendar className="h-3.5 w-3.5 shrink-0" />
+              )}
+              {refill.label}
+            </p>
+          )}
+
+          {/* Dose actions only: an inactive medication has nothing to log, so
+              it ends above rather than carrying an empty ruled row. */}
+          {med.active === 1 && (
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+              <DoseReminderButton med={med} />
+              {scheduled ? (
+                <DoseNextDue med={med} />
+              ) : todayLog ? (
+                todayLog.taken ? (
+                  <Badge
+                    className="status-completed h-9 px-3 text-xs font-semibold"
+                    data-testid={`badge-taken-${med.id}`}
+                  >
+                    <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                    Taken
+                  </Badge>
+                ) : (
+                  <Badge
+                    className="status-skipped h-9 px-3 text-xs font-semibold"
+                    data-testid={`badge-skipped-${med.id}`}
+                  >
+                    <XCircle className="mr-1 h-3.5 w-3.5" />
+                    Skipped
+                  </Badge>
+                )
+              ) : (
+                <>
+                  <AlertDialog
+                    open={
+                      pendingDose?.medicationId === med.id &&
+                      pendingDose?.taken === true
+                    }
+                    onOpenChange={(isOpen) => !isOpen && setPendingDose(null)}
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-11 text-sm px-4"
+                      onClick={() =>
+                        setPendingDose({ medicationId: med.id!, taken: true })
+                      }
+                      data-testid={`button-take-${med.id}`}
+                    >
+                      Take
+                    </Button>
+                    <AlertDialogContent className="max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="font-heading flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          Mark as taken?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Record today's dose of{" "}
+                          <span className="font-medium text-foreground">
+                            {med.name}
+                          </span>
+                          {med.dosage ? ` (${med.dosage})` : ""}
+                          {med.frequency ? `, ${med.frequency}` : ""} as taken.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="gap-2 sm:gap-2">
+                        <AlertDialogCancel
+                          className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                          data-testid={`button-take-cancel-${med.id}`}
+                        >
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => logDose(med.id!, true)}
+                          className="h-11 text-base sm:h-10 sm:text-sm bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 font-semibold"
+                          data-testid={`button-take-confirm-${med.id}`}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" /> Mark as
+                          taken
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <AlertDialog
+                    open={
+                      pendingDose?.medicationId === med.id &&
+                      pendingDose?.taken === false
+                    }
+                    onOpenChange={(isOpen) => !isOpen && setPendingDose(null)}
+                  >
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-11 text-sm px-3 text-muted-foreground"
+                      onClick={() =>
+                        setPendingDose({
+                          medicationId: med.id!,
+                          taken: false,
+                        })
+                      }
+                      data-testid={`button-skip-${med.id}`}
+                    >
+                      Skip
+                    </Button>
+                    <AlertDialogContent className="max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="font-heading flex items-center gap-2">
+                          <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                          Skip this dose?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Record today's dose of{" "}
+                          <span className="font-medium text-foreground">
+                            {med.name}
+                          </span>
+                          {med.dosage ? ` (${med.dosage})` : ""}
+                          {med.frequency ? `, ${med.frequency}` : ""} as
+                          skipped. It won't count as taken in your history.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="gap-2 sm:gap-2">
+                        <AlertDialogCancel
+                          className="h-11 text-base sm:h-10 sm:text-sm mt-0"
+                          data-testid={`button-skip-cancel-${med.id}`}
+                        >
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => logDose(med.id!, false)}
+                          className="h-11 text-base sm:h-10 sm:text-sm bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700 font-semibold"
+                          data-testid={`button-skip-confirm-${med.id}`}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" /> Skip dose
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -1087,7 +1112,11 @@ export default function Medications() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 min-w-0">
+            {/* One tile per row on a phone. Two columns made every tile
+                ~165px wide, so the medication name - the only thing that
+                identifies the tile - was the part that got truncated, and an
+                odd number of medications left a half-width tile dangling. */}
+            <div className="grid min-w-0 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
               {active.map((med) => {
                 const todayLog = logs.find(
                   (l) => l.medicationId === med.id && l.date === today,
@@ -1097,7 +1126,7 @@ export default function Medications() {
                 return (
                   <div
                     key={med.id}
-                    className={`p-2.5 rounded-md text-center text-sm min-w-0 ${
+                    className={`flex min-w-0 items-center gap-2 rounded-md px-3 py-2 text-sm ${
                       taken
                         ? "bg-green-50 dark:bg-green-950/20"
                         : skipped
@@ -1105,25 +1134,33 @@ export default function Medications() {
                           : "bg-secondary/50"
                     }`}
                   >
-                    <div className="flex items-center justify-center gap-1 mb-1 min-w-0">
+                    <span className="shrink-0 text-muted-foreground">
                       {timeIcon(med.timeOfDay)}
-                      <span className="font-semibold truncate">{med.name}</span>
-                    </div>
-                    <span className="text-muted-foreground">{med.dosage}</span>
+                    </span>
+                    {/* Wraps rather than truncates: a long name is still the
+                        name, and a clipped one tells you nothing. */}
+                    <span className="min-w-0 flex-1 font-medium leading-snug">
+                      {med.name}
+                    </span>
+                    {med.dosage && (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {med.dosage}
+                      </span>
+                    )}
                     {taken && (
                       <span
-                        className="inline-flex items-center justify-center gap-1 mt-1 text-xs font-semibold text-green-700 dark:text-green-300"
+                        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-300"
                         data-testid={`schedule-taken-${med.id}`}
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Taken
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Taken
                       </span>
                     )}
                     {skipped && (
                       <span
-                        className="inline-flex items-center justify-center gap-1 mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
+                        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
                         data-testid={`schedule-skipped-${med.id}`}
                       >
-                        <XCircle className="w-3.5 h-3.5" /> Skipped
+                        <XCircle className="h-3.5 w-3.5" /> Skipped
                       </span>
                     )}
                   </div>
