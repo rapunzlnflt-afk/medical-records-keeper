@@ -35,6 +35,7 @@ import {
   type DoseEvent,
   type DoseSchedule,
   type LogDoseResult,
+  describeAlreadyLogged,
 } from "@/lib/dose-schedule";
 import { mirrorDoseLocally } from "@/lib/dose-mirror";
 
@@ -49,7 +50,10 @@ function statusCopy(event: DoseEvent): { title: string; detail: string } {
           : "This dose is already marked as taken.",
       };
     case "skipped":
-      return { title: "Marked as skipped", detail: `This ${due} dose was skipped.` };
+      return {
+        title: "Marked as skipped",
+        detail: `This ${due} dose was skipped.`,
+      };
     case "missed":
       return {
         title: "Recorded as missed",
@@ -71,7 +75,9 @@ export default function DoseConfirm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [submitting, setSubmitting] = useState<null | "taken" | "skipped">(null);
+  const [submitting, setSubmitting] = useState<null | "taken" | "skipped">(
+    null,
+  );
   const [result, setResult] = useState<LogDoseResult | null>(null);
   const [tooSoon, setTooSoon] = useState<LogDoseResult | null>(null);
 
@@ -124,10 +130,7 @@ export default function DoseConfirm() {
       queryClient.invalidateQueries({ queryKey: ["dose-schedules"] });
 
       if (outcome.outcome === "already_logged") {
-        toast({
-          title: "Already recorded",
-          description: "This dose was logged somewhere else.",
-        });
+        toast(describeAlreadyLogged(outcome.status, outcome.taken_at));
         refetch();
       }
     } catch (err) {
@@ -196,7 +199,10 @@ export default function DoseConfirm() {
               aria-hidden="true"
             />
             <div className="space-y-1">
-              <h1 className="text-xl font-semibold" data-testid="text-dose-recorded">
+              <h1
+                className="text-xl font-semibold"
+                data-testid="text-dose-recorded"
+              >
                 {takenNow ? "Dose recorded" : "Dose skipped"}
               </h1>
               <p className="text-muted-foreground">{schedule.label}</p>
@@ -204,7 +210,10 @@ export default function DoseConfirm() {
             {result.next_due_at ? (
               <div className="rounded-lg bg-muted/60 px-4 py-3">
                 <p className="text-sm text-muted-foreground">Next dose</p>
-                <p className="text-lg font-semibold" data-testid="text-next-due">
+                <p
+                  className="text-lg font-semibold"
+                  data-testid="text-next-due"
+                >
                   {formatDueLabel(result.next_due_at)}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -212,7 +221,10 @@ export default function DoseConfirm() {
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground" data-testid="text-course-finished">
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="text-course-finished"
+              >
                 That was the last dose in this course.
               </p>
             )}
@@ -233,9 +245,15 @@ export default function DoseConfirm() {
       <Shell back={backLink}>
         <Card>
           <CardContent className="space-y-4 p-6 text-center">
-            <Clock className="mx-auto h-10 w-10 text-muted-foreground" aria-hidden="true" />
+            <Clock
+              className="mx-auto h-10 w-10 text-muted-foreground"
+              aria-hidden="true"
+            />
             <div className="space-y-1">
-              <h1 className="text-xl font-semibold" data-testid="text-dose-status">
+              <h1
+                className="text-xl font-semibold"
+                data-testid="text-dose-status"
+              >
                 {copy.title}
               </h1>
               <p className="text-muted-foreground">{schedule.label}</p>
@@ -266,16 +284,27 @@ export default function DoseConfirm() {
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               {overdue ? "Dose was due" : "Dose due"}
             </p>
-            <h1 className="text-2xl font-semibold break-words" data-testid="text-dose-label">
+            <h1
+              className="text-2xl font-semibold break-words"
+              data-testid="text-dose-label"
+            >
               {schedule.label}
             </h1>
             {schedule.subject_name && (
-              <p className="text-muted-foreground">for {schedule.subject_name}</p>
+              <p className="text-muted-foreground">
+                for {schedule.subject_name}
+              </p>
             )}
-            <p className="text-3xl font-semibold tabular-nums" data-testid="text-dose-due-at">
+            <p
+              className="text-3xl font-semibold tabular-nums"
+              data-testid="text-dose-due-at"
+            >
               {formatDueLabel(event.due_at)}
             </p>
-            <p className="text-sm text-muted-foreground" data-testid="text-dose-due-relative">
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="text-dose-due-relative"
+            >
               {dueRelative}
             </p>
           </div>
@@ -346,8 +375,8 @@ export default function DoseConfirm() {
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
-            The next dose is scheduled from the time you record, not from when it
-            was due.
+            The next dose is scheduled from the time you record, not from when
+            it was due.
           </p>
         </CardContent>
       </Card>
@@ -356,7 +385,13 @@ export default function DoseConfirm() {
   );
 }
 
-function Shell({ children, back }: { children: React.ReactNode; back: React.ReactNode }) {
+function Shell({
+  children,
+  back,
+}: {
+  children: React.ReactNode;
+  back: React.ReactNode;
+}) {
   return (
     <div className="mx-auto w-full max-w-md space-y-4 p-4 pb-10">
       {back}
@@ -369,7 +404,10 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
   return (
     <Card>
       <CardContent className="space-y-4 p-6 text-center">
-        <AlertTriangle className="mx-auto h-10 w-10 text-muted-foreground" aria-hidden="true" />
+        <AlertTriangle
+          className="mx-auto h-10 w-10 text-muted-foreground"
+          aria-hidden="true"
+        />
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">{title}</h1>
           <p className="text-sm text-muted-foreground">{detail}</p>
@@ -385,8 +423,8 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
 function Disclaimer() {
   return (
     <p className="px-2 text-center text-xs leading-relaxed text-muted-foreground">
-      This is a reminder tool, not a medical device. Notification delivery is not
-      guaranteed — do not rely on it alone for critical medication.
+      This is a reminder tool, not a medical device. Notification delivery is
+      not guaranteed — do not rely on it alone for critical medication.
     </p>
   );
 }

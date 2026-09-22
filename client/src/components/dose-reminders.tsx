@@ -74,6 +74,7 @@ import {
   saveDoseSchedule,
   type DoseSchedule,
   type LogDoseResult,
+  describeAlreadyLogged,
 } from "@/lib/dose-schedule";
 import { mirrorDoseLocally } from "@/lib/dose-mirror";
 import { detectPhoneReminderState } from "@/lib/reminder-sync";
@@ -711,10 +712,7 @@ export function DoseNextDue({ med }: { med: Medication }) {
       refreshDoseState(med.id as number);
 
       if (outcome.outcome === "already_logged") {
-        toast({
-          title: "Already recorded",
-          description: "This dose was recorded somewhere else.",
-        });
+        toast(describeAlreadyLogged(outcome.status, outcome.taken_at));
       } else if (outcome.next_due_at) {
         toast({
           title: taken ? "Dose recorded" : "Dose skipped",

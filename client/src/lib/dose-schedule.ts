@@ -513,6 +513,50 @@ export function formatDueLabel(due: string | Date, now = new Date()): string {
   return `${date.toLocaleDateString([], { weekday: "short" })} ${time}`;
 }
 
+/**
+ * Wording for an `already_logged` outcome.
+ *
+ * "Logged somewhere else" is only true when someone actually logged it. A dose
+ * that ran past its grace period was closed by the server with nobody touching
+ * it, and telling the user it was recorded elsewhere sends them looking for a
+ * second device that doesn't exist.
+ */
+export function describeAlreadyLogged(
+  status: DoseStatus | undefined,
+  takenAt?: string | null,
+): { title: string; description: string } {
+  switch (status) {
+    case "taken":
+      return {
+        title: "Already recorded",
+        description: takenAt
+          ? `This dose was recorded as taken at ${formatDueLabel(takenAt)}.`
+          : "This dose was already recorded as taken.",
+      };
+    case "skipped":
+      return {
+        title: "Marked as skipped",
+        description: "This dose was skipped, so nothing was recorded for it.",
+      };
+    case "missed":
+      return {
+        title: "Recorded as missed",
+        description:
+          "This dose passed its grace period, so the next one was already scheduled.",
+      };
+    case "superseded":
+      return {
+        title: "No longer needed",
+        description: "This reminder was replaced by a newer dose.",
+      };
+    default:
+      return {
+        title: "Already recorded",
+        description: "This dose has already been closed.",
+      };
+  }
+}
+
 /** "in 35 minutes", "25 minutes ago", "now". */
 export function formatRelativeToNow(
   target: string | Date,
