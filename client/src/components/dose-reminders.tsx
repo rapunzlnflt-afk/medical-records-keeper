@@ -151,7 +151,7 @@ export function DoseReminderButton({ med }: { med: Medication }) {
       <Button
         size="sm"
         variant={on ? "secondary" : "ghost"}
-        className="h-11 px-3 text-sm"
+        className="h-11 shrink-0 px-2.5 text-sm"
         // A brand-new notifier goes through the explainer. Editing one that
         // already exists does not — the user has read it for this medication.
         // Deliberately never disabled while the lookup is in flight. This
@@ -166,7 +166,7 @@ export function DoseReminderButton({ med }: { med: Medication }) {
           </>
         ) : (
           <>
-            <BellOff className="mr-1 h-3.5 w-3.5" /> Remind me
+            <BellOff className="mr-1 h-3.5 w-3.5" /> Remind
           </>
         )}
       </Button>
