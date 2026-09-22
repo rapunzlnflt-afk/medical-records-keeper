@@ -57,6 +57,7 @@ import {
   Loader2,
   Moon,
   ShieldAlert,
+  VolumeX,
 } from "lucide-react";
 import {
   DOSE_DEFAULT_GRACE_MIN,
@@ -238,14 +239,15 @@ function DoseExplainerDialog({
               <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
               <span>
                 <span className="font-semibold">
-                  A reminder has to leave this device.
+                  Your reminder times get saved online.
                 </span>{" "}
-                Your phone can't wake itself up for a medication while the app
-                is closed, so the schedule is stored online: the name you choose
-                for the reminder, the times, and nothing else. Your dosage,
-                prescriber, pharmacy, purpose, side effects and notes stay in
-                this browser, as always. You can name the reminder something
-                vague like "morning pill" if you'd rather.
+                This app can only run while it is open on your screen. Switch to
+                another app, lock your phone, or close the tab and it stops — so
+                your reminder has to come from the internet instead. Only two
+                things are saved there: this reminder's name and its times.
+                Everything else — dosage, prescriber, pharmacy, notes — stays in
+                this browser. Rather not store a medication name? Call it
+                "morning pill".
               </span>
             </li>
             <li className="flex gap-2">
@@ -270,6 +272,19 @@ function DoseExplainerDialog({
                 {formatClock(DOSE_DEFAULT_WINDOW_END)} unless you change it, and
                 you can allow overnight reminders on the next screen if you need
                 them.
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <VolumeX className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+              <span>
+                <span className="font-semibold">
+                  A silenced phone stays silent.
+                </span>{" "}
+                These are ordinary phone notifications, so they obey your
+                phone's settings, not this app's. On silent, on Do Not Disturb,
+                or with notifications switched off for your browser, a reminder
+                arrives quietly or not at all. Nothing this app can do will
+                override that.
               </span>
             </li>
             <li className="flex gap-2">
