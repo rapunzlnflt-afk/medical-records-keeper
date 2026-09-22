@@ -1,6 +1,10 @@
 import type { Appointment, Medication, Patient } from "@shared/schema";
 import { format, parseISO } from "date-fns";
-import { getSupabase, isSupabaseConfigured, VAPID_PUBLIC_KEY } from "./supabase";
+import {
+  getSupabase,
+  isSupabaseConfigured,
+  VAPID_PUBLIC_KEY,
+} from "./supabase";
 import { BUILD_COMMIT, BUILD_TIME } from "./build-info";
 import { getAppointments, getMedications, getPatients } from "./db";
 
@@ -54,9 +58,10 @@ export function getLastReminderSyncStatus(): SyncStatusRecord | null {
 function getOrCreateDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
-    id = (typeof crypto !== "undefined" && "randomUUID" in crypto)
-      ? crypto.randomUUID()
-      : `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     localStorage.setItem(DEVICE_ID_KEY, id);
   }
   return id;
@@ -72,14 +77,22 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export function detectPhoneReminderState(): PhoneReminderState {
-  if (typeof window === "undefined") return { status: "unsupported", reason: "No window" };
-  if (!("serviceWorker" in navigator)) return { status: "unsupported", reason: "Service workers not supported" };
-  if (!("PushManager" in window)) return { status: "unsupported", reason: "Push API not supported" };
-  if (!("Notification" in window)) return { status: "unsupported", reason: "Notifications not supported" };
+  if (typeof window === "undefined")
+    return { status: "unsupported", reason: "No window" };
+  if (!("serviceWorker" in navigator))
+    return { status: "unsupported", reason: "Service workers not supported" };
+  if (!("PushManager" in window))
+    return { status: "unsupported", reason: "Push API not supported" };
+  if (!("Notification" in window))
+    return { status: "unsupported", reason: "Notifications not supported" };
   if (!isSupabaseConfigured() || !VAPID_PUBLIC_KEY) {
-    return { status: "not-configured", reason: "Supabase or VAPID not configured" };
+    return {
+      status: "not-configured",
+      reason: "Supabase or VAPID not configured",
+    };
   }
-  if (Notification.permission === "denied") return { status: "permission-denied" };
+  if (Notification.permission === "denied")
+    return { status: "permission-denied" };
   return { status: "permission-default" }; // caller should refresh once subscribed
 }
 
@@ -88,10 +101,48 @@ export function detectPhoneReminderState(): PhoneReminderState {
  * id. Exported so dose-schedule.ts can share one identity per device rather
  * than creating a second anonymous user.
  */
+// One sign-in per page, shared by every caller.
+//
+// Anonymous sign-in is slow — measured at up to 40 seconds on a cold device,
+// most of it spent inside the auth client after the network request has already
+// come back — and several features ask for an identity at once when the app
+// opens. Without this, each caller starts its own sign-in, they serialise behind
+// the auth lock, and the last one waits for all the others.
+let anonAuthInFlight: Promise<string> | null = null;
+
 export async function ensureAnonAuth(): Promise<string> {
+  if (anonAuthInFlight) return anonAuthInFlight;
+  anonAuthInFlight = ensureAnonAuthOnce().catch((err) => {
+    // A failure must not be cached, or the app stays broken until reload.
+    anonAuthInFlight = null;
+    throw err;
+  });
+  return anonAuthInFlight;
+}
+
+/**
+ * The user id of an EXISTING session, or null when this device has never signed
+ * in. Read paths use this instead of ensureAnonAuth: a device with no identity
+ * owns no rows, so there is nothing to fetch and no reason to spend forty
+ * seconds creating an identity just to discover that.
+ */
+export async function currentUserId(): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return null;
+    return data.session?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureAnonAuthOnce(): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
-  const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+  const { data: sessionData, error: sessErr } =
+    await supabase.auth.getSession();
   if (sessErr) throw new Error(`get session failed: ${sessErr.message}`);
   if (sessionData.session?.user) return sessionData.session.user.id;
   const { data, error } = await supabase.auth.signInAnonymously();
@@ -136,7 +187,9 @@ async function upsertDevice(): Promise<{ userId: string; endpoint: string }> {
     .select("id");
   if (error) throw new Error(`device upsert failed: ${error.message}`);
   if (!data || data.length === 0) {
-    throw new Error("device upsert returned no rows (RLS may have hidden it from select)");
+    throw new Error(
+      "device upsert returned no rows (RLS may have hidden it from select)",
+    );
   }
   return { userId, endpoint: sub.endpoint };
 }
@@ -147,7 +200,12 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
     message: string,
     stage?: string,
   ): SyncStatusRecord => {
-    const rec: SyncStatusRecord = { ts: new Date().toISOString(), ok, message, stage };
+    const rec: SyncStatusRecord = {
+      ts: new Date().toISOString(),
+      ok,
+      message,
+      stage,
+    };
     writeStatus(DEVICE_SYNC_KEY, rec);
     return rec;
   };
@@ -159,8 +217,15 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
 
   try {
     const initial = detectPhoneReminderState();
-    if (initial.status === "unsupported" || initial.status === "not-configured") {
-      stamp(false, initial.status === "unsupported" ? initial.reason : initial.reason, initial.status);
+    if (
+      initial.status === "unsupported" ||
+      initial.status === "not-configured"
+    ) {
+      stamp(
+        false,
+        initial.status === "unsupported" ? initial.reason : initial.reason,
+        initial.status,
+      );
       return initial;
     }
 
@@ -169,7 +234,11 @@ export async function enablePhoneReminders(): Promise<PhoneReminderState> {
       permission = await Notification.requestPermission();
     } catch (err: any) {
       stamp(false, err?.message ?? String(err), "request-permission");
-      return { status: "error", message: err?.message ?? String(err), stage: "request-permission" };
+      return {
+        status: "error",
+        message: err?.message ?? String(err),
+        stage: "request-permission",
+      };
     }
     if (permission === "denied") {
       stamp(false, "permission denied", "permission");
@@ -264,9 +333,10 @@ export async function getDailyMedsNudge(): Promise<DailyMedsNudgeSettings> {
       .eq("device_id", deviceId)
       .maybeSingle();
     if (error || !data) return { ...DAILY_MEDS_NUDGE_DEFAULTS };
-    const time = typeof data.local_time === "string" && isValidLocalTime(data.local_time)
-      ? data.local_time
-      : DAILY_MEDS_NUDGE_DEFAULT_TIME;
+    const time =
+      typeof data.local_time === "string" && isValidLocalTime(data.local_time)
+        ? data.local_time
+        : DAILY_MEDS_NUDGE_DEFAULT_TIME;
     return { enabled: Boolean(data.enabled), time };
   } catch {
     return { ...DAILY_MEDS_NUDGE_DEFAULTS };
@@ -287,7 +357,9 @@ export async function setDailyMedsNudge(
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
 
-  const time = isValidLocalTime(next.time) ? next.time : DAILY_MEDS_NUDGE_DEFAULT_TIME;
+  const time = isValidLocalTime(next.time)
+    ? next.time
+    : DAILY_MEDS_NUDGE_DEFAULT_TIME;
   const userId = await ensureAnonAuth();
   const deviceId = getOrCreateDeviceId();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -301,15 +373,25 @@ export async function setDailyMedsNudge(
   const { data, error } = await supabase
     .from("daily_nudges")
     .upsert(
-      { user_id: userId, device_id: deviceId, enabled: next.enabled, local_time: time },
+      {
+        user_id: userId,
+        device_id: deviceId,
+        enabled: next.enabled,
+        local_time: time,
+      },
       { onConflict: "user_id,device_id" },
     )
     .select("enabled, local_time");
   if (error) throw new Error(`daily nudge save failed: ${error.message}`);
   if (!data || data.length === 0) {
-    throw new Error("daily nudge save returned no rows (RLS may have hidden it from select)");
+    throw new Error(
+      "daily nudge save returned no rows (RLS may have hidden it from select)",
+    );
   }
-  return { enabled: Boolean(data[0].enabled), time: data[0].local_time ?? time };
+  return {
+    enabled: Boolean(data[0].enabled),
+    time: data[0].local_time ?? time,
+  };
 }
 
 /** "20:00" -> "8:00 PM", for display only. */
@@ -384,7 +466,11 @@ export async function collectPhoneReminderDiagnostics(): Promise<PhoneReminderDi
 
 function collectStaticDiagnostics(): Omit<
   PhoneReminderDiagnostics,
-  "authedUserId" | "lastDeviceSync" | "lastReminderSync" | "serviceWorkerScriptUrl" | "serviceWorkerState"
+  | "authedUserId"
+  | "lastDeviceSync"
+  | "lastReminderSync"
+  | "serviceWorkerScriptUrl"
+  | "serviceWorkerState"
 > {
   if (typeof window === "undefined") {
     return {
@@ -412,14 +498,20 @@ function collectStaticDiagnostics(): Omit<
 
   const ua = navigator.userAgent || "";
   const platform = (navigator as any).platform || "";
-  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
     (platform === "MacIntel" && (navigator as any).maxTouchPoints > 1);
   const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
 
   const displayModes = ["standalone", "fullscreen", "minimal-ui", "browser"];
-  const displayMode = displayModes.find((m) => window.matchMedia(`(display-mode: ${m})`).matches) ?? "unknown";
-  const isStandalone = displayMode === "standalone" ||
-    (typeof (navigator as any).standalone === "boolean" && (navigator as any).standalone === true);
+  const displayMode =
+    displayModes.find(
+      (m) => window.matchMedia(`(display-mode: ${m})`).matches,
+    ) ?? "unknown";
+  const isStandalone =
+    displayMode === "standalone" ||
+    (typeof (navigator as any).standalone === "boolean" &&
+      (navigator as any).standalone === true);
 
   let deviceId = "";
   try {
@@ -429,7 +521,8 @@ function collectStaticDiagnostics(): Omit<
   }
 
   return {
-    notificationPermission: "Notification" in window ? Notification.permission : "unavailable",
+    notificationPermission:
+      "Notification" in window ? Notification.permission : "unavailable",
     serviceWorkerSupported: "serviceWorker" in navigator,
     pushManagerSupported: "PushManager" in window,
     notificationApiSupported: "Notification" in window,
@@ -438,7 +531,10 @@ function collectStaticDiagnostics(): Omit<
     origin: window.location.origin,
     hostname: window.location.hostname,
     protocol: window.location.protocol,
-    isSecureContext: typeof window.isSecureContext === "boolean" ? window.isSecureContext : false,
+    isSecureContext:
+      typeof window.isSecureContext === "boolean"
+        ? window.isSecureContext
+        : false,
     supabaseConfigured: isSupabaseConfigured(),
     vapidConfigured: Boolean(VAPID_PUBLIC_KEY),
     platform,
@@ -500,14 +596,21 @@ function formatTime12Hour(time: string): string {
   return `${hour12}:${mm} ${period}`;
 }
 
-function describeAppointmentWhen(appointmentDate: string, appointmentTime: string, fireAt: Date): string {
+function describeAppointmentWhen(
+  appointmentDate: string,
+  appointmentTime: string,
+  fireAt: Date,
+): string {
   // Both dates are in the user's local timezone. Compare by Y-M-D so DST
   // shifts don't bump the bucket.
   const appt = parseISO(`${appointmentDate}T${appointmentTime || "00:00"}:00`);
   if (Number.isNaN(appt.getTime())) {
-    return appointmentTime ? formatTime12Hour(appointmentTime) : appointmentDate;
+    return appointmentTime
+      ? formatTime12Hour(appointmentTime)
+      : appointmentDate;
   }
-  const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const dayKey = (d: Date) =>
+    `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   const fireKey = dayKey(fireAt);
   const apptKey = dayKey(appt);
   const tomorrow = new Date(fireAt);
@@ -521,7 +624,10 @@ function describeAppointmentWhen(appointmentDate: string, appointmentTime: strin
   return timePart ? `${datePart} at ${timePart}` : datePart;
 }
 
-function appointmentReminders(appointments: Appointment[], _patients: Map<number, Patient>): SyncedReminder[] {
+function appointmentReminders(
+  appointments: Appointment[],
+  _patients: Map<number, Patient>,
+): SyncedReminder[] {
   const out: SyncedReminder[] = [];
   for (const a of appointments) {
     if (!a.reminderDate || a.status !== "upcoming") continue;
@@ -549,7 +655,10 @@ function appointmentReminders(appointments: Appointment[], _patients: Map<number
   return out.filter((r) => r.source_id > 0);
 }
 
-function medicationReminders(medications: Medication[], _patients: Map<number, Patient>): SyncedReminder[] {
+function medicationReminders(
+  medications: Medication[],
+  _patients: Map<number, Patient>,
+): SyncedReminder[] {
   // Only refill-date reminders are scheduled centrally; recurring time-of-day
   // dosing is local-only because expanding it server-side would replicate too
   // much patient context. Refill date is a single occurrence.
@@ -565,9 +674,10 @@ function medicationReminders(medications: Medication[], _patients: Map<number, P
     const detailParts = [m.dosage?.trim(), m.frequency?.trim()].filter(
       (s): s is string => Boolean(s && s.length > 0),
     );
-    const body = detailParts.length > 0
-      ? `Refill due ${refillDateText} · ${detailParts.join(" · ")}`
-      : `Refill due ${refillDateText}`;
+    const body =
+      detailParts.length > 0
+        ? `Refill due ${refillDateText} · ${detailParts.join(" · ")}`
+        : `Refill due ${refillDateText}`;
     out.push({
       source: "medication",
       source_id: m.id ?? -1,
@@ -586,7 +696,12 @@ export async function syncRemindersToSupabase(opts: {
   medications: Medication[];
   patients: Patient[];
 }): Promise<{ synced: number } | { skipped: string }> {
-  const stamp = (ok: boolean, message: string, count?: number, stage?: string) => {
+  const stamp = (
+    ok: boolean,
+    message: string,
+    count?: number,
+    stage?: string,
+  ) => {
     stampReminderStatus({
       ts: new Date().toISOString(),
       ok,
@@ -672,7 +787,12 @@ export async function syncRemindersToSupabase(opts: {
   }
 
   const count = inserted?.length ?? rows.length;
-  stamp(true, `synced ${count} reminder${count === 1 ? "" : "s"}`, count, "insert");
+  stamp(
+    true,
+    `synced ${count} reminder${count === 1 ? "" : "s"}`,
+    count,
+    "insert",
+  );
   return { synced: count };
 }
 
@@ -705,7 +825,9 @@ function stampReminderStatus(record: SyncStatusRecord): void {
   writeStatus(REMINDER_SYNC_KEY, record);
   if (typeof window !== "undefined") {
     try {
-      window.dispatchEvent(new CustomEvent("mrk-reminder-sync-status", { detail: record }));
+      window.dispatchEvent(
+        new CustomEvent("mrk-reminder-sync-status", { detail: record }),
+      );
     } catch {
       // ignore — event broadcast is best-effort
     }
@@ -743,7 +865,8 @@ async function runSyncOnce(): Promise<void> {
   }
 
   try {
-    const { patients, appointments, medications } = await loadAllRemindersData();
+    const { patients, appointments, medications } =
+      await loadAllRemindersData();
     await syncRemindersToSupabase({ patients, appointments, medications });
   } catch (err: any) {
     stampReminderStatus({

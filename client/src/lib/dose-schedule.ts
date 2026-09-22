@@ -17,10 +17,11 @@
 // call sites that the UI cannot do anything about.
 
 import { getSupabase, isSupabaseConfigured } from "./supabase";
-import { ensureAnonAuth } from "./reminder-sync";
+import { currentUserId, ensureAnonAuth } from "./reminder-sync";
 
 export type DoseAnchor = "fixed" | "from_last_dose";
-export type DoseStatus = "pending" | "taken" | "skipped" | "missed" | "superseded";
+export type DoseStatus =
+  "pending" | "taken" | "skipped" | "missed" | "superseded";
 
 /** Server row: the rule. */
 export interface DoseSchedule {
@@ -122,11 +123,14 @@ export function isDoseSchedulingAvailable(): boolean {
  * rather than throwing when the backend is unreachable, so a medication card
  * degrades to its normal local behaviour instead of failing to render.
  */
-export async function getDoseSchedule(medicationId: number): Promise<DoseSchedule | null> {
+export async function getDoseSchedule(
+  medicationId: number,
+): Promise<DoseSchedule | null> {
   if (!isDoseSchedulingAvailable()) return null;
   try {
+    const userId = await currentUserId();
+    if (!userId) return null;
     const supabase = requireClient();
-    const userId = await ensureAnonAuth();
     const { data, error } = await supabase
       .from("dose_schedules")
       .select("*")
@@ -145,8 +149,9 @@ export async function getDoseSchedules(): Promise<Map<number, DoseSchedule>> {
   const out = new Map<number, DoseSchedule>();
   if (!isDoseSchedulingAvailable()) return out;
   try {
+    const userId = await currentUserId();
+    if (!userId) return out;
     const supabase = requireClient();
-    const userId = await ensureAnonAuth();
     const { data, error } = await supabase
       .from("dose_schedules")
       .select("*")
@@ -165,11 +170,13 @@ export async function getDoseSchedules(): Promise<Map<number, DoseSchedule>> {
  * row by construction — a phone that was off for two days cannot come back to
  * a backlog of stale doses.
  */
-export async function getOpenDose(scheduleId: string): Promise<DoseEvent | null> {
+export async function getOpenDose(
+  scheduleId: string,
+): Promise<DoseEvent | null> {
   if (!isDoseSchedulingAvailable()) return null;
   try {
+    if (!(await currentUserId())) return null;
     const supabase = requireClient();
-    await ensureAnonAuth();
     const { data, error } = await supabase
       .from("dose_events")
       .select("*")
@@ -187,8 +194,8 @@ export async function getOpenDose(scheduleId: string): Promise<DoseEvent | null>
 export async function getDoseEvent(eventId: string): Promise<DoseEvent | null> {
   if (!isDoseSchedulingAvailable()) return null;
   try {
+    if (!(await currentUserId())) return null;
     const supabase = requireClient();
-    await ensureAnonAuth();
     const { data, error } = await supabase
       .from("dose_events")
       .select("*")
@@ -222,11 +229,14 @@ export async function getDoseEventWithSchedule(
 }
 
 /** Recent occurrences, newest first. Used by the medication history view. */
-export async function listDoseEvents(scheduleId: string, limit = 30): Promise<DoseEvent[]> {
+export async function listDoseEvents(
+  scheduleId: string,
+  limit = 30,
+): Promise<DoseEvent[]> {
   if (!isDoseSchedulingAvailable()) return [];
   try {
+    if (!(await currentUserId())) return [];
     const supabase = requireClient();
-    await ensureAnonAuth();
     const { data, error } = await supabase
       .from("dose_events")
       .select("*")
@@ -277,7 +287,8 @@ export async function saveDoseSchedule(
     .upsert(row, { onConflict: "user_id,source_id" })
     .select("*")
     .single();
-  if (error) throw new Error(`Could not save the dose schedule: ${error.message}`);
+  if (error)
+    throw new Error(`Could not save the dose schedule: ${error.message}`);
 
   const schedule = data as DoseSchedule;
   if (schedule.enabled) await ensureOpenDose(schedule);
@@ -293,7 +304,9 @@ export async function saveDoseSchedule(
  * a duplicate insert harmless — it fails closed, which is why the error is
  * swallowed here.
  */
-export async function ensureOpenDose(schedule: DoseSchedule): Promise<DoseEvent | null> {
+export async function ensureOpenDose(
+  schedule: DoseSchedule,
+): Promise<DoseEvent | null> {
   const existing = await getOpenDose(schedule.id);
   if (existing) return existing;
   try {
@@ -367,7 +380,8 @@ export async function disableDoseSchedule(medicationId: number): Promise<void> {
     .update({ enabled: false, updated_at: new Date().toISOString() })
     .eq("user_id", userId)
     .eq("source_id", medicationId);
-  if (error) throw new Error(`Could not turn off scheduled dosing: ${error.message}`);
+  if (error)
+    throw new Error(`Could not turn off scheduled dosing: ${error.message}`);
 
   await supabase
     .from("dose_events")
@@ -406,17 +420,24 @@ export async function deleteDoseSchedule(medicationId: number): Promise<void> {
  * restate something they already typed. Returns null when unsure — a wrong
  * guess here is worse than no guess.
  */
-export function parseFrequencyToIntervalMin(frequency: string | null | undefined): number | null {
+export function parseFrequencyToIntervalMin(
+  frequency: string | null | undefined,
+): number | null {
   if (!frequency) return null;
   const text = frequency.toLowerCase().trim();
 
-  const everyHours = text.match(/every\s+(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/);
+  const everyHours = text.match(
+    /every\s+(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/,
+  );
   if (everyHours) {
     const hours = Number.parseFloat(everyHours[1]);
-    if (Number.isFinite(hours) && hours > 0) return clampInterval(Math.round(hours * 60));
+    if (Number.isFinite(hours) && hours > 0)
+      return clampInterval(Math.round(hours * 60));
   }
 
-  const everyMinutes = text.match(/every\s+(\d+)\s*(?:m|min|mins|minute|minutes)\b/);
+  const everyMinutes = text.match(
+    /every\s+(\d+)\s*(?:m|min|mins|minute|minutes)\b/,
+  );
   if (everyMinutes) {
     const mins = Number.parseInt(everyMinutes[1], 10);
     if (Number.isFinite(mins) && mins > 0) return clampInterval(mins);
@@ -434,11 +455,20 @@ export function parseFrequencyToIntervalMin(frequency: string | null | undefined
   const perDay = text.match(/(\d+)\s*(?:x|times)\s*(?:a|per)?\s*(?:day|daily)/);
   if (perDay) {
     const n = Number.parseInt(perDay[1], 10);
-    if (Number.isFinite(n) && n >= 1 && n <= 24) return clampInterval(Math.round(1440 / n));
+    if (Number.isFinite(n) && n >= 1 && n <= 24)
+      return clampInterval(Math.round(1440 / n));
   }
 
-  if (/\b(once|1x)\s*(?:a|per)?\s*(?:day|daily)\b/.test(text) || text === "daily") return 1440;
-  if (/\btwice\s*(?:a|per)?\s*(?:day|daily)\b/.test(text) || /\bbid\b/.test(text)) return 720;
+  if (
+    /\b(once|1x)\s*(?:a|per)?\s*(?:day|daily)\b/.test(text) ||
+    text === "daily"
+  )
+    return 1440;
+  if (
+    /\btwice\s*(?:a|per)?\s*(?:day|daily)\b/.test(text) ||
+    /\bbid\b/.test(text)
+  )
+    return 720;
   if (/\bthree times\b/.test(text) || /\btid\b/.test(text)) return 480;
   if (/\bfour times\b/.test(text) || /\bqid\b/.test(text)) return 360;
 
@@ -467,20 +497,27 @@ export function describeInterval(intervalMin: number): string {
 export function formatDueLabel(due: string | Date, now = new Date()): string {
   const date = typeof due === "string" ? new Date(due) : due;
   if (Number.isNaN(date.getTime())) return "";
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
   const sameDay = date.toDateString() === now.toDateString();
   if (sameDay) return time;
 
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow ${time}`;
+  if (date.toDateString() === tomorrow.toDateString())
+    return `Tomorrow ${time}`;
 
   return `${date.toLocaleDateString([], { weekday: "short" })} ${time}`;
 }
 
 /** "in 35 minutes", "25 minutes ago", "now". */
-export function formatRelativeToNow(target: string | Date, now = new Date()): string {
+export function formatRelativeToNow(
+  target: string | Date,
+  now = new Date(),
+): string {
   const date = typeof target === "string" ? new Date(target) : target;
   if (Number.isNaN(date.getTime())) return "";
   const diffMin = Math.round((date.getTime() - now.getTime()) / 60000);
@@ -504,5 +541,8 @@ export function formatRelativeToNow(target: string | Date, now = new Date()): st
 
 /** True when a pending dose is past due but still inside its grace period. */
 export function isDoseDue(event: DoseEvent, now = new Date()): boolean {
-  return event.status === "pending" && new Date(event.due_at).getTime() <= now.getTime();
+  return (
+    event.status === "pending" &&
+    new Date(event.due_at).getTime() <= now.getTime()
+  );
 }
