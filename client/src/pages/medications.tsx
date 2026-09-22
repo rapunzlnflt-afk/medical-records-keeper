@@ -728,18 +728,39 @@ export default function Medications() {
 
     return (
       <Card className="hover-elevate" data-testid={`medication-${med.id}`}>
-        <CardContent className="space-y-2 p-4">
+        <CardContent className="space-y-1.5 p-4">
           {/* The name owns the first line and edit/delete ride at its right,
               so the actions no longer need a row of their own. */}
+          <Link
+            href={`/medications/${med.id}`}
+            className="block rounded-sm py-1.5 font-heading text-base font-semibold leading-tight text-foreground break-words hover:text-primary sm:text-lg"
+            data-testid={`link-medication-history-${med.id}`}
+          >
+            {med.name}
+          </Link>
+
+          {/* `meta` is one string rather than a row of spans and bullet
+              elements: separators that are their own elements wrap like words
+              and strand a bullet at the end of a line. */}
+          {/* edit/delete ride beside the dosage line: the name needs the
+              whole width on a narrow phone, and a long one collided with
+              these icons when they shared its row. */}
           <div className="flex items-start gap-1">
-            <Link
-              href={`/medications/${med.id}`}
-              className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words rounded-sm font-heading text-base font-semibold leading-tight text-foreground hover:text-primary sm:text-lg"
-              data-testid={`link-medication-history-${med.id}`}
-            >
-              {med.name}
-            </Link>
-            <div className="flex shrink-0 items-center">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <span className="font-medium text-foreground/80">{meta}</span>
+              {med.frequency && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  {timeIcon(med.timeOfDay)}
+                  {med.frequency}
+                </span>
+              )}
+              {!med.active && (
+                <Badge variant="outline" className="text-xs font-medium">
+                  Inactive
+                </Badge>
+              )}
+            </div>
+            <div className="-mt-2 flex shrink-0 items-center">
               <Dialog
                 open={editing?.id === med.id}
                 onOpenChange={(o) => !o && setEditing(null)}
@@ -821,24 +842,6 @@ export default function Medications() {
             </div>
           </div>
 
-          {/* `meta` is one string rather than a row of spans and bullet
-              elements: separators that are their own elements wrap like words
-              and strand a bullet at the end of a line. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <span className="font-medium text-foreground/80">{meta}</span>
-            {med.frequency && (
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
-                {timeIcon(med.timeOfDay)}
-                {med.frequency}
-              </span>
-            )}
-            {!med.active && (
-              <Badge variant="outline" className="text-xs font-medium">
-                Inactive
-              </Badge>
-            )}
-          </div>
-
           {med.purpose && (
             <p className="text-sm text-muted-foreground">{med.purpose}</p>
           )}
@@ -864,7 +867,7 @@ export default function Medications() {
           {/* Dose actions only: an inactive medication has nothing to log, so
               it ends above rather than carrying an empty ruled row. */}
           {med.active === 1 && (
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+            <div className="flex items-center gap-1 border-t border-border/50 pt-2">
               <DoseReminderButton med={med} />
               {scheduled ? (
                 <DoseNextDue med={med} />
@@ -898,7 +901,7 @@ export default function Medications() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-11 text-sm px-4"
+                      className="h-11 shrink-0 px-3 text-sm"
                       onClick={() =>
                         setPendingDose({ medicationId: med.id!, taken: true })
                       }
@@ -949,7 +952,7 @@ export default function Medications() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-11 text-sm px-3 text-muted-foreground"
+                      className="h-11 shrink-0 px-2.5 text-sm text-muted-foreground"
                       onClick={() =>
                         setPendingDose({
                           medicationId: med.id!,
