@@ -151,19 +151,21 @@ export function DoseReminderButton({ med }: { med: Medication }) {
       <Button
         size="sm"
         variant={on ? "secondary" : "ghost"}
-        className="h-11 shrink-0 px-2.5 text-sm"
+        className={
+          on ? "h-11 w-11 shrink-0 p-0" : "h-11 shrink-0 px-2.5 text-sm"
+        }
         // A brand-new notifier goes through the explainer. Editing one that
         // already exists does not — the user has read it for this medication.
         // Deliberately never disabled while the lookup is in flight. This
         // control depends on a network round trip, and a button that cannot be
         // pressed because the backend is slow or unreachable just looks broken.
         onClick={() => setStep(schedule ? "settings" : "explainer")}
+        aria-label={on ? "Reminders on — change settings" : undefined}
+        title={on ? "Reminders on" : undefined}
         data-testid={`button-dose-reminders-${med.id}`}
       >
         {on ? (
-          <>
-            <BellRing className="mr-1 h-3.5 w-3.5" /> Reminders on
-          </>
+          <BellRing className="h-4 w-4" />
         ) : (
           <>
             <BellOff className="mr-1 h-3.5 w-3.5" /> Remind
@@ -688,12 +690,11 @@ function DoseSettingsDialog({
  * card decides to fall back to its normal local behaviour — a medication
  * without reminders works exactly as it did before any of this existed.
  */
-export function DoseNextDue({ med }: { med: Medication }) {
-  const { data: schedule } = useSchedule(med.id);
-  const [pendingForce, setPendingForce] = useState<LogDoseResult | null>(null);
-  const [busy, setBusy] = useState(false);
-  const { toast } = useToast();
-
+/** Schedule plus its open dose. Shared so the status line and the buttons
+ *  below it can never disagree about what is due. Same query key, so the
+ *  second caller reads the cache rather than refetching. */
+function useDoseState(medId: number | undefined) {
+  const { data: schedule } = useSchedule(medId);
   const enabled = Boolean(schedule?.enabled);
   const { data: openDose } = useQuery({
     queryKey: openDoseKey(schedule?.id ?? "none"),
@@ -702,6 +703,48 @@ export function DoseNextDue({ med }: { med: Medication }) {
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
+  return { schedule, openDose, enabled };
+}
+
+/** What is due, on its own full-width line above the action row. This used to
+ *  be a pill inside the action row, where it had no width left and wrapped
+ *  into a four-line grey blob on a phone. */
+export function DoseStatusLine({ med }: { med: Medication }) {
+  const { schedule, openDose, enabled } = useDoseState(med.id);
+  if (!enabled || !schedule) return null;
+
+  if (!openDose) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {describeInterval(schedule.interval_min)} — scheduling the next dose.
+      </p>
+    );
+  }
+
+  const due = new Date(openDose.due_at).getTime() <= Date.now();
+  return (
+    <p
+      className={`flex items-center gap-1.5 text-xs ${
+        due ? "font-semibold text-primary" : "text-muted-foreground"
+      }`}
+      data-testid={`dose-status-${med.id}`}
+    >
+      <Clock className="h-3.5 w-3.5 shrink-0" />
+      <span>
+        {due ? "Dose due" : "Next dose"} {formatDueLabel(openDose.due_at)}{" "}
+        <span className="font-normal">
+          ({formatRelativeToNow(openDose.due_at)})
+        </span>
+      </span>
+    </p>
+  );
+}
+
+export function DoseNextDue({ med }: { med: Medication }) {
+  const [pendingForce, setPendingForce] = useState<LogDoseResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+  const { schedule, openDose, enabled } = useDoseState(med.id);
 
   if (!enabled || !schedule) return null;
 
@@ -743,34 +786,14 @@ export function DoseNextDue({ med }: { med: Medication }) {
     }
   }
 
-  const due = openDose
-    ? new Date(openDose.due_at).getTime() <= Date.now()
-    : false;
-
   return (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      data-testid={`dose-next-${med.id}`}
-    >
+    <>
       {openDose ? (
         <>
-          <span
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ${
-              due
-                ? "bg-primary/10 text-primary"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            {due ? "Dose due" : "Next dose"} {formatDueLabel(openDose.due_at)}
-            <span className="font-normal">
-              ({formatRelativeToNow(openDose.due_at)})
-            </span>
-          </span>
           <Button
             size="sm"
             variant="outline"
-            className="h-11 px-4 text-sm"
+            className="h-11 shrink-0 px-3 text-sm"
             onClick={() => record(true)}
             disabled={busy}
             data-testid={`button-dose-take-${med.id}`}
@@ -780,7 +803,7 @@ export function DoseNextDue({ med }: { med: Medication }) {
           <Button
             size="sm"
             variant="ghost"
-            className="h-11 px-3 text-sm text-muted-foreground"
+            className="h-11 shrink-0 px-2.5 text-sm text-muted-foreground"
             onClick={() => record(false)}
             disabled={busy}
             data-testid={`button-dose-skip-${med.id}`}
@@ -788,11 +811,7 @@ export function DoseNextDue({ med }: { med: Medication }) {
             Skip
           </Button>
         </>
-      ) : (
-        <span className="text-xs text-muted-foreground">
-          {describeInterval(schedule.interval_min)} — scheduling the next dose.
-        </span>
-      )}
+      ) : null}
 
       {/* too_soon is not an error. The spacing guard exists to catch a double
           tap or a forgotten dose, but a dose genuinely taken early is a real
@@ -835,7 +854,7 @@ export function DoseNextDue({ med }: { med: Medication }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }
 
