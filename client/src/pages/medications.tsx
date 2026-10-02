@@ -291,8 +291,11 @@ function MedicationForm({
   const canSubmit = Boolean(form.name && form.dosage);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
+    // flex-1 + min-h-0, not h-full: this sits under the dialog header, so
+    // h-full made it one header taller than the screen and the dialog's
+    // overflow-hidden cut the bottom of the form (Notes) off.
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
         <MedFieldSection
           icon={Pill}
           title="Medication Details"
