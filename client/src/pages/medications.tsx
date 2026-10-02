@@ -69,7 +69,16 @@ import {
   Calendar,
   ArrowLeft,
   ChevronDown,
+  Archive,
+  ArchiveRestore,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Collapsible,
   CollapsibleContent,
@@ -78,10 +87,11 @@ import {
 import {
   DoseReminderButton,
   DoseStatusLine,
+  refreshDoseState,
   DoseNextDue,
   useHasDoseReminders,
 } from "@/components/dose-reminders";
-import { deleteDoseSchedule } from "@/lib/dose-schedule";
+import { deleteDoseSchedule, disableDoseSchedule } from "@/lib/dose-schedule";
 import type { Medication, MedicationLog, Physician } from "@shared/schema";
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { Link, useLocation } from "wouter";
@@ -417,22 +427,6 @@ function MedicationForm({
               </Select>
             </div>
           </div>
-          {isEdit && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3">
-              <div className="min-w-0">
-                <Label className={medLabelClass}>Active</Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Turn off to keep this medication in history without dose
-                  prompts.
-                </p>
-              </div>
-              <Switch
-                checked={form.active === 1}
-                onCheckedChange={(c) => setForm({ ...form, active: c ? 1 : 0 })}
-                data-testid="switch-med-active"
-              />
-            </div>
-          )}
         </MedFieldSection>
 
         <MedFieldSection
@@ -608,6 +602,9 @@ export default function Medications() {
   const pid = activePatientId;
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Medication | null>(null);
+  // Held at page level: MedCard is redefined on every render, so state kept
+  // inside it would reset on any refetch and could close the dialog mid-tap.
+  const [deleting, setDeleting] = useState<Medication | null>(null);
   const [pendingDose, setPendingDose] = useState<{
     medicationId: number;
     taken: boolean;
@@ -649,6 +646,65 @@ export default function Medications() {
       invalidateMeds();
       setEditing(null);
       toast({ title: "Medication updated" });
+    },
+  });
+  // Archive is the old "inactive" state with a one-tap control. An archived
+  // medication must also stop reminding: marking a med inactive used to leave
+  // its server schedule running, so pushes kept arriving for it. Best effort,
+  // like delete: an unreachable backend must not block the local change.
+  const archiveMut = useMutation({
+    mutationFn: async ({
+      med,
+      archive,
+    }: {
+      med: Medication;
+      archive: boolean;
+    }) => {
+      // Whether this medication is known to have live reminders, from the
+      // card's own schedule query. If it does, they must actually be switched
+      // off before the medication is archived: an archived card has no bell,
+      // so a schedule left running would keep pushing with no way to stop it.
+      const cached = queryClient.getQueryData<{ enabled?: boolean } | null>([
+        "dose-schedule",
+        med.id,
+      ]);
+      const hadReminders = Boolean(cached?.enabled);
+      if (archive) {
+        if (hadReminders) {
+          await disableDoseSchedule(med.id!); // throws: archive is refused
+        } else {
+          // No known schedule. Still try, quietly, in case the cache was cold;
+          // offline must not block archiving a medication with no reminders.
+          await disableDoseSchedule(med.id!).catch(() => undefined);
+        }
+      }
+      await updateMedication(med.id!, { ...med, active: archive ? 0 : 1 });
+      return { med, archive, hadReminders };
+    },
+    onSuccess: ({ med, archive, hadReminders }) => {
+      invalidateMeds();
+      refreshDoseState(med.id!);
+      toast(
+        archive
+          ? {
+              title: `${med.name} archived`,
+              description: hadReminders
+                ? "Its reminders are off. Find it under Archived to restore it."
+                : "Find it under Archived to restore it.",
+            }
+          : {
+              title: `${med.name} restored`,
+              description: "Tap the bell to turn reminders back on.",
+            },
+      );
+    },
+    onError: () => {
+      toast({
+        title: "Couldn't archive",
+        description:
+          "Its reminders couldn't be turned off. Check your connection and try again.",
+        variant: "destructive",
+      });
     },
   });
   const deleteMut = useMutation({
@@ -757,7 +813,7 @@ export default function Medications() {
               )}
               {!med.active && (
                 <Badge variant="outline" className="text-xs font-medium">
-                  Inactive
+                  Archived
                 </Badge>
               )}
             </div>
@@ -796,18 +852,46 @@ export default function Medications() {
                   />
                 </DialogContent>
               </Dialog>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              {/* Archive and Delete share one menu: both take a medication off
+                  the active list, and a third icon squeezed the dosage line
+                  into a mid-phrase wrap on a 375px phone. Delete also moves
+                  one deliberate tap further from an accidental press. */}
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-11 w-11 text-muted-foreground hover:text-destructive"
-                    data-testid={`button-delete-med-${med.id}`}
-                    aria-label={`Delete medication ${med.name}`}
+                    className="h-11 w-11 text-muted-foreground"
+                    aria-label={`More actions for ${med.name}`}
+                    data-testid={`button-med-menu-${med.id}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <MoreHorizontal className="w-4 h-4" />
                   </Button>
-                </AlertDialogTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[10rem]">
+                  {med.active === 1 && (
+                    <DropdownMenuItem
+                      className="min-h-11 gap-2 text-base sm:text-sm"
+                      onSelect={() => archiveMut.mutate({ med, archive: true })}
+                      disabled={archiveMut.isPending}
+                      data-testid={`button-archive-med-${med.id}`}
+                    >
+                      <Archive className="h-4 w-4" /> Archive
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    className="min-h-11 gap-2 text-base text-destructive focus:text-destructive sm:text-sm"
+                    onSelect={() => setDeleting(med)}
+                    data-testid={`button-delete-med-${med.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <AlertDialog
+                open={deleting?.id === med.id}
+                onOpenChange={(o) => !o && setDeleting(null)}
+              >
                 <AlertDialogContent className="max-w-md">
                   <AlertDialogHeader>
                     <AlertDialogTitle className="font-heading flex items-center gap-2">
@@ -831,7 +915,10 @@ export default function Medications() {
                       Cancel
                     </AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => deleteMut.mutate(med.id!)}
+                      onClick={() => {
+                        deleteMut.mutate(med.id!);
+                        setDeleting(null);
+                      }}
                       className="h-11 text-base sm:h-10 sm:text-sm bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold"
                       data-testid={`button-delete-med-confirm-${med.id}`}
                     >
@@ -865,8 +952,22 @@ export default function Medications() {
             </p>
           )}
 
-          {/* Dose actions only: an inactive medication has nothing to log, so
-              it ends above rather than carrying an empty ruled row. */}
+          {/* An archived medication has nothing to log, so it gets a single
+              Restore control instead of the dose row. */}
+          {med.active !== 1 && (
+            <div className="border-t border-border/50 pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 px-3 text-sm"
+                onClick={() => archiveMut.mutate({ med, archive: false })}
+                disabled={archiveMut.isPending}
+                data-testid={`button-restore-med-${med.id}`}
+              >
+                <ArchiveRestore className="mr-1.5 h-4 w-4" /> Restore
+              </Button>
+            </div>
+          )}
           {med.active === 1 && (
             <>
               {/* What is due gets its own line. It used to be a pill competing
@@ -1057,10 +1158,10 @@ export default function Medications() {
                 });
               }
               if (inactive.length) {
-                w.document.write("<h2>Inactive</h2>");
+                w.document.write("<h2>Archived</h2>");
                 inactive.forEach((med) => {
                   w.document.write(
-                    `<div class="card"><div class="title">${med.name} <span class="badge">${med.type}</span> <span class="badge">Inactive</span></div><div class="meta">${med.dosage} &mdash; ${med.frequency}</div></div>`,
+                    `<div class="card"><div class="title">${med.name} <span class="badge">${med.type}</span> <span class="badge">Archived</span></div><div class="meta">${med.dosage} &mdash; ${med.frequency}</div></div>`,
                   );
                 });
               }
@@ -1193,7 +1294,7 @@ export default function Medications() {
             value="inactive"
             className="min-h-11 font-body text-sm font-semibold"
           >
-            Inactive ({inactive.length})
+            Archived ({inactive.length})
           </TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="space-y-3 mt-3">
@@ -1224,7 +1325,7 @@ export default function Medications() {
             <Card>
               <CardContent className="py-12 text-center">
                 <p className="text-base text-muted-foreground">
-                  No inactive medications
+                  No archived medications
                 </p>
               </CardContent>
             </Card>
