@@ -69,6 +69,8 @@ import {
   Calendar,
   ArrowLeft,
   ChevronDown,
+  ChevronRight,
+  History,
   Archive,
   ArchiveRestore,
   MoreHorizontal,
@@ -954,6 +956,20 @@ export default function Medications() {
               {refill.label}
             </p>
           )}
+
+          {/* The name has always opened the history, but nothing marked it as
+              tappable. This is the visible way in. The forced negative margin keeps
+              a 44px tap target without adding 44px of visual height (plain -my is
+              overridden by the card's space-y rule). */}
+          <Link
+            href={`/medications/${med.id}`}
+            className="!-my-3 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-primary hover:underline"
+            data-testid={`button-med-history-${med.id}`}
+          >
+            <History className="h-4 w-4 shrink-0" />
+            History
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </Link>
 
           {/* An archived medication has nothing to log, so it gets a single
               Restore control instead of the dose row. */}
