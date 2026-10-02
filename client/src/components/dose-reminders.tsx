@@ -533,8 +533,8 @@ function DoseSettingsDialog({
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Counted from the moment you record a dose, not from when the
-              reminder was due.
+              The next reminder comes this long after you tap "I took it," not
+              after the time the dose was due.
             </p>
           </div>
 
