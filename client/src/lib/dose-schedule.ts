@@ -291,7 +291,8 @@ export async function saveDoseSchedule(
     throw new Error(`Could not save the dose schedule: ${error.message}`);
 
   const schedule = data as DoseSchedule;
-  if (schedule.enabled) await ensureOpenDose(schedule);
+  if (schedule.enabled && !scheduleHasEnded(schedule))
+    await ensureOpenDose(schedule);
   return schedule;
 }
 
@@ -494,6 +495,43 @@ export function describeInterval(intervalMin: number): string {
 }
 
 /** "6:00 PM", "Tomorrow 8:00 AM", "Mon 8:00 AM". */
+/** Today's calendar date as YYYY-MM-DD in `timeZone` (device zone if unset). */
+export function localDateKey(now = new Date(), timeZone?: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timeZone || undefined,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+  } catch {
+    return new Intl.DateTimeFormat("en-CA").format(now);
+  }
+}
+
+/**
+ * True once a schedule is past its "Stop reminding after" date. The server
+ * stops queuing doses then but leaves `enabled` true, so anything that shows
+ * "on" has to check this as well — otherwise an ended schedule still looks live.
+ */
+export function scheduleHasEnded(
+  schedule: Pick<DoseSchedule, "ends_on" | "timezone"> | null | undefined,
+  now = new Date(),
+): boolean {
+  if (!schedule?.ends_on) return false;
+  return localDateKey(now, schedule.timezone) > schedule.ends_on;
+}
+
+/** "Sep 23" from a YYYY-MM-DD date, read as a calendar date (no zone shift). */
+export function formatEndsOn(endsOn: string): string {
+  const [y, m, d] = endsOn.split("-").map(Number);
+  if (!y || !m || !d) return endsOn;
+  return new Date(y, m - 1, d).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function formatDueLabel(due: string | Date, now = new Date()): string {
   const date = typeof due === "string" ? new Date(due) : due;
   if (Number.isNaN(date.getTime())) return "";
