@@ -89,8 +89,8 @@ function VitalForm({ onSubmit, onCancel }: {
   const canSubmit = Boolean(form.date);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
         <VitalFieldSection
           icon={Calendar}
           title="Reading Date"
