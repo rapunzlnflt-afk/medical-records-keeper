@@ -94,7 +94,7 @@ function openDoseKey(scheduleId: string) {
   return ["dose-open", scheduleId] as const;
 }
 
-function refreshDoseState(medId: number) {
+export function refreshDoseState(medId: number) {
   queryClient.invalidateQueries({ queryKey: ["dose-schedule", medId] });
   queryClient.invalidateQueries({ queryKey: ["dose-open"] });
   queryClient.invalidateQueries({ queryKey: ["medication-logs"] });
