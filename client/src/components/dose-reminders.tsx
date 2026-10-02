@@ -76,6 +76,9 @@ import {
   type DoseSchedule,
   type LogDoseResult,
   describeAlreadyLogged,
+  formatEndsOn,
+  localDateKey,
+  scheduleHasEnded,
 } from "@/lib/dose-schedule";
 import { mirrorDoseLocally } from "@/lib/dose-mirror";
 import { detectPhoneReminderState } from "@/lib/reminder-sync";
@@ -144,7 +147,7 @@ export function DoseReminderButton({ med }: { med: Medication }) {
 
   if (!isDoseSchedulingAvailable() || typeof med.id !== "number") return null;
 
-  const on = Boolean(schedule?.enabled);
+  const on = Boolean(schedule?.enabled) && !scheduleHasEnded(schedule);
 
   return (
     <>
@@ -417,6 +420,12 @@ function DoseSettingsDialog({
       setError("The daily window has to start before it ends.");
       return;
     }
+    if (endsOn && endsOn < localDateKey()) {
+      setError(
+        "That stop date has already passed. Clear it, or pick today or later.",
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -616,13 +625,30 @@ function DoseSettingsDialog({
               <Label htmlFor={`dose-ends-${med.id}`}>
                 Stop reminding after
               </Label>
-              <Input
-                id={`dose-ends-${med.id}`}
-                type="date"
-                value={endsOn}
-                onChange={(e) => setEndsOn(e.target.value)}
-                data-testid={`input-dose-ends-${med.id}`}
-              />
+              {/* iOS's picker "Reset" puts back the value the field opened
+                  with rather than emptying it, so on an iPhone this date
+                  could not be removed at all. Clear is the only reliable way. */}
+              <div className="flex items-center gap-2">
+                <Input
+                  id={`dose-ends-${med.id}`}
+                  type="date"
+                  value={endsOn}
+                  onChange={(e) => setEndsOn(e.target.value)}
+                  className="min-w-0 flex-1"
+                  data-testid={`input-dose-ends-${med.id}`}
+                />
+                {endsOn && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 shrink-0 px-3 text-sm"
+                    onClick={() => setEndsOn("")}
+                    data-testid={`button-dose-ends-clear-${med.id}`}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Optional. Useful for a course that ends.
               </p>
@@ -695,7 +721,8 @@ function DoseSettingsDialog({
  *  second caller reads the cache rather than refetching. */
 function useDoseState(medId: number | undefined) {
   const { data: schedule } = useSchedule(medId);
-  const enabled = Boolean(schedule?.enabled);
+  const ended = Boolean(schedule?.enabled) && scheduleHasEnded(schedule);
+  const enabled = Boolean(schedule?.enabled) && !ended;
   const { data: openDose } = useQuery({
     queryKey: openDoseKey(schedule?.id ?? "none"),
     queryFn: () => getOpenDose(schedule!.id),
@@ -703,14 +730,25 @@ function useDoseState(medId: number | undefined) {
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
-  return { schedule, openDose, enabled };
+  return { schedule, openDose, enabled, ended };
 }
 
 /** What is due, on its own full-width line above the action row. This used to
  *  be a pill inside the action row, where it had no width left and wrapped
  *  into a four-line grey blob on a phone. */
 export function DoseStatusLine({ med }: { med: Medication }) {
-  const { schedule, openDose, enabled } = useDoseState(med.id);
+  const { schedule, openDose, enabled, ended } = useDoseState(med.id);
+  if (ended && schedule?.ends_on) {
+    return (
+      <p
+        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+        data-testid={`dose-status-${med.id}`}
+      >
+        <BellOff className="h-3.5 w-3.5 shrink-0" />
+        Reminders ended {formatEndsOn(schedule.ends_on)}
+      </p>
+    );
+  }
   if (!enabled || !schedule) return null;
 
   if (!openDose) {
@@ -861,5 +899,6 @@ export function DoseNextDue({ med }: { med: Medication }) {
 /** True when this medication has reminders on — the card uses it to choose. */
 export function useHasDoseReminders(medId: number | undefined): boolean {
   const { data } = useSchedule(medId);
-  return Boolean(data?.enabled);
+  // An ended schedule hands the card back its ordinary Take / Skip buttons.
+  return Boolean(data?.enabled) && !scheduleHasEnded(data);
 }
