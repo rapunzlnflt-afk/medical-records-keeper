@@ -30,6 +30,7 @@ function AppRouter() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/profile" component={Profile} />
+      <Route path="/appointments/:aptId" component={Appointments} />
       <Route path="/appointments" component={Appointments} />
       {/* Landing target for a dose notification. Kept above /medications/:id
           so an event id is never read as a medication id. */}
@@ -37,6 +38,7 @@ function AppRouter() {
       <Route path="/medications/:id" component={MedicationHistory} />
       <Route path="/medications" component={Medications} />
       <Route path="/physicians" component={Physicians} />
+      <Route path="/records/:recordId" component={MedicalRecords} />
       <Route path="/records" component={MedicalRecords} />
       <Route path="/vitals" component={Vitals} />
       <Route path="/emergency" component={EmergencyContacts} />

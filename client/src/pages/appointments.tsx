@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getAppointments, createAppointment, updateAppointment, deleteAppointment, getPhysicians } from "@/lib/db";
@@ -26,7 +26,8 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, BellOff, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useRoute } from "wouter";
+import { AppointmentRecords, flashCard } from "@/components/appointment-records";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 import { appointmentHasNotes } from "@/lib/appointment-notes";
@@ -480,6 +481,9 @@ export default function Appointments() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const { toast } = useToast();
+  // /appointments/:aptId — arrived from a record's "From …" link.
+  const [, routeParams] = useRoute("/appointments/:aptId");
+  const targetAptId = routeParams?.aptId ? Number(routeParams.aptId) : null;
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
     queryKey: ["appointments", pid],
@@ -527,6 +531,14 @@ export default function Appointments() {
   const timelineList = appointments
     .filter((a) => hasAppointmentPassed(a))
     .sort((a, b) => -sortAscByDateTime(a, b));
+
+  // Open history if the linked appointment lives there, then land on its card.
+  useEffect(() => {
+    if (targetAptId == null || isLoading) return;
+    if (historyList.some((a) => a.id === targetAptId)) setHistoryOpen(true);
+    flashCard(`appointment-${targetAptId}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetAptId, isLoading]);
 
   // Simple calendar view data
   const currentMonth = new Date();
@@ -1169,6 +1181,10 @@ function AppointmentCard({
               </AlertDialogContent>
             </AlertDialog>
           </div>
+        </div>
+        {/* Full card width (not the narrow text column) so record titles stay readable on small phones. */}
+        <div className="sm:pl-[3.75rem]">
+          <AppointmentRecords apt={apt} patientId={patientId} physicians={physicians} canAttach={canAddNotes} />
         </div>
       </CardContent>
       {notesOpen && (

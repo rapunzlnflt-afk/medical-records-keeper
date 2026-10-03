@@ -129,6 +129,9 @@ export interface MedicalRecord {
   description: string | null;
   notes: string | null;
   imageUrl: string | null;
+  // The appointment this record belongs to, if any (e.g. lab results from a visit).
+  // Optional so records saved before this existed simply have no link.
+  appointmentId?: number | null;
 }
 
 export interface Vital {
