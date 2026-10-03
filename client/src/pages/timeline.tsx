@@ -14,6 +14,7 @@ import {
   noteIsFlaggedForDoctor,
 } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
+import { appointmentStatusLabel } from "@/lib/appointment-status";
 import type { Appointment, Note, NoteUpdate, Physician } from "@shared/schema";
 
 type TimelineFilter = "all" | "appointments" | "notes" | "flagged";
@@ -177,7 +178,7 @@ export default function Timeline() {
             appointment.type ? `Type: ${appointment.type}` : "",
             appointment.time ? `Time: ${appointment.time}` : "",
             appointment.location ? `Location: ${appointment.location}` : "",
-            appointment.status ? `Status: ${appointment.status}` : "",
+            `Status: ${appointmentStatusLabel(appointment)}`,
             appointment.notes ? `Notes: ${appointment.notes}` : "",
             appointment.visitSummary ? `Visit summary: ${appointment.visitSummary}` : "",
             appointment.diagnosisFindings ? `Diagnosis / findings: ${appointment.diagnosisFindings}` : "",
