@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getAppointments, createAppointment, updateAppointment, deleteAppointment, getPhysicians } from "@/lib/db";
@@ -26,13 +26,18 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Plus, Trash2, Edit2, MapPin, Clock, Calendar, Stethoscope, Printer, FileText, BellRing, BellOff, ClipboardList, History, ChevronDown, ArrowLeft, NotebookPen } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useRoute } from "wouter";
+import { AppointmentRecords, flashCard } from "@/components/appointment-records";
+import { Switch } from "@/components/ui/switch";
+import {
+  appointmentStartMs, hasAppointmentPassed, appointmentState,
+  APPOINTMENT_STATE_LABEL, APPOINTMENT_STATE_CLASS, appointmentStatusLabel,
+} from "@/lib/appointment-status";
 import type { Appointment, Physician } from "@shared/schema";
 import { format, parseISO, isAfter, isBefore } from "date-fns";
 import { appointmentHasNotes } from "@/lib/appointment-notes";
 import { AppointmentNotesDialog, FollowUpOfferDialog } from "@/components/appointment-notes-dialog";
 const TYPES = ["checkup", "specialist", "lab", "imaging", "procedure", "other"];
-const STATUSES = ["upcoming", "completed", "cancelled"];
 const mapHref = (address?: string) => {
   if (!address) return "";
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -242,15 +247,27 @@ function AppointmentForm({ physicians, initial, onSubmit, onCancel, isEdit }: {
                 </SelectContent>
               </Select>
             </div>
+            {/* Upcoming vs. past comes from the date. Cancelled is the one status
+                the date can't tell, so it's the only one the user sets. */}
             {isEdit && (
               <div className="space-y-2">
-                <Label className={labelClass}>Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger className={controlClass} data-testid="select-apt-status"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="apt-cancelled" className={labelClass}>Cancelled</Label>
+                <label htmlFor="apt-cancelled" className="flex items-center gap-3 min-h-[2.75rem] cursor-pointer">
+                  <Switch
+                    id="apt-cancelled"
+                    checked={form.status === "cancelled"}
+                    onCheckedChange={(on) =>
+                      setForm({
+                        ...form,
+                        status: on
+                          ? "cancelled"
+                          : initial?.status && initial.status !== "cancelled" ? initial.status : "upcoming",
+                      })
+                    }
+                    data-testid="switch-apt-cancelled"
+                  />
+                  <span className="text-sm text-foreground/80">This appointment was cancelled</span>
+                </label>
               </div>
             )}
           </div>
@@ -448,30 +465,6 @@ const APT_DIALOG_CLASS =
 
 // Considered "past" when its scheduled date+time has already gone by.
 // Uses end-of-day if no time is set so all-day items don't expire at midnight.
-function hasAppointmentPassed(a: Appointment): boolean {
-  return appointmentStartMs(a) < Date.now();
-}
-
-// Numeric sort key for appointments — same wall-clock interpretation the
-// dashboard uses so both pages order "next-one-first" identically. Tolerates
-// loose time strings ("9:30", " 9:30 ", "") that may exist in legacy data;
-// returns +Infinity for unparseable dates so they sink to the bottom rather
-// than landing at the top.
-function appointmentStartMs(a: Appointment): number {
-  const date = (a.date || "").trim();
-  if (!date) return Number.POSITIVE_INFINITY;
-  const raw = (a.time || "").trim();
-  let hh = 23, mm = 59;
-  const m = raw.match(/^(\d{1,2}):(\d{1,2})/);
-  if (m) {
-    hh = Math.min(23, Math.max(0, Number(m[1])));
-    mm = Math.min(59, Math.max(0, Number(m[2])));
-  }
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const ms = new Date(`${date}T${pad(hh)}:${pad(mm)}:00`).getTime();
-  return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
-}
-
 export default function Appointments() {
   const { activePatientId } = usePatient();
   const pid = activePatientId;
@@ -480,6 +473,9 @@ export default function Appointments() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const { toast } = useToast();
+  // /appointments/:aptId — arrived from a record's "From …" link.
+  const [, routeParams] = useRoute("/appointments/:aptId");
+  const targetAptId = routeParams?.aptId ? Number(routeParams.aptId) : null;
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
     queryKey: ["appointments", pid],
@@ -528,6 +524,14 @@ export default function Appointments() {
     .filter((a) => hasAppointmentPassed(a))
     .sort((a, b) => -sortAscByDateTime(a, b));
 
+  // Open history if the linked appointment lives there, then land on its card.
+  useEffect(() => {
+    if (targetAptId == null || isLoading) return;
+    if (historyList.some((a) => a.id === targetAptId)) setHistoryOpen(true);
+    flashCard(`appointment-${targetAptId}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetAptId, isLoading]);
+
   // Simple calendar view data
   const currentMonth = new Date();
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
@@ -571,7 +575,7 @@ export default function Appointments() {
             </style></head><body><h1>Appointments</h1>`);
             const writeApt = (apt: Appointment) => {
               const doc = physicians.find((p) => p.id === apt.physicianId);
-              w.document.write(`<div class="card"><div class="title">${apt.title} <span class="badge">${apt.type}</span> <span class="badge">${apt.status}</span></div><div class="meta">${apt.date} at ${apt.time}${doc ? ' &mdash; ' + doc.name : ''}${apt.location ? ' &mdash; ' + apt.location : ''}</div>${apt.notes ? '<div class="meta">' + apt.notes + '</div>' : ''}</div>`);
+              w.document.write(`<div class="card"><div class="title">${apt.title} <span class="badge">${apt.type}</span> <span class="badge">${appointmentStatusLabel(apt)}</span></div><div class="meta">${apt.date} at ${apt.time}${doc ? ' &mdash; ' + doc.name : ''}${apt.location ? ' &mdash; ' + apt.location : ''}</div>${apt.notes ? '<div class="meta">' + apt.notes + '</div>' : ''}</div>`);
             };
             w.document.write('<h2 style="font-family:Montserrat,Arial,sans-serif;font-size:16px;margin:20px 0 10px;">Upcoming</h2>');
             if (activeList.length === 0) w.document.write('<p style="font-size:12px;color:#64748b;">No upcoming appointments.</p>');
@@ -1029,11 +1033,13 @@ function AppointmentCard({
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h3 className="font-heading text-sm sm:text-base font-semibold leading-tight break-words min-w-0">{apt.title}</h3>
               <Badge variant="secondary" className="text-xs font-medium">{apt.type}</Badge>
-              {/* Status badge only makes sense for still-scheduled visits; past
-                  appointments default to "upcoming" so showing it there is noise. */}
-              {!hasAppointmentPassed(apt) && (
-                <Badge className="text-xs font-medium status-upcoming">upcoming</Badge>
-              )}
+              {/* Status from the date (Upcoming / Past visit), or Cancelled if marked. */}
+              <Badge
+                className={`text-xs font-medium ${APPOINTMENT_STATE_CLASS[appointmentState(apt)]}`}
+                data-testid={`apt-status-${apt.id}`}
+              >
+                {APPOINTMENT_STATE_LABEL[appointmentState(apt)]}
+              </Badge>
             </div>
            <div className="flex items-center gap-x-3 gap-y-0.5 mt-1 text-sm text-foreground/75 flex-wrap min-w-0">
   <span className="flex items-center gap-1.5 min-w-0">
@@ -1169,6 +1175,10 @@ function AppointmentCard({
               </AlertDialogContent>
             </AlertDialog>
           </div>
+        </div>
+        {/* Full card width (not the narrow text column) so record titles stay readable on small phones. */}
+        <div className="sm:pl-[3.75rem]">
+          <AppointmentRecords apt={apt} patientId={patientId} physicians={physicians} canAttach={canAddNotes} />
         </div>
       </CardContent>
       {notesOpen && (

@@ -211,6 +211,8 @@ export async function updateAppointment(id: number, data: Partial<Appointment>):
 }
 export async function deleteAppointment(id: number): Promise<void> {
   await db.appointments.delete(id);
+  // Records attached to it stay; they just stop pointing at a visit that's gone.
+  await db.medicalRecords.filter((r) => r.appointmentId === id).modify({ appointmentId: null });
 }
 
 // --- Medications ---
@@ -472,14 +474,17 @@ export async function importAllData(data: any): Promise<void> {
   }
 
   // Import appointments
+  const appointmentIdMap: Record<number, number> = {};
   if (data.appointments?.length) {
     for (const a of data.appointments) {
+      const oldId = a.id;
       const { id, ...rest } = a;
       if (rest.physicianId && physicianIdMap[rest.physicianId]) {
         rest.physicianId = physicianIdMap[rest.physicianId];
       }
       rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
-      await db.appointments.add(rest);
+      const newId = await db.appointments.add(rest);
+      if (oldId != null) appointmentIdMap[oldId] = newId;
     }
   }
 
@@ -514,6 +519,8 @@ export async function importAllData(data: any): Promise<void> {
         rest.physicianId = physicianIdMap[rest.physicianId];
       }
       rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
+      // Appointments get new ids on restore, so carry the link across.
+      if (rest.appointmentId != null) rest.appointmentId = appointmentIdMap[rest.appointmentId] ?? null;
       await db.medicalRecords.add(rest);
     }
   }
