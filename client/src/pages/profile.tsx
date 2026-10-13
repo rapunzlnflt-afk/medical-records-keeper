@@ -107,6 +107,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
+
 function FullScreenImage({ src, title, onClose }: { src: string; title: string; onClose: () => void }) {
   const [zoomed, setZoomed] = useState(false);
 
@@ -347,7 +348,21 @@ function InsuranceCardSection({
   const editing = draft !== null;
   const shown = draft ?? values;
   const viewingSrc = viewing === "front" ? shown.front : shown.back;
-  const hasDetails = details.some((d) => Boolean(d.value));
+  const visibleDetails = details.filter((d) => Boolean(d.value));
+  const hasDetails = visibleDetails.length > 0;
+  // Two columns: an odd count leaves a free cell next to the last detail.
+  const editInGrid = visibleDetails.length % 2 === 1;
+  const editButton = (
+    <Button
+      ref={editButtonRef}
+      size="sm" variant="outline" className="gap-1.5"
+      onClick={() => startEdit()}
+      aria-label={`Edit ${title}`}
+      data-testid={`button-edit-${sectionId}`}
+    >
+      <Edit2 className="w-3.5 h-3.5" /> Edit
+    </Button>
+  );
   const dirty = draft !== null && snapshot.current !== null && !cardValuesEqual(draft, snapshot.current);
 
   useEffect(() => {
@@ -454,21 +469,15 @@ function InsuranceCardSection({
           <>
             {hasDetails ? (
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-4 min-w-0">
-                {details.map((d) => <DetailRow key={d.label} label={d.label} value={d.value} />)}
+                {/* Edit fills the empty spot beside the last detail when the details
+                  leave one (an odd number); otherwise it gets its own row below. */}
+              {visibleDetails.map((d) => <DetailRow key={d.label} label={d.label} value={d.value} />)}
+              {editInGrid && <div className="min-w-0 flex items-end">{editButton}</div>}
               </dl>
             ) : (
               <p className="text-sm text-muted-foreground border-t pt-4">{emptyDetailsText}</p>
             )}
-
-            <Button
-              ref={editButtonRef}
-              size="sm" variant="outline" className="gap-1.5"
-              onClick={startEdit}
-              aria-label={`Edit ${title}`}
-              data-testid={`button-edit-${sectionId}`}
-            >
-              <Edit2 className="w-3.5 h-3.5" /> Edit
-            </Button>
+            {!editInGrid && editButton}
           </>
         )}
       </CardContent>
