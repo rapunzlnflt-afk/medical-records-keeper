@@ -3,7 +3,7 @@
 // what to do about a missed dose, the link, and who has joined.
 // A port of Pawfolio's sitter sharing card; keep the wording in step.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Users, Copy, Share2, Bell, BellOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -133,7 +133,8 @@ function SharedMedRow({ item }: { item: ShareableSchedule }) {
   );
 }
 
-export function CaregiverShareCard() {
+/** `bare` drops the card frame so it can sit in a grouped list (Medications' "More tools"). */
+export function CaregiverShareCard({ bare = false }: { bare?: boolean } = {}) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(getOwnerLabel());
@@ -190,17 +191,17 @@ export function CaregiverShareCard() {
   };
 
   return (
-    <Card className="h-fit" data-testid="card-caregiver-share">
+    <Frame bare={bare}>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="w-full text-left px-4 py-3 flex items-center gap-3 min-h-[56px] rounded-lg hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={`w-full text-left px-4 py-3 flex items-center gap-3 min-h-[56px] hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${bare ? "focus-visible:ring-inset" : "rounded-lg"}`}
             data-testid="button-toggle-caregiver-share"
           >
             <Users className="w-5 h-5 flex-shrink-0 text-primary" />
             <span className="flex-1 min-w-0">
-              <span className="block font-heading text-base font-semibold leading-tight">
+              <span className={bare ? "block text-sm font-semibold leading-tight" : "block font-heading text-base font-semibold leading-tight"}>
                 Share doses with a caregiver
               </span>
               <span className="block text-xs text-muted-foreground mt-0.5 break-words">
@@ -368,6 +369,15 @@ export function CaregiverShareCard() {
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+    </Frame>
+  );
+}
+
+function Frame({ bare, children }: { bare: boolean; children: ReactNode }) {
+  if (bare) return <div data-testid="card-caregiver-share">{children}</div>;
+  return (
+    <Card className="h-fit" data-testid="card-caregiver-share">
+      {children}
     </Card>
   );
 }
