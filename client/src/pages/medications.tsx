@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CaregiverShareCard } from "@/components/caregiver-share-card";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import {
@@ -1363,6 +1364,9 @@ export default function Medications() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Caregiver sharing (MedRecords Max) — collapsed, like the link lists. */}
+      <CaregiverShareCard />
 
       {/* Helpful Links — collapsed by default so the medication list stays the focus. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

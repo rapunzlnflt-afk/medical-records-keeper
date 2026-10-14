@@ -181,10 +181,25 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || "./";
+  // The caregiver page (caregiver.html) and the app share this scope. A
+  // caregiver's dose push must open the caregiver page, and an owner's push
+  // must never turn a caregiver window into the app (same rule as Pawfolio).
+  const page = (u) => new URL(u, self.registration.scope).pathname;
+  const isCaregiver = (u) => page(u).endsWith("/caregiver.html");
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      if (isCaregiver(targetUrl)) {
+        for (const client of clients) {
+          if ("focus" in client && isCaregiver(client.url)) {
+            client.postMessage({ type: "mr-open", url: targetUrl });
+            return client.focus();
+          }
+        }
+        if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+        return;
+      }
       for (const client of clients) {
-        if ("focus" in client) {
+        if ("focus" in client && !isCaregiver(client.url)) {
           client.focus();
           if ("navigate" in client) {
             try {

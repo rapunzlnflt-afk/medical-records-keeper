@@ -24,6 +24,29 @@ import Pharmacies from "@/pages/pharmacies";
 import Notes from "@/pages/notes";
 import Timeline from "@/pages/timeline";
 import NotFound from "@/pages/not-found";
+import { useEffect } from "react";
+import { syncCaregiverDoses } from "@/lib/caregiver-share";
+
+/** Copies settled caregiver doses into the local history on open and on return. */
+function useCaregiverDoseSync() {
+  useEffect(() => {
+    const run = () => {
+      syncCaregiverDoses()
+        .then((n) => {
+          if (n > 0) queryClient.invalidateQueries({ queryKey: ["medication-logs"] });
+        })
+        .catch(() => {});
+    };
+    run();
+    const onVis = () => document.visibilityState === "visible" && run();
+    document.addEventListener("visibilitychange", onVis);
+    const t = window.setInterval(run, 10 * 60000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.clearInterval(t);
+    };
+  }, []);
+}
 
 function AppRouter() {
   return (
@@ -52,6 +75,7 @@ function AppRouter() {
 
 function AppLayout() {
   const isMobile = useIsMobile();
+  useCaregiverDoseSync();
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
