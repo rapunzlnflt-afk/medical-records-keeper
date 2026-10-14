@@ -101,6 +101,8 @@ export function refreshDoseState(medId: number) {
   queryClient.invalidateQueries({ queryKey: ["dose-schedule", medId] });
   queryClient.invalidateQueries({ queryKey: ["dose-open"] });
   queryClient.invalidateQueries({ queryKey: ["medication-logs"] });
+  // The caregiver card lists medications with reminders on.
+  queryClient.invalidateQueries({ queryKey: ["caregiver-schedules"] });
 }
 
 function useSchedule(medId: number | undefined) {

@@ -142,7 +142,14 @@ export function CaregiverShareCard() {
 
   const enabled = open && isDoseSchedulingAvailable();
   const { data: groupState } = useQuery({ queryKey: KEY_GROUP, queryFn: getActiveGroup, enabled });
-  const { data: schedules = [] } = useQuery({ queryKey: KEY_SCHEDULES, queryFn: listShareableSchedules, enabled });
+  const { data: schedules = [] } = useQuery({
+    queryKey: KEY_SCHEDULES,
+    queryFn: listShareableSchedules,
+    enabled,
+    // Recheck every time the card opens, so reminders turned on elsewhere show up.
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
 
   if (!isDoseSchedulingAvailable()) return null;
 
