@@ -17,6 +17,8 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { getOwnerLabel, latestCaregiverDose } from "@/lib/caregiver-share";
+import { holdMessage, holdTitle } from "@/lib/dose-hold";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +60,7 @@ import {
   Moon,
   ShieldAlert,
   VolumeX,
+  Users,
 } from "lucide-react";
 import {
   DOSE_DEFAULT_GRACE_MIN,
@@ -761,6 +764,7 @@ export function DoseStatusLine({ med }: { med: Medication }) {
 
   const due = new Date(openDose.due_at).getTime() <= Date.now();
   return (
+    <>
     <p
       className={`flex items-center gap-1.5 text-xs ${
         due ? "font-semibold text-primary" : "text-muted-foreground"
@@ -774,6 +778,28 @@ export function DoseStatusLine({ med }: { med: Medication }) {
           ({formatRelativeToNow(openDose.due_at)})
         </span>
       </span>
+    </p>
+    {schedule.shared && <CaregiverLastDose scheduleId={schedule.id} medId={med.id!} />}
+    </>
+  );
+}
+
+/** "Given by Dana at 2:14 PM" when a caregiver logged the latest dose. */
+function CaregiverLastDose({ scheduleId, medId }: { scheduleId: string; medId: number }) {
+  const { data } = useQuery({
+    queryKey: ["caregiver-last", scheduleId],
+    queryFn: () => latestCaregiverDose(scheduleId),
+    refetchInterval: 60000,
+  });
+  if (!data) return null;
+  const at = new Date(data.at);
+  const today = at.toDateString() === new Date().toDateString();
+  const clock = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const when = today ? clock : `${at.toLocaleDateString([], { month: "short", day: "numeric" })}, ${clock}`;
+  return (
+    <p className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid={`dose-caregiver-${medId}`}>
+      <Users className="h-3.5 w-3.5 shrink-0" />
+      {data.status === "taken" ? "Given" : "Skipped"} by {data.who}, {when}
     </p>
   );
 }
@@ -794,7 +820,7 @@ export function DoseNextDue({ med }: { med: Medication }) {
     setBusy(true);
     try {
       const at = new Date();
-      const outcome = await logDose(openDose.id, taken, { at, force });
+      const outcome = await logDose(openDose.id, taken, { at, force, actorLabel: getOwnerLabel() || undefined });
 
       if (outcome.outcome === "too_soon") {
         setPendingForce(outcome);
@@ -861,16 +887,9 @@ export function DoseNextDue({ med }: { med: Medication }) {
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-heading">
-              That's earlier than scheduled
+              {holdTitle(pendingForce)}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingForce?.minutes_remaining
-                ? `This dose isn't due for another ${pendingForce.minutes_remaining} minute${
-                    pendingForce.minutes_remaining === 1 ? "" : "s"
-                  }. `
-                : "This dose isn't due yet. "}
-              Record it anyway only if you actually took it.
-            </AlertDialogDescription>
+            <AlertDialogDescription>{holdMessage(pendingForce)}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel

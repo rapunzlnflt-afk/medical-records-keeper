@@ -42,7 +42,15 @@ export interface DoseSchedule {
   timezone: string;
   created_at: string;
   updated_at: string;
+  /** Caregiver sharing (0005_dose_sharing.sql). */
+  shared?: boolean;
+  starts_on?: string | null;
+  missed_rule?: MissedRule | null;
+  missed_note?: string | null;
 }
+
+/** What a caregiver should do about a missed dose (shown on their page). */
+export type MissedRule = "asap" | "skip" | "double" | "note";
 
 /** Server row: one occurrence. */
 export interface DoseEvent {
@@ -55,6 +63,10 @@ export interface DoseEvent {
   note: string | null;
   notified_at: string | null;
   created_at: string;
+  /** Set when a caregiver logged it through their link (0005). */
+  actor_member?: string | null;
+  logged_at?: string | null;
+  recorded_late?: boolean;
 }
 
 /**
@@ -73,7 +85,9 @@ export interface LogDoseResult {
   taken_at?: string | null;
   next_due_at?: string | null;
   next_event_id?: string | null;
-  minutes_remaining?: number;
+  /** too_soon: how long ago the last dose was taken (the half-interval hold). */
+  minutes_ago?: number;
+  last_taken_at?: string | null;
   message?: string;
 }
 
@@ -268,7 +282,9 @@ export async function saveDoseSchedule(
     user_id: userId,
     source_id: medicationId,
     label: input.label.trim(),
-    subject_name: input.subjectName?.trim() || null,
+    // Left alone unless given: caregiver sharing sets it to the person's
+    // first name, and saving the reminder settings must not wipe it.
+    ...(input.subjectName !== undefined ? { subject_name: input.subjectName?.trim() || null } : {}),
     interval_min: input.intervalMin,
     anchor: input.anchor ?? "from_last_dose",
     fixed_times: input.fixedTimes ?? null,

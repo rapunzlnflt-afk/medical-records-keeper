@@ -11,6 +11,8 @@
 // correctly as a cold start from a notification tap, with no app state behind
 // it.
 
+import { getOwnerLabel } from "@/lib/caregiver-share";
+import { holdMessage, holdTitle } from "@/lib/dose-hold";
 import { useEffect, useMemo, useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -112,7 +114,7 @@ export default function DoseConfirm() {
     setTooSoon(null);
     const at = new Date();
     try {
-      const outcome = await logDose(event.id, taken, { force });
+      const outcome = await logDose(event.id, taken, { force, actorLabel: getOwnerLabel() || undefined });
 
       if (outcome.outcome === "too_soon" && !force) {
         setTooSoon(outcome);
@@ -317,8 +319,8 @@ export default function DoseConfirm() {
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
               <div className="space-y-3 text-sm">
                 <p className="text-amber-900 dark:text-amber-200">
-                  {tooSoon.message ??
-                    "A dose was recorded very recently, so this one is earlier than the usual spacing."}
+                  <strong className="block">{holdTitle(tooSoon)}</strong>
+                  {holdMessage(tooSoon)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
