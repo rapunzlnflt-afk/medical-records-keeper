@@ -142,7 +142,14 @@ export function CaregiverShareCard() {
 
   const enabled = open && isDoseSchedulingAvailable();
   const { data: groupState } = useQuery({ queryKey: KEY_GROUP, queryFn: getActiveGroup, enabled });
-  const { data: schedules = [] } = useQuery({ queryKey: KEY_SCHEDULES, queryFn: listShareableSchedules, enabled });
+  const { data: schedules = [] } = useQuery({
+    queryKey: KEY_SCHEDULES,
+    queryFn: listShareableSchedules,
+    enabled,
+    // Recheck every time the card opens, so reminders turned on elsewhere show up.
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
 
   if (!isDoseSchedulingAvailable()) return null;
 
@@ -188,7 +195,7 @@ export function CaregiverShareCard() {
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="w-full text-left px-4 py-3 flex items-center gap-3 min-h-[56px] hover-elevate rounded-lg"
+            className="w-full text-left px-4 py-3 flex items-center gap-3 min-h-[56px] rounded-lg hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             data-testid="button-toggle-caregiver-share"
           >
             <Users className="w-5 h-5 flex-shrink-0 text-primary" />
