@@ -240,7 +240,7 @@ export function CaregiverShareCard({ bare = false }: { bare?: boolean } = {}) {
                     id="caregiver-owner-name"
                     value={name}
                     maxLength={40}
-                    placeholder="Shown to caregivers, like “Shared by Shauna”"
+                    placeholder="Shown to caregivers, e.g. Carol"
                     onChange={(e) => setName(e.target.value)}
                     onBlur={() => {
                       setOwnerLabel(name);
