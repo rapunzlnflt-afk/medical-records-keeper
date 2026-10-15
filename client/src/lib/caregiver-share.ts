@@ -40,7 +40,7 @@ function client() {
   return c;
 }
 
-// === The owner's first name, shown to caregivers ("Shared by Shauna") ===
+// === The owner's first name, shown to caregivers ("Carol shared these doses with you") ===
 
 export function getOwnerLabel(): string {
   try {
