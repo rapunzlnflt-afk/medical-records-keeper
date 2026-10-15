@@ -344,7 +344,7 @@ function DoseExplainerDialog({
 // overnight switch get clipped — so both dose dialogs use the app's established
 // full-screen-sheet-on-mobile shape with an inner scroll area instead.
 const DOSE_DIALOG_CLASS =
-  "p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
+  "p-0 sm:p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
   "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[min(560px,calc(100vw-2rem))] sm:max-w-[560px] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border " +
   "overflow-hidden flex flex-col";
 
