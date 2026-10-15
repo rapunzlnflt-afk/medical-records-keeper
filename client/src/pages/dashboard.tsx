@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMax } from "@/lib/plan";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,6 +104,7 @@ function StatCard({ title, value, icon: Icon, href }: {
 
 export default function Dashboard() {
   const { activePatientId, activePatient } = usePatient();
+  const max = useMax();
   const pid = activePatientId;
   const { data: appointments = [] } = useQuery<Appointment[]>({ queryKey: ["appointments", pid], queryFn: () => getAppointments(pid) });
   const { data: medications = [] } = useQuery<Medication[]>({ queryKey: ["medications", pid], queryFn: () => getMedications(pid) });
@@ -257,14 +259,14 @@ const reminders = appointments.filter((a) => {
         <FirstVisitNoticeCard hasData={hasAnyData} onResolved={advanceNotice} />
       ) : showBackupNotice ? (
         <BackupReminderCard hasData={hasAnyData} onResolved={advanceNotice} />
-      ) : (
+      ) : max ? (
         <VisitNotesPromptCard
           appointments={appointments}
           physicians={physicians}
           patientId={pid}
           onResolved={advanceNotice}
         />
-      )}
+      ) : null}
 
       {physicians.length === 0 && appointments.length === 0 && medications.length === 0 && records.length === 0 && (
         <Card>

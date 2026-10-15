@@ -3,7 +3,7 @@ import {
   LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
   HeartPulse, Phone, Building2, IdCard, Sun, Moon, Download, Upload,
   Plus, X, Check, ChevronDown, Pencil, Trash2, NotebookPen,
-  History,
+  History, Sparkles,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -27,6 +27,8 @@ import {
   exportAllData, importAllData, getPatients,
 } from "@/lib/db";
 import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
+import { GF_KEY, noteRestoredBackup, useMax } from "@/lib/plan";
+import { MaxTag } from "@/components/max-lock";
 import { formatPersonName, formatTitleCase } from "@/lib/format-name";
 import type { Patient } from "@shared/schema";
 
@@ -44,10 +46,10 @@ const navItems = [
   { title: "Appointments", url: "/appointments", icon: CalendarDays },
   { title: "Medications", url: "/medications", icon: Pill },
   { title: "Physicians", url: "/physicians", icon: Stethoscope },
-  { title: "Medical Records", url: "/records", icon: FileText },
+  { title: "Medical Records", url: "/records", icon: FileText, max: true },
   { title: "Notes", url: "/notes", icon: NotebookPen },
-  { title: "Timeline", url: "/timeline", icon: History },
-  { title: "Vitals", url: "/vitals", icon: HeartPulse },
+  { title: "Timeline", url: "/timeline", icon: History, max: true },
+  { title: "Vitals", url: "/vitals", icon: HeartPulse, max: true },
   { title: "Pharmacies", url: "/pharmacies", icon: Building2 },
   { title: "Emergency Contacts", url: "/emergency", icon: Phone },
 ];
@@ -288,12 +290,19 @@ export function AppSidebar() {
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
+  const hasMax = useMax();
   const [loading, setLoading] = useState(false);
 
   const handleSaveData = async () => {
     setSaving(true);
     try {
-      const data = await exportAllData();
+      const data: any = await exportAllData();
+      // Carries grandfathered Max to a new phone when this backup is restored.
+      try {
+        if (localStorage.getItem(GF_KEY) === "1") data.mrMaxGrandfathered = true;
+      } catch {
+        /* ignore */
+      }
       const filename = `medical-records-backup-${new Date().toISOString().slice(0, 10)}.json`;
       const outcome = await saveJsonBackup({
         filename,
@@ -337,6 +346,7 @@ export function AppSidebar() {
       const data = JSON.parse(text);
       if (!data.version) throw new Error("Invalid backup file");
       await importAllData(data);
+      noteRestoredBackup(data);
       await queryClient.invalidateQueries();
       toast({ title: "Data Loaded", description: "Your records have been restored." });
     } catch {
@@ -394,11 +404,24 @@ export function AppSidebar() {
                       >
                         <item.icon className="w-5 h-5" />
                         <span className="font-body text-base font-medium">{item.title}</span>
+                        {"max" in item && item.max && !hasMax && <MaxTag className="ml-auto opacity-80" />}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  data-active={location === "/max"}
+                  className={location === "/max" ? "gradient-primary text-white font-semibold" : ""}
+                >
+                  <Link href="/max" data-testid="nav-max" onClick={() => { if (isMobile) setOpenMobile(false); }}>
+                    <Sparkles className="w-5 h-5" />
+                    <span className="font-body text-base font-medium">{hasMax ? "MedRecords Max" : "Get MedRecords Max"}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

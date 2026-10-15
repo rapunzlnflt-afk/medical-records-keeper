@@ -5,6 +5,8 @@ import { getVitals, createVital, deleteVital } from "@/lib/db";
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useMax } from "@/lib/plan";
+import { MaxLockCard } from "@/components/max-lock";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -264,6 +266,7 @@ function VitalForm({ onSubmit, onCancel }: {
 }
 
 export default function Vitals() {
+  const max = useMax();
   const { activePatientId } = usePatient();
   const pid = activePatientId;
   const [open, setOpen] = useState(false);
@@ -295,7 +298,7 @@ export default function Vitals() {
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Vitals</h1>
           <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Track your health metrics over time</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        {max && <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-vital">
               <Plus className="w-4 h-4" /> Log Vitals
@@ -312,14 +315,16 @@ export default function Vitals() {
             </DialogHeader>
             <VitalForm onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
+
+      {!max && <MaxLockCard feature="Vitals" pitch="Log blood pressure, weight, heart rate, blood sugar, temperature and oxygen levels over time." hasRecords={vitals.length > 0} />}
 
       {/* Latest Reading Cards */}
       {latest && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
           {latest.bloodPressureSystolic && latest.bloodPressureDiastolic && (
-            <Card className="gradient-primary text-white border-none">
+                  <Card className="gradient-primary text-white border-none">
               <CardContent className="p-3 text-center">
                 <Activity className="w-5 h-5 mx-auto mb-1 text-white/80" />
                 <p className="text-sm text-white/90 font-semibold">Blood Pressure</p>
@@ -360,7 +365,7 @@ export default function Vitals() {
       )}
 
       {/* History Table */}
-      <Card>
+      {(max || vitals.length > 0) && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="font-heading text-lg font-semibold">History</CardTitle>
         </CardHeader>
@@ -409,7 +414,7 @@ export default function Vitals() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

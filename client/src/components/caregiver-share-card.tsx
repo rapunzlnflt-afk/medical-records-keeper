@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { hasMax } from "@/lib/plan";
+import { useMax } from "@/lib/plan";
+import { MaxLockCard } from "@/components/max-lock";
 import { isDoseSchedulingAvailable, type MissedRule } from "@/lib/dose-schedule";
 import {
   createGroup,
@@ -158,7 +159,7 @@ export function CaregiverShareCard({ bare = false }: { bare?: boolean } = {}) {
   const members = groupState?.members ?? [];
   const url = freshUrl || (group ? linkFor(group) : null);
   const sharedCount = schedules.filter((s) => s.schedule.shared).length;
-  const max = hasMax();
+  const max = useMax();
 
   const act = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -219,9 +220,11 @@ export function CaregiverShareCard({ bare = false }: { bare?: boolean } = {}) {
         <CollapsibleContent>
           <CardContent className="px-4 pb-4 pt-0 space-y-4">
             {!max ? (
-              <p className="text-sm text-muted-foreground">
-                Caregiver sharing is part of MedRecords Max.
-              </p>
+              <MaxLockCard
+                feature="Caregiver sharing"
+                pitch="Send a caregiver a link. They see only the medications you choose, get a reminder when each dose is due, and you see who gave it."
+                testId="card-max-lock-caregiver"
+              />
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">

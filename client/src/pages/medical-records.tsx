@@ -5,6 +5,8 @@ import { getMedicalRecords, createMedicalRecord, updateMedicalRecord, deleteMedi
 import { usePatient } from "@/lib/patient-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useMax } from "@/lib/plan";
+import { MaxLockCard } from "@/components/max-lock";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +39,7 @@ import { fileToStorableDataUrl, FILE_UPLOAD_ACCEPT, IMAGE_READ_ERROR } from "@/l
 import { RecordForm, getCategoryInfo, CATEGORIES } from "@/components/record-form";
 
 export default function MedicalRecords() {
+  const max = useMax();
   const { activePatientId } = usePatient();
   const pid = activePatientId;
   const [open, setOpen] = useState(false);
@@ -104,7 +107,7 @@ export default function MedicalRecords() {
           <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">Medical Records</h1>
           <p className="text-sm sm:text-base text-muted-foreground font-body mt-1.5">Lab results, conditions, vaccinations, and more</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        {max && <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gradient-primary text-white border-none gap-1" data-testid="button-add-record">
               <Plus className="w-4 h-4" /> Add Record
@@ -114,11 +117,19 @@ export default function MedicalRecords() {
             <DialogHeader><DialogTitle className="font-heading">New Medical Record</DialogTitle></DialogHeader>
             <RecordForm physicians={physicians} onSubmit={(data) => createMut.mutate(data)} onCancel={() => setOpen(false)} />
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
+      {!max && (
+        <MaxLockCard
+          feature="Medical Records"
+          pitch="Keep lab results, scans, test reports and other documents with photos or cloud links, sorted by type."
+          hasRecords={records.length > 0}
+        />
+      )}
+
       {/* Info Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {max && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
             <div className="flex items-start gap-2.5">
@@ -145,8 +156,9 @@ export default function MedicalRecords() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
+      {(max || records.length > 0) && (<>
       <div className="flex gap-3 flex-wrap items-end">
         <Input placeholder="Search records..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" data-testid="input-search-records" />
         <Select value={catFilter} onValueChange={setCatFilter}>
@@ -219,7 +231,7 @@ export default function MedicalRecords() {
                       )}
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
-                      <Dialog open={editing?.id === rec.id} onOpenChange={(o) => !o && setEditing(null)}>
+                      {max && <Dialog open={editing?.id === rec.id} onOpenChange={(o) => !o && setEditing(null)}>
                         <DialogTrigger asChild>
                           <Button size="icon" variant="ghost" onClick={() => setEditing(rec)}>
                             <Edit2 className="w-4 h-4" />
@@ -229,7 +241,7 @@ export default function MedicalRecords() {
                           <DialogHeader><DialogTitle className="font-heading">Edit Record</DialogTitle></DialogHeader>
                           <RecordForm physicians={physicians} initial={rec} onSubmit={(data) => updateMut.mutate({ id: rec.id!, data })} onCancel={() => setEditing(null)} />
                         </DialogContent>
-                      </Dialog>
+                      </Dialog>}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -284,9 +296,10 @@ export default function MedicalRecords() {
           })
         )}
       </div>
+      </>)}
 
       {/* Cache Warning */}
-      <Card className="border-red-300/40 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/30">
+      {(max || records.length > 0) && <Card className="border-red-300/40 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/30">
         <CardContent className="p-4">
           <div className="flex items-start gap-2.5">
             <TriangleAlert className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
@@ -312,7 +325,7 @@ export default function MedicalRecords() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }
