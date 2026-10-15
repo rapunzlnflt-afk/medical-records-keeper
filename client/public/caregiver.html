@@ -203,10 +203,13 @@
     function render(){
       if(!data) return;
       var meds = data.meds || [];
-      // "Hi, Dana" / "Carol shared these doses with you": the caregiver's own
-      // name is the greeting, so it can't be read as the owner signed in as them.
-      var from = data.owner ? esc(data.owner) + ' shared these doses with you' : 'These doses were shared with you';
-      var html = member ? header('Hi, ' + esc(member.label), from) : header('Medication doses', from);
+      // "Doses for Mom" / "Shared by Carol": who the doses are for comes first,
+      // so a caregiver helping several families can tell the pages apart.
+      var people = [];
+      meds.forEach(function(m){ if(m.person && people.indexOf(m.person) < 0) people.push(m.person); });
+      var forWhom = people.length > 1 ? people.slice(0, -1).join(', ') + ' and ' + people[people.length - 1] : people[0];
+      var html = header(forWhom ? 'Doses for ' + esc(forWhom) : 'Medication doses',
+                        data.owner ? 'Shared by ' + esc(data.owner) : 'Shared with you');
       html += '<div class="wrap">';
       if(!meds.length){
         html += '<div class="card"><p class="muted" style="margin:0;">No doses are shared right now.</p></div>';
