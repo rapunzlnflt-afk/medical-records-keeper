@@ -34,6 +34,9 @@
 
     --border: 210 30% 91%;
     --input: 210 30% 91%;
+    /* Form fields: pale blue with a soft blue border (Oct 2026). */
+    --field: 216 70% 97%;
+    --field-border: 216 62% 89%;
     --ring: 217 91% 60%;
 
     --radius: 0.5rem;
@@ -84,6 +87,8 @@
 
     --border: 215 25% 22%;
     --input: 215 25% 22%;
+    --field: 215 30% 17%;
+    --field-border: 215 28% 27%;
     --ring: 199 89% 68%;
 
     --chart-1: 199 89% 68%;
@@ -227,12 +232,12 @@ textarea::placeholder {
   color: hsl(var(--muted-foreground) / 0.4) !important;
 }
 
-/* Disabled gradient button override — make it clearly grayed out */
+/* Disabled gradient button: faded blue, so it still reads as the main action */
 button.gradient-primary:disabled,
 button.gradient-primary[disabled] {
-  background: hsl(var(--muted)) !important;
-  color: hsl(var(--muted-foreground)) !important;
-  opacity: 0.7;
+  /* Stays blue, just faded, until the form is ready. */
+  color: #fff !important;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 

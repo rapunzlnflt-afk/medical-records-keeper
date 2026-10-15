@@ -100,7 +100,7 @@ function NoteEditor({
               id="note-category"
               value={noteCategory(draft)}
               onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))}
-              className="flex h-12 w-full max-w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-12 w-full max-w-full rounded-md border border-[hsl(var(--field-border))] bg-[hsl(var(--field))] px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               data-testid="select-note-category"
             >
               {NOTE_CATEGORIES.map((category) => (
@@ -144,7 +144,7 @@ function NoteEditor({
                   ...current,
                   flaggedPhysicianId: event.target.value ? Number(event.target.value) : null,
                 }))}
-                className="flex h-12 w-full max-w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="flex h-12 w-full max-w-full rounded-md border border-[hsl(var(--field-border))] bg-[hsl(var(--field))] px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 data-testid="select-note-flag-physician"
               >
                 <option value="">Any doctor</option>
