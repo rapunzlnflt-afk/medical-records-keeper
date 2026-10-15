@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, ClipboardPenLine, Flag, NotebookPen } from "lucide-react";
 import { HistoryActions, HistoryPrintHeading } from "@/components/history-actions";
+import { useMax } from "@/lib/plan";
+import { MaxLockCard } from "@/components/max-lock";
 import { formatHistoryDate, localDateKey, localSortKey, type HistoryCopyDocument } from "@/lib/history-actions";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,6 +86,7 @@ function emptyMessage(filter: TimelineFilter): string {
 }
 
 export default function Timeline() {
+  const max = useMax();
   const { activePatientId, activePatient } = usePatient();
   const [filter, setFilter] = useState<TimelineFilter>("all");
   const [flaggedPhysicianId, setFlaggedPhysicianId] = useState<number | null>(null);
@@ -224,6 +227,12 @@ export default function Timeline() {
           </p>
         </div>
 
+        {!max ? (
+          <MaxLockCard
+            feature="Timeline"
+            pitch="See every appointment and note in one list, newest first, filter by doctor or flagged items, and print it for a visit."
+          />
+        ) : (<>
         <div
           className="no-print max-w-full"
           data-testid="timeline-filter-row"
@@ -389,6 +398,7 @@ export default function Timeline() {
             ))}
           </div>
         )}
+        </>)}
       </div>
     </div>
   );

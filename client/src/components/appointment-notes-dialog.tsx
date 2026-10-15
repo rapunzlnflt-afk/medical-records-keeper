@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { NOTE_TEXT_FIELDS } from "@/lib/appointment-notes";
 import { NotebookPen, CalendarPlus } from "lucide-react";
+import { useMax } from "@/lib/plan";
+import { MaxLockCard } from "@/components/max-lock";
 import { format, parseISO } from "date-fns";
 import type { Appointment, Physician } from "@shared/schema";
 
@@ -79,6 +81,7 @@ export function AppointmentNotesDialog({
   // this whole component) being unmounted by the post-save query invalidation.
   onFollowUpRequested?: (appointment: Appointment, date: string) => void;
 }) {
+  const max = useMax();
   const { toast } = useToast();
   const [form, setForm] = useState<NotesForm>(() => toForm(appointment));
 
@@ -126,6 +129,26 @@ export function AppointmentNotesDialog({
   });
 
   const isEdit = Boolean(appointment.notesUpdatedAt);
+
+  // Visit notes are MedRecords Max. Notes already saved stay visible on the
+  // appointment card; only adding or editing them needs Max.
+  if (!max) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md" data-testid="dialog-visit-notes-max">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl">Visit notes</DialogTitle>
+            <DialogDescription>{appointment.title}</DialogDescription>
+          </DialogHeader>
+          <MaxLockCard
+            feature="Visit notes"
+            pitch="After a visit, write down the diagnosis, instructions, tests ordered and the follow-up date, so the next visit starts where this one ended."
+            hasRecords={isEdit}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <>

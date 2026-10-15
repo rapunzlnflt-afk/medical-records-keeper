@@ -23,6 +23,7 @@ import EmergencyContacts from "@/pages/emergency-contacts";
 import Pharmacies from "@/pages/pharmacies";
 import Notes from "@/pages/notes";
 import Timeline from "@/pages/timeline";
+import MaxPage from "@/pages/max";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { syncCaregiverDoses } from "@/lib/caregiver-share";
@@ -68,6 +69,7 @@ function AppRouter() {
       <Route path="/pharmacies" component={Pharmacies} />
       <Route path="/notes" component={Notes} />
       <Route path="/timeline" component={Timeline} />
+      <Route path="/max" component={MaxPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useMax } from "@/lib/plan";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { getAppointments, createAppointment, updateAppointment, deleteAppointment, getPhysicians } from "@/lib/db";
@@ -1011,6 +1012,7 @@ function AppointmentCard({
   muted?: boolean;
 }) {
   const [notesOpen, setNotesOpen] = useState(false);
+  const max = useMax();
   const [pendingFollowUp, setPendingFollowUp] = useState<{ appointment: Appointment; date: string } | null>(null);
   const doc = physicians.find((p) => p.id === apt.physicianId);
   const canAddNotes = hasAppointmentPassed(apt) || appointmentHasNotes(apt);
@@ -1178,7 +1180,7 @@ function AppointmentCard({
         </div>
         {/* Full card width (not the narrow text column) so record titles stay readable on small phones. */}
         <div className="sm:pl-[3.75rem]">
-          <AppointmentRecords apt={apt} patientId={patientId} physicians={physicians} canAttach={canAddNotes} />
+          <AppointmentRecords apt={apt} patientId={patientId} physicians={physicians} canAttach={canAddNotes && max} />
         </div>
       </CardContent>
       {notesOpen && (
