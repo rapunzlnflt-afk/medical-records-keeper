@@ -406,19 +406,3 @@ button.gradient-primary[disabled] {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -10px rgba(0, 0, 0, 0.5);
   }
 }
-
-/* Phone safe areas (viewport-fit=cover, Oct 2026): keep headers, the close
-   button and the slide-out menu clear of the status bar / notch and the home
-   indicator. env() is 0 on devices without insets, so nothing moves there. */
-@media (max-width: 639px) {
-  [role="dialog"] > .gradient-primary:first-child {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
-  }
-  [role="dialog"] > button.absolute.top-4 {
-    top: calc(env(safe-area-inset-top, 0px) + 1rem);
-  }
-}
-[data-sidebar="sidebar"][data-mobile="true"] {
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
