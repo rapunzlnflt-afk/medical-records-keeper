@@ -58,26 +58,26 @@
   }
 
   .dark {
-    --background: 216 40% 8%;
+    --background: 221 52% 13%;
     --foreground: 210 20% 92%;
 
-    --card: 213 33% 14%;
+    --card: 218 42% 19%;
     --card-foreground: 210 20% 92%;
 
-    --popover: 213 33% 14%;
+    --popover: 218 42% 19%;
     --popover-foreground: 210 20% 92%;
 
-    --primary: 199 89% 68%;
-    --primary-foreground: 216 40% 8%;
+    --primary: 213 94% 68%;
+    --primary-foreground: 221 52% 13%;
 
-    --secondary: 215 25% 20%;
+    --secondary: 218 36% 25%;
     --secondary-foreground: 210 20% 92%;
 
-    --muted: 215 25% 20%;
+    --muted: 218 36% 25%;
     --muted-foreground: 210 22% 82%;
 
-    --accent: 213 80% 65%;
-    --accent-foreground: 216 40% 8%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -85,26 +85,26 @@
     --success: 145 44% 50%;
     --success-foreground: 0 0% 100%;
 
-    --border: 215 25% 22%;
-    --input: 215 25% 22%;
-    --field: 215 30% 17%;
-    --field-border: 215 28% 27%;
-    --ring: 199 89% 68%;
+    --border: 218 32% 28%;
+    --input: 218 32% 28%;
+    --field: 220 48% 16%;
+    --field-border: 217 30% 31%;
+    --ring: 213 94% 68%;
 
-    --chart-1: 199 89% 68%;
+    --chart-1: 213 94% 68%;
     --chart-2: 213 80% 65%;
     --chart-3: 145 44% 50%;
     --chart-4: 39 100% 60%;
     --chart-5: 0 62% 60%;
 
-    --sidebar-background: 216 40% 7%;
+    --sidebar-background: 221 52% 11%;
     --sidebar-foreground: 210 20% 92%;
-    --sidebar-primary: 199 89% 68%;
-    --sidebar-primary-foreground: 216 40% 8%;
-    --sidebar-accent: 215 30% 16%;
-    --sidebar-accent-foreground: 199 80% 75%;
-    --sidebar-border: 215 25% 22%;
-    --sidebar-ring: 199 89% 68%;
+    --sidebar-primary: 213 94% 68%;
+    --sidebar-primary-foreground: 221 52% 13%;
+    --sidebar-accent: 217 33% 19%;
+    --sidebar-accent-foreground: 213 94% 78%;
+    --sidebar-border: 217 28% 22%;
+    --sidebar-ring: 213 94% 68%;
   }
 }
 
@@ -205,7 +205,8 @@
   background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
 }
 .dark .gradient-primary {
-  background: linear-gradient(135deg, #38bdf8 0%, #60a5fa 100%);
+  /* Same blue as light mode so dark mode doesn't turn teal (Oct 2026). */
+  background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
 }
 
 .gradient-text {
