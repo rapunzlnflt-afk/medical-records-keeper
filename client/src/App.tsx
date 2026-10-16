@@ -85,21 +85,29 @@ function AppLayout() {
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         {isMobile && (
-         <header className="flex items-center gap-3 px-4 py-3.5 gradient-primary text-white shadow-sm shrink-0 z-40">
+         <header
+           // Mirrors Pawfolio's mobile top bar: pinned, 56px tall, 22px bold
+           // title, app icon on the right. iPhone Safari treats a fixed top bar
+           // as a toolbar and carries its color behind the status bar, so the
+           // title is never blurred while the page scrolls.
+           className="fixed top-0 inset-x-0 h-[56px] flex items-center gap-[12px] px-[16px] gradient-primary text-white border-b border-white/15 z-40"
+         >
   <SidebarTrigger
     data-testid="button-sidebar-toggle"
-    className="text-white hover:bg-white/15 hover:text-white"
+    className="h-[40px] w-[40px] text-white hover:bg-white/15 hover:text-white [&_svg]:!h-[26px] [&_svg]:!w-[26px] [&_svg]:stroke-[3]"
   />
-  <div className="flex flex-col leading-tight">
-    <span className="font-heading text-base font-semibold text-white">
-      MedRecords
-    </span>
-    <span className="text-xs text-white/80">
-      Health organizer
-    </span>
-  </div>
+  <span className="flex-1 pl-[4px] font-heading text-[22px] leading-none font-bold text-white">
+    MedRecords
+  </span>
+  <img
+    src={`${import.meta.env.BASE_URL}icon-192.png`}
+    alt=""
+    className="h-[40px] w-[40px] shrink-0 rounded-[8px] bg-white p-[1px] shadow-[0_2px_6px_rgba(0,0,0,0.15)]"
+  />
 </header>
         )}
+        {/* Holds the space the pinned band covers. */}
+        {isMobile && <div className="h-[56px] shrink-0" aria-hidden="true" />}
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 flex flex-col">
           <div className="flex-1">
             <AppRouter />
