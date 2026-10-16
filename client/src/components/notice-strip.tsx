@@ -14,7 +14,7 @@ export type NoticeTone = "info" | "amber" | "red";
  */
 const TONES: Record<NoticeTone, { wrap: string; chip: string; icon: string }> = {
   info: {
-    wrap: "border-border bg-card",
+    wrap: "shadcn-card bg-card",
     chip: "bg-primary/10",
     icon: "text-primary",
   },

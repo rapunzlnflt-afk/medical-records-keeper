@@ -82,7 +82,7 @@ function FieldSection({ icon: Icon, title, description, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
+    <section className="shadcn-card rounded-xl border bg-card">
       <header className="flex items-start gap-3 px-4 sm:px-5 pt-4 pb-2">
         <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
           <Icon className="w-4 h-4 text-white" />

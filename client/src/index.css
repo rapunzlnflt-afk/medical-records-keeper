@@ -392,3 +392,16 @@ button.gradient-primary[disabled] {
     margin: 0 !important;
   }
 }
+
+/* Card depth: soft blue-tinted shadow instead of a gray outline (Oct 2026).
+   In the components layer so a Card's own className can still override it. */
+@layer components {
+  .shadcn-card {
+    border-color: transparent;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px -8px rgba(30, 64, 175, 0.14);
+  }
+  .dark .shadcn-card {
+    border-color: hsl(var(--card-border, var(--border)));
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -10px rgba(0, 0, 0, 0.5);
+  }
+}
