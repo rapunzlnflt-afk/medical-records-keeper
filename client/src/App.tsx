@@ -85,7 +85,7 @@ function AppLayout() {
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         {isMobile && (
-         <header className="flex items-center gap-3 px-4 py-2 gradient-primary text-white shadow-sm shrink-0 z-40">
+         <header className="flex items-center gap-3 px-4 py-3.5 gradient-primary text-white shadow-sm shrink-0 z-40">
   <SidebarTrigger
     data-testid="button-sidebar-toggle"
     className="text-white hover:bg-white/15 hover:text-white"
