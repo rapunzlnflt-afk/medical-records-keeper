@@ -46,6 +46,8 @@
     label{ display:block; font-size:14px; font-weight:700; margin-top:12px; }
     input{ width:100%; font-size:17px; padding:12px; border:1px solid #cbd5e1; border-radius:10px; margin-top:6px; font-family:inherit; }
     .muted{ color:var(--muted); font-size:14px; }
+    .verse{ max-width:360px; margin:0 auto; padding:8px 20px 32px; text-align:center; color:var(--muted); font-size:13px; line-height:1.55; }
+    .verse b{ display:block; margin-top:4px; font-size:11px; letter-spacing:.02em; }
     .small{ font-size:13px; }
     .err{ color:#b91c1c; font-size:14px; margin-top:8px; }
     .foot{ text-align:center; margin-top:22px; }
@@ -79,6 +81,7 @@
 </head>
 <body>
   <div id="app"><header><div class="brand"><img src="./icon-192.png" alt="" width="24" height="24"><span>MedRecords &bull; Medication doses</span></div><h1>Loading…</h1></header></div>
+  <footer class="verse" data-testid="footer-verse">“Dear friend, I pray that you may enjoy good health and that all may go well with you, even as your soul is getting along well.”<b>3 John 2</b></footer>
   <script>
   (function(){
     var FN = 'https://mpanuzarzcfgjbheepmj.supabase.co/functions/v1/dose-share';
