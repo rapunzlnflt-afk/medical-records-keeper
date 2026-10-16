@@ -85,16 +85,22 @@ function AppLayout() {
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         {isMobile && (
-         <header className="flex items-center gap-3 px-4 py-3.5 gradient-primary text-white shadow-sm shrink-0 z-40">
+         <header
+           className="flex items-center gap-3 px-4 pb-3.5 gradient-primary text-white shadow-sm shrink-0 z-40"
+           // Start the band under the phone's status bar / notch so the title
+           // isn't covered (and blurred) by it. Falls back to the old padding
+           // where there is no inset.
+           style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.875rem)" }}
+         >
   <SidebarTrigger
     data-testid="button-sidebar-toggle"
     className="text-white hover:bg-white/15 hover:text-white"
   />
   <div className="flex flex-col leading-tight">
-    <span className="font-heading text-base font-semibold text-white">
+    <span className="font-heading text-xl font-bold text-white">
       MedRecords
     </span>
-    <span className="text-xs text-white/80">
+    <span className="text-sm text-white/85">
       Health organizer
     </span>
   </div>
