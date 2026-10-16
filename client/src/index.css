@@ -202,15 +202,15 @@
 
 /* Cyan-to-Deep-Blue Gradient Utilities */
 .gradient-primary {
-  background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
 }
 .dark .gradient-primary {
   /* Same blue as light mode so dark mode doesn't turn teal (Oct 2026). */
-  background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
