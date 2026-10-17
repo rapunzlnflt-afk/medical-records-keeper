@@ -786,6 +786,9 @@ export function DoseStatusLine({ med }: { med: Medication }) {
   );
 }
 
+/** Doses open for one-tap recording this long before they're due (matches caregiver.html). */
+const DOSE_OPEN_BEFORE_MS = 90 * 60000;
+
 /** "Given by Dana at 2:14 PM" when a caregiver logged the latest dose. */
 function CaregiverLastDose({ scheduleId, medId }: { scheduleId: string; medId: number }) {
   const { data } = useQuery({
@@ -811,6 +814,17 @@ export function DoseNextDue({ med }: { med: Medication }) {
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const { schedule, openDose, enabled } = useDoseState(med.id);
+  // After a dose is given (by you or a caregiver), the next one is hours away,
+  // so "I took it" and Skip fade until 90 minutes before it is due, the same
+  // window the caregiver page uses. They still work, for a dose taken early.
+  const opensAt = openDose ? new Date(openDose.due_at).getTime() - DOSE_OPEN_BEFORE_MS : 0;
+  const resting = Boolean(openDose) && opensAt > Date.now();
+  const [, wake] = useState(0);
+  useEffect(() => {
+    if (!resting) return;
+    const t = setTimeout(() => wake((n) => n + 1), Math.min(opensAt - Date.now() + 500, 2147483000));
+    return () => clearTimeout(t);
+  }, [resting, opensAt]);
 
   if (!enabled || !schedule) return null;
 
@@ -855,7 +869,11 @@ export function DoseNextDue({ med }: { med: Medication }) {
   return (
     <>
       {openDose ? (
-        <>
+        <div
+          className={`flex items-center gap-1 transition-opacity duration-300 ${resting ? "opacity-40" : ""}`}
+          data-resting={resting ? "true" : undefined}
+          data-testid={`dose-actions-${med.id}`}
+        >
           <Button
             size="sm"
             variant="outline"
@@ -876,7 +894,7 @@ export function DoseNextDue({ med }: { med: Medication }) {
           >
             Skip
           </Button>
-        </>
+        </div>
       ) : null}
 
       {/* too_soon is not an error. The spacing guard exists to catch a double
