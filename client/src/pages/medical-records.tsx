@@ -319,7 +319,7 @@ export default function MedicalRecords() {
                   {" "}<span className="font-semibold">Save to Files</span> (recommended) or email it to yourself.
                   On other devices a <span className="font-semibold">.json</span> file downloads automatically.
                 </li>
-                <li>The backup file is named <span className="font-semibold">medical-records-backup-YYYY-MM-DD.json</span>. Keep it somewhere safe.</li>
+                <li>The backup file is always named <span className="font-semibold">MedRecords-Backup.json</span>. Save it to the same place each time and choose <span className="font-semibold">Replace</span> so you keep one up-to-date copy.</li>
                 <li>If your data is ever erased, open the app and tap <span className="font-semibold">Load My Data</span>, then select your backup file to restore everything.</li>
               </ol>
             </div>

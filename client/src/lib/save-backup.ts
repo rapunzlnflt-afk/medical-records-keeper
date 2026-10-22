@@ -31,7 +31,7 @@ export type SaveBackupOutcome =
   | { kind: "failed"; error: unknown };
 
 interface SaveBackupOptions {
-  filename: string;       // e.g. "medical-records-backup-2026-05-12.json"
+  filename: string;       // e.g. "MedRecords-Backup.json"
   json: string;           // already-stringified payload
   shareTitle?: string;    // shown on the share sheet
   /** Descriptive text. Omit for backups — it makes iOS surface message

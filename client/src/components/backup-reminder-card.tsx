@@ -110,7 +110,7 @@ export function BackupReminderCard({ hasData, onResolved }: { hasData: boolean; 
     setSaving(true);
     try {
       const data = await exportAllData();
-      const filename = `medical-records-backup-${todayISO()}.json`;
+      const filename = "MedRecords-Backup.json"; // fixed name so Files offers to replace the old backup
       const outcome = await saveJsonBackup({
         filename,
         json: JSON.stringify(data, null, 2),

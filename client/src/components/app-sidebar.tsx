@@ -303,7 +303,7 @@ export function AppSidebar() {
       } catch {
         /* ignore */
       }
-      const filename = `medical-records-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const filename = "MedRecords-Backup.json"; // fixed name so Files offers to replace the old backup
       const outcome = await saveJsonBackup({
         filename,
         json: JSON.stringify(data, null, 2),
