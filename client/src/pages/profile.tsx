@@ -39,6 +39,7 @@ import { formatPersonName } from "@/lib/format-name";
 import { fileToStorableDataUrl, IMAGE_READ_ERROR, IMAGE_UPLOAD_ACCEPT } from "@/lib/image";
 import { Switch } from "@/components/ui/switch";
 import { useCare } from "@/lib/care-plan";
+import { syncCarePeople } from "@/lib/care-share";
 import { CANCER_TYPES, CONDITIONS, conditionLabels, conditionsShared } from "@/lib/care";
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"];
@@ -1027,6 +1028,8 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       setEditingPersonal(false);
       setEditingConditions(false);
+      // Keep the name and conditions caregivers see in step (only for people already shared).
+      if (care) syncCarePeople().catch(() => {});
     },
     onError: () => {
       toast({ title: "Error", description: "Could not save. Please try again.", variant: "destructive" });
