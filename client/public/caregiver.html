@@ -77,6 +77,41 @@
     .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
     .undo{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:#1f2937; color:#fff; border-radius:10px; padding:7px 7px 7px 14px; margin-bottom:12px; font-size:15px; font-weight:700; }
     .undo button{ flex:0 0 auto; background:none; border:1px solid rgba(255,255,255,0.5); color:#fff; border-radius:8px; padding:6px 16px; font-size:15px; font-weight:700; }
+    /* MedRecords Care: the care log card and its entry sheet. */
+    .conds{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+    .cond{ background:#eef2ff; color:#1e3a8a; border:1px solid #c7d2fe; border-radius:999px; padding:3px 10px; font-size:13px; font-weight:700; }
+    .care h2{ margin:0; font-size:19px; font-weight:800; }
+    .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+    .tile{ min-height:52px; background:#f8fafc; color:var(--ink); border:1px solid #d6dbe4; border-radius:12px; padding:10px; font-size:15px; font-weight:700; text-align:left; line-height:1.25; overflow-wrap:anywhere; }
+    .tile:active{ background:#eef2ff; }
+    .entries{ list-style:none; margin:14px 0 0; padding:0; border-top:1px solid var(--line); }
+    .entries li{ display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); }
+    .entries .t{ flex:0 0 auto; width:68px; font-size:14px; color:var(--muted); font-weight:700; white-space:nowrap; }
+    .entries .b{ flex:1; min-width:0; font-size:15px; overflow-wrap:anywhere; }
+    .entries .b strong{ font-weight:800; }
+    .entries .by{ color:var(--muted); font-size:13px; }
+    .entries .n{ color:#334155; font-size:14px; margin-top:2px; }
+    .entries .dec{ color:var(--late); font-weight:700; }
+    .entries button{ flex:0 0 auto; background:none; border:none; color:var(--accent-dark); font-size:14px; font-weight:700; text-decoration:underline; text-underline-offset:3px; padding:2px 0 2px 4px; }
+    details.yday{ margin-top:12px; }
+    details.yday summary{ cursor:pointer; font-size:15px; font-weight:700; color:var(--accent-dark); padding:6px 0; }
+    #sheet .in.form{ max-height:92vh; overflow-y:auto; overscroll-behavior:contain; }
+    #sheet .q{ font-size:15px; font-weight:800; margin:16px 0 8px; }
+    .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+    .chip{ background:#fff; color:var(--ink); border:1px solid #cbd5e1; border-radius:999px; padding:9px 14px; font-size:15px; font-weight:700; }
+    .chip[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    .chip.no[aria-pressed="true"]{ background:var(--late); border-color:var(--late); }
+    .scale{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+    .scale button{ height:46px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; font-size:17px; font-weight:800; color:var(--ink); }
+    .scale button[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    .ends{ display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:var(--muted); margin-top:4px; }
+    .levels{ display:grid; gap:6px; }
+    .levels button{ text-align:left; min-height:46px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; padding:8px 12px; font-size:15px; font-weight:700; color:var(--ink); }
+    .levels button[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    #sheet textarea, #sheet input[type=text], #sheet input[type=number]{ display:block; width:100%; margin-top:6px; padding:12px; font-size:16px; border:1px solid #d1d5db; border-radius:12px; font-family:inherit; color:inherit; background:#fff; }
+    #sheet .row2{ display:flex; gap:8px; }
+    #sheet .row2 .secondary{ flex:1; margin-top:18px; }
+    #sheet .row2 .primary{ flex:2; }
   </style>
 </head>
 <body>
@@ -85,11 +120,13 @@
   <script>
   (function(){
     var FN = 'https://mpanuzarzcfgjbheepmj.supabase.co/functions/v1/dose-share';
+    // MedRecords Care: the care log lives in its own function on the same link.
+    var CARE_FN = 'https://mpanuzarzcfgjbheepmj.supabase.co/functions/v1/care-share';
     var ANON = 'sb_publishable_gQ7s_Xuxnn9aYiJmaa6K_w_RYXbQRUk';
     var VAPID = 'BCc_bFqs1a5CZ6ep5bFyjk1zoIodRggwwxpD6GXBPmLEm32IDLYOtUYwdZtzfBnPlNsVQtRt8UqpO_tX-i5532I';
     var KEY_TOKEN = 'mrCaregiverToken', KEY_DEVICE = 'mrCaregiverDevice', KEY_PUSH = 'mrCaregiverPush';
     var app = document.getElementById('app');
-    var data = null, member = null, tick = null;
+    var data = null, member = null, tick = null, care = null;
     var OPEN_BEFORE_MS = 90 * 60000, UNDO_MS = 5 * 60000;
     // "Change time given" stays this long after Given (matches the server).
     var CHANGE_MS = 30 * 60000;
@@ -125,8 +162,20 @@
         .then(function(r){ return r.json().then(function(j){ j.__status = r.status; return j; }); });
     }
 
+    function callCare(action, extra){
+      var body = Object.assign({ action: action, token: token(), device_id: deviceId() }, extra || {});
+      return fetch(CARE_FN, { method:'POST', headers:{ 'content-type':'application/json', apikey: ANON }, body: JSON.stringify(body) })
+        .then(function(r){ return r.json().then(function(j){ j.__status = r.status; return j; }); });
+    }
+    // The care log is optional: if it isn't shared (or can't load) the page is
+    // exactly the dose page it always was.
+    function loadCare(){
+      return callCare('state').then(function(r){ care = (r && r.state && !r.error) ? r.state : null; }, function(){ /* keep the last copy */ });
+    }
+    function hasCare(){ return !!(care && care.people && care.people.length); }
+
     function header(title, sub){
-      return '<header><div class="brand"><img src="./icon-192.png" alt="" width="24" height="24"><span>MedRecords &bull; Medication doses</span></div>' +
+      return '<header><div class="brand"><img src="./icon-192.png" alt="" width="24" height="24"><span>MedRecords &bull; ' + (hasCare() ? 'Care' : 'Medication doses') + '</span></div>' +
              '<h1>' + title + '</h1>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</header>';
     }
 
@@ -152,6 +201,14 @@
         '<p class="muted" style="margin:0;">You\u2019ll see what\u2019s due and can record each dose. Your name shows next to doses you record.</p>' +
         '<label for="name">Your first name</label><input id="name" autocomplete="given-name" maxlength="40" placeholder="e.g. Dana">' +
         '<button type="button" class="primary block" id="join">Continue</button><p class="err" id="err"></p></div></div>';
+      callCare('peek').then(function(r){
+        if(!r || !r.care) return;
+        var h = app.querySelector('header h1'), sb = app.querySelector('header .sub'), p = app.querySelector('.card .muted'), br = app.querySelector('.brand span');
+        if(br) br.innerHTML = 'MedRecords &bull; Care';
+        if(h) h.textContent = 'Helping with care';
+        if(sb) sb.textContent = 'Someone shared a care log with you';
+        if(p) p.textContent = 'You can log meals, therapy, how they\u2019re doing and help with personal care, and see what others logged. Your name shows next to what you log.';
+      }, function(){});
       var go = document.getElementById('join');
       go.onclick = function(){
         var name = document.getElementById('name').value.trim();
@@ -161,7 +218,7 @@
           go.disabled = false;
           if(r.error === 'link_inactive') return showInactive();
           if(r.error){ document.getElementById('err').textContent = 'Could not join. Check your connection and try again.'; return; }
-          member = r.member; data = r.state; render();
+          member = r.member; data = r.state; loadCare().then(render);
         }, function(){ go.disabled = false; document.getElementById('err').textContent = 'Could not join. Check your connection and try again.'; });
       };
     }
@@ -219,6 +276,204 @@
       });
     }
 
+    /* ---------- MedRecords Care: care log ----------
+       Keys match client/src/lib/care.ts and the care-share function; never
+       rename a key, change the label instead. */
+    var C = {
+      meal: [['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack']],
+      amount: [['all','Ate all'],['most','Most'],['some','Some'],['little','A little']],
+      therapy: [['PT','Physical therapy'],['OT','Occupational therapy']],
+      task: [['bathing','Bathing'],['dressing','Changing clothes'],['toileting','Toileting / cleaning'],['grooming','Grooming']],
+      help: [['none','No help'],['some','Some help'],['full','Full help']],
+      level: [['alert','Alert and talkative'],['quiet','Alert but quiet'],['confused-sometimes','Confused at times'],['very-confused','Very confused'],['drowsy','Drowsy, hard to wake'],['unable','Unable to communicate']],
+      reason: [['tired','Tired'],['pain','In pain'],['asleep','Asleep'],['refused','Refused'],['sick','Felt sick'],['not-hungry','Not hungry']]
+    };
+    var MINS = [15, 30, 45, 60];
+    var TILES = [
+      ['meal','Meal',{ kind:'meal' }], ['snack','Snack',{ kind:'meal', meal:'snack' }],
+      ['pt','Physical therapy',{ kind:'therapy', therapy:'PT' }], ['ot','Occupational therapy',{ kind:'therapy', therapy:'OT' }],
+      ['mood','How they\u2019re doing',{ kind:'mood' }], ['awareness','Awareness',{ kind:'awareness' }],
+      ['bathing','Bathing',{ kind:'personal', task:'bathing' }], ['dressing','Changing clothes',{ kind:'personal', task:'dressing' }],
+      ['toileting','Toileting / cleaning',{ kind:'personal', task:'toileting' }], ['grooming','Grooming',{ kind:'personal', task:'grooming' }]
+    ];
+    function lbl(list, k){ for(var i = 0; i < list.length; i++) if(list[i][0] === k) return list[i][1]; return k || ''; }
+    function moodWord(n){ return n <= 3 ? 'Hard day' : n <= 6 ? 'Okay day' : 'Good day'; }
+    function carePerson(name){ if(!hasCare() || !name) return null; for(var i = 0; i < care.people.length; i++) if(care.people[i].name === name) return care.people[i]; return null; }
+    function entriesFor(cp){ return ((care && care.entries) || []).filter(function(e){ return e.person_id === cp.id; }).sort(function(a, b){ return new Date(b.at) - new Date(a.at); }); }
+    function findEntry(id){ return ((care && care.entries) || []).filter(function(e){ return e.id === id; })[0] || null; }
+    function sameDay(a, b){ return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+
+    function entryTitle(e){
+      if(e.kind === 'meal') return lbl(C.meal, e.meal);
+      if(e.kind === 'therapy') return lbl(C.therapy, e.therapy);
+      if(e.kind === 'personal') return lbl(C.task, e.task);
+      if(e.kind === 'mood') return 'How they\u2019re doing';
+      return 'Awareness';
+    }
+    function entrySummary(e){
+      if(e.status === 'declined') return '<span class="dec">Declined' + (e.reason ? ' \u00b7 ' + esc(lbl(C.reason, e.reason)) : '') + '</span>';
+      if(e.kind === 'meal') return esc(lbl(C.amount, e.amount) || 'Ate');
+      if(e.kind === 'therapy') return esc([e.status === 'partial' ? 'Partial session' : 'Completed', e.minutes ? e.minutes + ' min' : ''].filter(Boolean).join(' \u00b7 '));
+      if(e.kind === 'personal') return esc(lbl(C.help, e.help) || 'Done');
+      if(e.kind === 'mood') return esc(e.score + ' / 10 \u00b7 ' + moodWord(e.score));
+      return esc(lbl(C.level, e.level));
+    }
+    function entryRow(e){
+      var extra = [e.details, e.note].filter(Boolean).map(esc).join(' \u00b7 ');
+      return '<li data-testid="care-entry"><span class="t">' + esc(clock(new Date(e.at))) + '</span><div class="b"><strong>' + esc(entryTitle(e)) + '</strong> \u2014 ' + entrySummary(e) +
+             (extra ? '<div class="n">' + extra + '</div>' : '') +
+             '<div class="by">by ' + esc(e.mine ? 'you' : (e.actor_label || 'a caregiver')) + '</div></div>' +
+             (e.can_edit ? '<button type="button" data-cedit="' + esc(e.id) + '">Edit</button>' : '') + '</li>';
+    }
+    function careCardHTML(cp){
+      var list = entriesFor(cp), now = new Date(), y = new Date(); y.setDate(y.getDate() - 1);
+      var today = list.filter(function(e){ return sameDay(new Date(e.at), now); });
+      var yday = list.filter(function(e){ return sameDay(new Date(e.at), y); });
+      var h = '<div class="card care" data-testid="care-card"><h2>Care log</h2>' +
+        '<p class="muted small" style="margin:2px 0 0;">Tap what you helped with. Everyone helping ' + esc(cp.name) + ' sees these.</p>' +
+        '<div class="tiles">' + TILES.map(function(t){ return '<button type="button" class="tile" data-tile="' + t[0] + '">' + esc(t[1]) + '</button>'; }).join('') + '</div>';
+      h += today.length
+        ? '<ul class="entries" aria-label="Today">' + today.map(entryRow).join('') + '</ul>'
+        : '<p class="muted" style="margin:14px 0 0;">Nothing logged yet today.</p>';
+      if(yday.length) h += '<details class="yday"><summary>Yesterday (' + yday.length + ')</summary><ul class="entries">' + yday.map(entryRow).join('') + '</ul></details>';
+      return h + '</div>';
+    }
+    function bindCare(cp){
+      if(!cp) return;
+      app.querySelectorAll('[data-tile]').forEach(function(b){
+        b.addEventListener('click', function(){
+          var t = TILES.filter(function(x){ return x[0] === b.getAttribute('data-tile'); })[0];
+          var d = Object.assign({ status:'done' }, t[2]);
+          if(d.kind === 'meal' && !d.meal){ var hr = new Date().getHours(); d.meal = hr < 11 ? 'breakfast' : hr < 16 ? 'lunch' : 'dinner'; }
+          openCareForm(cp, d, null);
+        });
+      });
+      app.querySelectorAll('[data-cedit]').forEach(function(b){
+        b.addEventListener('click', function(){ var e = findEntry(b.getAttribute('data-cedit')); if(e) openCareForm(cp, Object.assign({}, e), e.id); });
+      });
+    }
+
+    // Picked "HH:MM" today; a time later than now means last night.
+    // When editing, the entry keeps its own day.
+    function careAt(v, base){
+      var p = String(v || '').split(':'); if(p.length < 2) return null;
+      var d = base ? new Date(base) : new Date(); d.setHours(+p[0], +p[1], 0, 0);
+      if(!base && d.getTime() > Date.now() + 5 * 60000) d.setDate(d.getDate() - 1);
+      return d;
+    }
+    function chipsHTML(field, list, val, cls){
+      return '<div class="chips">' + list.map(function(o){ return '<button type="button" class="chip' + (cls ? ' ' + cls : '') + '" data-f="' + field + '" data-v="' + esc(o[0]) + '" aria-pressed="' + (val === o[0]) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>';
+    }
+    function lastAwareness(cp, skipId){
+      return entriesFor(cp).filter(function(e){ return e.kind === 'awareness' && e.id !== skipId; })[0] || null;
+    }
+    function openCareForm(cp, d, editId){
+      var prev = d.kind === 'awareness' ? lastAwareness(cp, editId) : null;
+      var at0 = d.at ? new Date(d.at) : new Date(), base = editId ? d.at : null;
+      function canSave(){
+        if(d.kind === 'meal') return !!d.meal && (d.status === 'declined' || !!d.amount);
+        if(d.kind === 'therapy') return !!d.therapy;
+        if(d.kind === 'personal') return !!d.task && (d.status === 'declined' || !!d.help);
+        if(d.kind === 'mood') return !!d.score;
+        return !!d.level;
+      }
+      function body(){
+        var dec = d.status === 'declined', h = '';
+        if(d.kind === 'meal'){
+          h += '<p class="q">Which meal</p>' + chipsHTML('meal', C.meal, d.meal);
+          h += '<p class="q">How much they ate</p><div class="chips">' + C.amount.map(function(o){ return '<button type="button" class="chip" data-f="amount" data-v="' + o[0] + '" aria-pressed="' + (!dec && d.amount === o[0]) + '">' + o[1] + '</button>'; }).join('') +
+               '<button type="button" class="chip no" data-f="status" data-v="declined" aria-pressed="' + dec + '">Declined</button></div>';
+          if(!dec) h += '<label for="cdet">What they ate <span class="muted">(optional)</span></label><input type="text" id="cdet" maxlength="300" placeholder="Oatmeal, half a banana, juice" value="' + esc(d.details || '') + '">';
+        } else if(d.kind === 'therapy'){
+          h += '<p class="q">Type</p>' + chipsHTML('therapy', C.therapy, d.therapy);
+          h += '<p class="q">How it went</p><div class="chips"><button type="button" class="chip" data-f="status" data-v="done" aria-pressed="' + (d.status === 'done') + '">Completed</button>' +
+               '<button type="button" class="chip" data-f="status" data-v="partial" aria-pressed="' + (d.status === 'partial') + '">Partial</button>' +
+               '<button type="button" class="chip no" data-f="status" data-v="declined" aria-pressed="' + dec + '">Declined</button></div>';
+          if(!dec){
+            h += '<p class="q">How long</p><div class="chips">' + MINS.map(function(m){ return '<button type="button" class="chip" data-f="minutes" data-v="' + m + '" aria-pressed="' + (d.minutes === m) + '">' + m + ' min</button>'; }).join('') + '</div>';
+            h += '<label for="cdet">Exercises or therapist <span class="muted">(optional)</span></label><input type="text" id="cdet" maxlength="300" placeholder="Walked hallway twice, arm bands" value="' + esc(d.details || '') + '">';
+          }
+        } else if(d.kind === 'personal'){
+          h += '<p class="q">Task</p>' + chipsHTML('task', C.task, d.task);
+          h += '<p class="q">Help needed</p><div class="chips">' + C.help.map(function(o){ return '<button type="button" class="chip" data-f="help" data-v="' + o[0] + '" aria-pressed="' + (!dec && d.help === o[0]) + '">' + o[1] + '</button>'; }).join('') +
+               '<button type="button" class="chip no" data-f="status" data-v="declined" aria-pressed="' + dec + '">Declined</button></div>';
+        } else if(d.kind === 'mood'){
+          h += '<p class="q">How are they doing today?</p><div class="scale" role="group" aria-label="Score from 1 to 10">';
+          for(var n = 1; n <= 10; n++) h += '<button type="button" data-f="score" data-v="' + n + '" aria-pressed="' + (d.score === n) + '">' + n + '</button>';
+          h += '</div><div class="ends"><span>1 \u00b7 Hard day</span><span>10 \u00b7 Great day</span></div>';
+          if(d.score) h += '<p class="muted" style="margin:8px 0 0;font-weight:700;">' + d.score + ' / 10 \u00b7 ' + moodWord(d.score) + '</p>';
+        } else {
+          h += '<p class="q">How alert are they?</p><div class="levels" role="group" aria-label="Awareness">' + C.level.map(function(o){ return '<button type="button" data-f="level" data-v="' + o[0] + '" aria-pressed="' + (d.level === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>';
+          var ia = C.level.map(function(o){ return o[0]; });
+          if(prev && d.level && ia.indexOf(d.level) - ia.indexOf(prev.level) >= 2){
+            h += '<div class="missednote" data-testid="care-drop">This is a big change from the last check (' + esc(lbl(C.level, prev.level).toLowerCase()) + '). If it came on suddenly, contact their doctor, or call 911 in an emergency.</div>';
+          }
+        }
+        if(dec && d.kind !== 'mood' && d.kind !== 'awareness'){
+          h += '<p class="q">Reason <span class="muted" style="font-weight:600;">(optional)</span></p><div class="chips">' +
+               C.reason.filter(function(o){ return o[0] !== 'not-hungry' || d.kind === 'meal'; }).map(function(o){ return '<button type="button" class="chip no" data-f="reason" data-v="' + o[0] + '" aria-pressed="' + (d.reason === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>';
+        }
+        h += '<label for="ctime">Time</label><input type="time" id="ctime" value="' + hhmm(at0) + '">';
+        h += '<label for="cnote">Notes <span class="muted">(optional)</span></label><textarea id="cnote" rows="3" maxlength="1000" placeholder="' + (d.kind === 'mood' ? 'Slept well, enjoyed a visit from the grandkids' : 'Anything worth remembering') + '">' + esc(d.note || '') + '</textarea>';
+        h += '<p class="err" id="cerr" role="alert"></p>';
+        h += '<div class="row2"><button type="button" class="secondary" data-close>Cancel</button><button type="button" class="primary" id="csave"' + (canSave() ? '' : ' disabled') + '>' + (editId ? 'Save changes' : 'Save') + '</button></div>';
+        if(editId) h += '<button type="button" class="link" id="cdel" style="color:var(--late);">Delete this entry</button>';
+        return h;
+      }
+      var s = sheet('<h2>' + esc(entryTitle(d)) + ' \u00b7 ' + esc(cp.name) + '</h2><div id="cbody"></div>');
+      var inner = s.querySelector('.in'); inner.classList.add('form');
+      function keep(){
+        var det = s.querySelector('#cdet'), note = s.querySelector('#cnote'), t = s.querySelector('#ctime');
+        if(det) d.details = det.value; if(note) d.note = note.value;
+        if(t && t.value){ var a = careAt(t.value, base); if(a) at0 = a; }
+      }
+      function paint(){
+        var box = s.querySelector('#cbody'); box.innerHTML = body();
+        s.querySelector('h2').textContent = entryTitle(d) + ' \u00b7 ' + cp.name;
+        box.querySelectorAll('[data-close]').forEach(function(b){ b.onclick = closeSheet; });
+        box.querySelectorAll('[data-f]').forEach(function(b){
+          b.onclick = function(){
+            keep();
+            var f = b.getAttribute('data-f'), v = b.getAttribute('data-v');
+            if(f === 'score' || f === 'minutes') v = +v;
+            if(f === 'status'){ d.status = v; if(v === 'declined'){ d.amount = null; d.help = null; d.minutes = null; } else d.reason = null; }
+            else if(f === 'amount' || f === 'help'){ d[f] = v; d.status = 'done'; d.reason = null; }
+            else if(f === 'reason'){ d.reason = d.reason === v ? null : v; }
+            else if(f === 'minutes'){ d.minutes = d.minutes === v ? null : v; }
+            else d[f] = v;
+            paint();
+          };
+        });
+        var save = box.querySelector('#csave'), err = box.querySelector('#cerr');
+        save.onclick = function(){
+          keep();
+          var t = s.querySelector('#ctime').value, a = careAt(t, base);
+          if(!a){ err.textContent = 'Pick a time.'; return; }
+          d.at = a.toISOString();
+          save.disabled = true;
+          var entry = { kind:d.kind, status:d.status, meal:d.meal, amount:d.amount, therapy:d.therapy, minutes:d.minutes, task:d.task, help:d.help, score:d.score, level:d.level, reason:d.reason, details:d.details, note:d.note, at:d.at };
+          var req = editId ? callCare('update', { id: editId, entry: entry }) : callCare('add', { person_id: cp.id, entry: entry });
+          req.then(function(r){
+            if(r.error === 'link_inactive') { closeSheet(); return showInactive(); }
+            if(r.error === 'cannot_edit'){ save.disabled = false; err.textContent = 'This entry can\u2019t be changed any more (30 minutes have passed).'; return; }
+            if(r.error === 'bad_time'){ save.disabled = false; err.textContent = 'Pick a time within the last day.'; return; }
+            if(r.error || !r.state){ save.disabled = false; err.textContent = 'Couldn\u2019t save. Check your connection and try again.'; return; }
+            care = r.state; closeSheet(); render(); toast(editId ? 'Saved' : 'Logged for ' + cp.name);
+          }, function(){ save.disabled = false; err.textContent = 'Couldn\u2019t save. Check your connection and try again.'; });
+        };
+        var del = box.querySelector('#cdel');
+        if(del) del.onclick = function(){
+          if(!confirm('Delete this entry?')) return;
+          del.disabled = true;
+          callCare('delete', { id: editId }).then(function(r){
+            if(r.error || !r.state){ del.disabled = false; err.textContent = r.error === 'cannot_edit' ? 'This entry can\u2019t be changed any more (30 minutes have passed).' : 'Couldn\u2019t delete. Try again.'; return; }
+            care = r.state; closeSheet(); render(); toast('Deleted');
+          }, function(){ del.disabled = false; err.textContent = 'Couldn\u2019t delete. Try again.'; });
+        };
+      }
+      paint();
+    }
+
     function render(){
       if(!data) return;
       var meds = data.meds || [];
@@ -227,12 +482,16 @@
       // a time. A red dot marks any other person with a dose due now.
       var people = [];
       meds.forEach(function(m){ var p = m.person || 'Other'; if(people.indexOf(p) < 0) people.push(p); });
+      // People with a shared care log get a tab too, even with no doses shared.
+      (hasCare() ? care.people : []).forEach(function(cp){ if(people.indexOf(cp.name) < 0) people.push(cp.name); });
       if(people.indexOf(activePerson) < 0) activePerson = people.filter(dueNowFor)[0] || people[0] || null;
       if(people.length > 1) meds = meds.filter(function(m){ return (m.person || 'Other') === activePerson; });
       var forWhom = people.length ? activePerson : null;
-      // "Doses for Mom" / "Shared by Carol": who the doses are for comes first.
-      var html = header(forWhom && forWhom !== 'Other' ? 'Doses for ' + esc(forWhom) : 'Medication doses',
-                        data.owner ? 'Shared by ' + esc(data.owner) : 'Shared with you');
+      var cp = carePerson(forWhom);
+      // "Doses for Mom" / "Care for Mom" / "Shared by Carol": who it's for comes first.
+      var owner = data.owner || (care && care.owner);
+      var html = header(forWhom && forWhom !== 'Other' ? (cp ? 'Care for ' : 'Doses for ') + esc(forWhom) : (cp ? 'Care' : 'Medication doses'),
+                        owner ? 'Shared by ' + esc(owner) : 'Shared with you');
       html += '<div class="wrap">';
       if(people.length > 1){
         html += '<div class="tabs" role="tablist" aria-label="People">' + people.map(function(p){
@@ -241,7 +500,10 @@
                  (due ? '<span class="dot" aria-hidden="true"></span><span class="sr"> (dose due now)</span>' : '') + '</button>';
         }).join('') + '</div>';
       }
-      if(!meds.length){
+      if(cp && cp.conditions && cp.conditions.length){
+        html += '<div class="conds" aria-label="Health conditions">' + cp.conditions.map(function(c){ return '<span class="cond">' + esc(c) + '</span>'; }).join('') + '</div>';
+      }
+      if(!meds.length && !cp){
         html += '<div class="card"><p class="muted" style="margin:0;">No doses are shared right now.</p></div>';
       }
       // What needs doing first: a dose that's due or open now, then the next due.
@@ -294,12 +556,14 @@
         }
         html += '</div>';
       });
-      html += '<div class="card">' + remindersHTML() + '</div>';
-      html += '<div class="foot"><button type="button" class="link" id="leave">Stop getting these doses</button>' +
-              '<p class="muted small" style="margin:6px 0 0;">Shared from <strong>MedRecords</strong> by CleartrackApps. You see only the doses shared with you.</p></div>';
+      if(cp) html += careCardHTML(cp);
+      if(meds.length || !cp) html += '<div class="card">' + remindersHTML() + '</div>';
+      html += '<div class="foot"><button type="button" class="link" id="leave">' + (hasCare() ? 'Stop getting updates on this phone' : 'Stop getting these doses') + '</button>' +
+              '<p class="muted small" style="margin:6px 0 0;">Shared from <strong>MedRecords</strong> by CleartrackApps. You see only ' + (hasCare() ? 'what\u2019s' : 'the doses') + ' shared with you.</p></div>';
       html += '</div>';
       app.innerHTML = html;
-      document.title = 'Medication doses — MedRecords';
+      document.title = (hasCare() ? 'Care' : 'Medication doses') + ' — MedRecords';
+      bindCare(cp);
       app.querySelectorAll('[data-person]').forEach(function(b){
         b.addEventListener('click', function(){
           activePerson = b.getAttribute('data-person'); ls(KEY_TAB, activePerson); render(); window.scrollTo(0, 0);
@@ -333,8 +597,9 @@
       var on = document.getElementById('pushon'); if(on) on.onclick = turnOnPush;
       var off = document.getElementById('pushoff'); if(off) off.onclick = turnOffPush;
       document.getElementById('leave').onclick = function(){
-        if(!confirm('Stop getting these doses on this phone?')) return;
-        call('leave').then(function(){ ls(KEY_TOKEN, null); ls(KEY_PUSH, null); app.innerHTML = header('You\u2019re all set') + '<div class="wrap"><div class="card"><p class="muted" style="margin:0;">You won\u2019t see these doses here any more.</p></div></div>'; });
+        var wasCare = hasCare();
+        if(!confirm(wasCare ? 'Stop getting doses and the care log on this phone?' : 'Stop getting these doses on this phone?')) return;
+        call('leave').then(function(){ ls(KEY_TOKEN, null); ls(KEY_PUSH, null); care = null; app.innerHTML = header('You\u2019re all set') + '<div class="wrap"><div class="card"><p class="muted" style="margin:0;">' + (wasCare ? 'You won\u2019t see these updates here any more.' : 'You won\u2019t see these doses here any more.') + '</p></div></div>'; });
       };
     }
 
@@ -575,7 +840,7 @@
     }
 
     function refresh(){
-      return call('state').then(function(r){
+      return Promise.all([call('state'), loadCare()]).then(function(rs){ return rs[0]; }).then(function(r){
         if(r.error === 'link_inactive') { showInactive(); return; }
         if(r.error === 'not_joined') { showJoin(); return; }
         if(r.error){ app.innerHTML = header('Couldn\u2019t load') + '<div class="wrap"><div class="card"><p class="muted" style="margin:0;">Check your connection and reopen this page.</p></div></div>'; return; }

@@ -35,6 +35,8 @@ import {
 } from "@/lib/care";
 import { formatPersonName } from "@/lib/format-name";
 import type { CareEntry } from "@shared/schema";
+import { fetchCaregiverEntries, type CloudCareEntry } from "@/lib/care-share";
+import { CareShareCard } from "@/components/care-share-card";
 
 const DIALOG_CLASS =
   "p-0 sm:p-0 gap-0 max-w-none w-screen h-[100dvh] max-h-[100dvh] rounded-none border-0 left-0 right-0 top-0 translate-x-0 translate-y-0 " +
@@ -430,11 +432,24 @@ export default function CareLog() {
   const [editing, setEditing] = useState<{ id?: number; draft: Draft } | null>(null);
   const [deleting, setDeleting] = useState<CareEntry | null>(null);
 
-  const { data: entries = [] } = useQuery<CareEntry[]>({
+  const { data: localEntries = [] } = useQuery<CareEntry[]>({
     queryKey: ["care-entries", pid, day],
     queryFn: () => getCareEntries(pid, `${day}T00:00`, `${shiftDay(day, 1)}T00:00`),
     enabled: care,
   });
+
+  // Caregiver entries not copied to this phone yet (they settle after 30 minutes).
+  const { data: cloudEntries = [] } = useQuery<CloudCareEntry[]>({
+    queryKey: ["care-entries", pid, day, "caregivers"],
+    queryFn: () => fetchCaregiverEntries(pid, day),
+    enabled: care,
+    refetchInterval: 60000,
+  });
+
+  const entries: (CareEntry | CloudCareEntry)[] = useMemo(() => {
+    const have = new Set(localEntries.map((e) => e.sourceId).filter(Boolean));
+    return [...localEntries, ...cloudEntries.filter((e) => !have.has(e.cloudId))].sort((a, b) => a.at.localeCompare(b.at));
+  }, [localEntries, cloudEntries]);
 
   // Last awareness check before the one being edited, looking back a week.
   const { data: recentAwareness = [] } = useQuery<CareEntry[]>({
@@ -570,7 +585,7 @@ export default function CareLog() {
         ) : (
           <ul className="space-y-2.5" data-testid="list-care-entries">
             {entries.map((e) => (
-              <li key={e.id} className="rounded-xl border bg-card px-3.5 py-3 shadow-sm" data-testid={`care-entry-${e.id}`}>
+              <li key={"cloudId" in e ? e.cloudId : e.id} className="rounded-xl border bg-card px-3.5 py-3 shadow-sm" data-testid={"cloudId" in e ? "care-entry-caregiver" : `care-entry-${e.id}`}>
                 <div className="flex items-start gap-3 min-w-0">
                   <span className="w-[4.25rem] flex-shrink-0 pt-0.5 text-sm font-semibold text-muted-foreground tabular-nums">{timeLabel(e.at)}</span>
                   <div className="min-w-0 flex-1">
@@ -582,8 +597,14 @@ export default function CareLog() {
                     </p>
                     {e.details && <p className="mt-0.5 text-sm text-muted-foreground break-words">{e.details}</p>}
                     {e.note && <p className="mt-1 text-sm whitespace-pre-wrap break-words">{e.note}</p>}
-                    {e.loggedBy && <p className="mt-1 text-xs font-semibold text-muted-foreground">Logged by {e.loggedBy}</p>}
+                    {e.loggedBy && (
+                      <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                        Logged by {e.loggedBy}
+                        {"cloudId" in e ? " from their phone" : ""}
+                      </p>
+                    )}
                   </div>
+                  {!("cloudId" in e) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-9 w-9 -mr-1.5 -mt-1 flex-shrink-0" aria-label="Entry options" data-testid={`button-entry-menu-${e.id}`}>
@@ -599,12 +620,15 @@ export default function CareLog() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  )}
                 </div>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {activePatient && <CareShareCard patient={activePatient} />}
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className={DIALOG_CLASS}>

@@ -454,6 +454,10 @@ export async function updateCareEntry(id: number, data: Partial<CareEntry>): Pro
   await db.careEntries.update(id, data);
   return (await db.careEntries.get(id))!;
 }
+/** True when an entry copied from a caregiver's phone is already here (any patient). */
+export async function hasCareEntrySource(sourceId: string): Promise<boolean> {
+  return (await db.careEntries.where("sourceId").equals(sourceId).count()) > 0;
+}
 export async function deleteCareEntry(id: number): Promise<void> {
   await db.careEntries.delete(id);
 }
