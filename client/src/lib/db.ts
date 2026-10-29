@@ -2,7 +2,7 @@ import Dexie, { type Table } from "dexie";
 import type {
   Patient, Physician, Appointment, Medication, MedicationLog,
   MedicalRecord, Vital, EmergencyContact, Pharmacy, ReminderSoundPreferences, Note,
-  NoteUpdate,
+  NoteUpdate, CareEntry,
 } from "@shared/schema";
 
 export const NOTE_CATEGORIES = [
@@ -44,6 +44,7 @@ class MedicalRecordsDB extends Dexie {
   reminderSoundPreferences!: Table<ReminderSoundPreferences, number>;
   notes!: Table<Note, number>;
   noteUpdates!: Table<NoteUpdate, number>;
+  careEntries!: Table<CareEntry, number>;
 
   constructor() {
     super("MedicalRecordsKeeper");
@@ -122,6 +123,24 @@ class MedicalRecordsDB extends Dexie {
       notes: "++id, patientId, date, flaggedForDoctor",
       noteUpdates: "++id, noteId, date",
     });
+
+    // MedRecords Care: adds only the careEntries table. Every existing store
+    // and index matches version 5 so no local data is rewritten.
+    this.version(6).stores({
+      patients: "++id",
+      physicians: "++id, patientId",
+      appointments: "++id, patientId",
+      medications: "++id, patientId",
+      medicationLogs: "++id, medicationId",
+      medicalRecords: "++id, patientId",
+      vitals: "++id, patientId",
+      emergencyContacts: "++id, patientId",
+      pharmacies: "++id, patientId",
+      reminderSoundPreferences: "++id, patientId",
+      notes: "++id, patientId, date, flaggedForDoctor",
+      noteUpdates: "++id, noteId, date",
+      careEntries: "++id, patientId, at, [patientId+at], sourceId",
+    });
   }
 }
 
@@ -171,6 +190,7 @@ export async function deletePatient(id: number): Promise<void> {
     await db.noteUpdates.where("noteId").anyOf(noteIds).delete();
   }
   await db.notes.where("patientId").equals(id).delete();
+  await db.careEntries.where("patientId").equals(id).delete();
   await db.patients.delete(id);
 }
 
@@ -417,12 +437,34 @@ export async function updateReminderSoundPreferences(
   return (await db.reminderSoundPreferences.get(existing.id!))!;
 }
 
+// --- Care log (MedRecords Care) ---
+/** Entries for one person between two ISO instants (inclusive start, exclusive end), newest first. */
+export async function getCareEntries(patientId: number, fromIso: string, toIso: string): Promise<CareEntry[]> {
+  const list = await db.careEntries
+    .where("[patientId+at]")
+    .between([patientId, fromIso], [patientId, toIso], true, false)
+    .toArray();
+  return list.sort((a, b) => b.at.localeCompare(a.at) || (b.id ?? 0) - (a.id ?? 0));
+}
+export async function createCareEntry(data: Omit<CareEntry, "id">): Promise<CareEntry> {
+  const id = await db.careEntries.add(data as CareEntry);
+  return { ...data, id } as CareEntry;
+}
+export async function updateCareEntry(id: number, data: Partial<CareEntry>): Promise<CareEntry> {
+  await db.careEntries.update(id, data);
+  return (await db.careEntries.get(id))!;
+}
+export async function deleteCareEntry(id: number): Promise<void> {
+  await db.careEntries.delete(id);
+}
+
 // ==================== Backup ====================
 export async function exportAllData() {
   return {
     // v8 adds note categories and appointment flags. Older backups still import
     // cleanly since records are spread field-for-field on restore.
-    version: 8,
+    // v9 adds MedRecords Care log entries and structured patient conditions.
+    version: 9,
     exportedAt: new Date().toISOString(),
     patients: await db.patients.toArray(),
     physicians: await db.physicians.toArray(),
@@ -436,6 +478,7 @@ export async function exportAllData() {
     reminderSoundPreferences: await db.reminderSoundPreferences.toArray(),
     notes: await db.notes.toArray(),
     noteUpdates: await db.noteUpdates.toArray(),
+    careEntries: await db.careEntries.toArray(),
   };
 }
 
@@ -588,6 +631,22 @@ export async function importAllData(data: any): Promise<void> {
       if (noteId) {
         await db.noteUpdates.add({ ...rest, noteId } as NoteUpdate);
       }
+    }
+  }
+
+  // Care log entries. A caregiver entry (sourceId) is restored once even if
+  // a backup somehow carries it twice.
+  if (data.careEntries?.length) {
+    const seen = new Set<string>();
+    for (const entry of data.careEntries) {
+      const { id, ...rest } = entry;
+      if (!rest.at || !rest.kind) continue;
+      if (rest.sourceId) {
+        if (seen.has(rest.sourceId)) continue;
+        seen.add(rest.sourceId);
+      }
+      rest.patientId = patientIdMap[rest.patientId] || patientIdMap[1] || 1;
+      await db.careEntries.add(rest as CareEntry);
     }
   }
 }

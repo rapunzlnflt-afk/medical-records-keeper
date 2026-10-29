@@ -3,7 +3,7 @@ import {
   LayoutDashboard, CalendarDays, Pill, Stethoscope, FileText,
   HeartPulse, Phone, Building2, IdCard, Sun, Moon, Download, Upload,
   Plus, X, Check, ChevronDown, Pencil, Trash2, NotebookPen,
-  History, Sparkles,
+  History, Sparkles, ClipboardList,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -29,6 +29,7 @@ import {
 import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
 import { GF_KEY, noteRestoredBackup, useMax } from "@/lib/plan";
 import { MaxTag } from "@/components/max-lock";
+import { useCare } from "@/lib/care-plan";
 import { formatPersonName, formatTitleCase } from "@/lib/format-name";
 import type { Patient } from "@shared/schema";
 
@@ -45,6 +46,7 @@ const navItems = [
   { title: "Profile", url: "/profile", icon: IdCard },
   { title: "Appointments", url: "/appointments", icon: CalendarDays },
   { title: "Medications", url: "/medications", icon: Pill },
+  { title: "Care Log", url: "/care", icon: ClipboardList, care: true },
   { title: "Physicians", url: "/physicians", icon: Stethoscope },
   { title: "Medical Records", url: "/records", icon: FileText, max: true },
   { title: "Notes", url: "/notes", icon: NotebookPen },
@@ -291,6 +293,7 @@ export function AppSidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const hasMax = useMax();
+  const care = useCare();
   const [loading, setLoading] = useState(false);
 
   const handleSaveData = async () => {
@@ -384,7 +387,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {navItems.filter((item) => !("care" in item) || care).map((item) => {
                 const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
                 return (
                   <SidebarMenuItem key={item.title}>

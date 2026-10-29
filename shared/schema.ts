@@ -41,6 +41,16 @@ export interface Patient {
   dentalPhone?: string | null;
   dentalPolicyHolder?: string | null;
   dentalEffectiveDate?: string | null;
+  // MedRecords Care: structured health conditions (keys from
+  // client/src/lib/care.ts CONDITIONS). Optional so older records and backups
+  // keep working. The free-text `conditions` field above is left as-is.
+  careConditions?: string[];
+  /** Cancer type key, only meaningful when careConditions includes "cancer". */
+  cancerType?: string | null;
+  /** Free text for the "other" condition. */
+  careConditionOther?: string | null;
+  /** Shared with caregivers unless turned off (undefined counts as shared). */
+  careConditionsShared?: boolean;
 }
 
 export interface Physician {
@@ -204,4 +214,44 @@ export interface NoteUpdate {
   date: string;
   text: string;
   createdAt: string;
+}
+
+/**
+ * One MedRecords Care log entry: a meal, a therapy session, a mood check,
+ * an awareness check or a personal-care task. Fields not used by an entry's
+ * kind stay undefined.
+ */
+export interface CareEntry {
+  id?: number;
+  patientId: number;
+  /** When it happened, local time "YYYY-MM-DDTHH:mm" so days bucket by the clock on the wall. */
+  at: string;
+  kind: "meal" | "therapy" | "mood" | "awareness" | "personal";
+  /** done / partial / declined. Mood and awareness checks are always "done". */
+  status: "done" | "partial" | "declined";
+  /** meal: breakfast | lunch | dinner | snack */
+  meal?: string;
+  /** meal: all | most | some | little */
+  amount?: string | null;
+  /** therapy: PT | OT */
+  therapy?: string;
+  minutes?: number | null;
+  /** personal: bathing | dressing | toileting | grooming */
+  task?: string;
+  /** personal: none | some | full */
+  help?: string | null;
+  /** mood: 1-10 */
+  score?: number | null;
+  /** awareness level key */
+  level?: string | null;
+  /** Why it was declined (reason key). */
+  reason?: string | null;
+  /** What they ate, which exercises, etc. */
+  details?: string | null;
+  note?: string | null;
+  /** First name of whoever logged it. */
+  loggedBy?: string | null;
+  createdAt: string;
+  /** Cloud id for entries that came from a caregiver's phone (dedupe). */
+  sourceId?: string | null;
 }

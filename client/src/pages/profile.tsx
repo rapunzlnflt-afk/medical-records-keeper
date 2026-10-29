@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Camera, Edit2, IdCard, ImageOff, Smile, Stethoscope, Trash2,
+  ArrowLeft, Activity, Camera, Edit2, IdCard, ImageOff, Smile, Stethoscope, Trash2,
   UserRound, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -37,6 +37,9 @@ import type { Patient, Physician } from "@shared/schema";
 import { formatPhone } from "@/lib/format-phone";
 import { formatPersonName } from "@/lib/format-name";
 import { fileToStorableDataUrl, IMAGE_READ_ERROR, IMAGE_UPLOAD_ACCEPT } from "@/lib/image";
+import { Switch } from "@/components/ui/switch";
+import { useCare } from "@/lib/care-plan";
+import { CANCER_TYPES, CONDITIONS, conditionLabels, conditionsShared } from "@/lib/care";
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"];
 
@@ -899,11 +902,119 @@ function CardDetailFields({ values, idPrefix, showPharmacyFields, onChange }: {
   );
 }
 
+/* ---------- MedRecords Care: health conditions ---------- */
+
+function ConditionsForm({ patient, onSubmit, onCancel }: {
+  patient: Patient;
+  onSubmit: (data: Partial<Patient>) => void;
+  onCancel: () => void;
+}) {
+  const [picked, setPicked] = useState<string[]>(patient.careConditions || []);
+  const [cancerType, setCancerType] = useState(patient.cancerType || "");
+  const [other, setOther] = useState(patient.careConditionOther || "");
+  const [shared, setShared] = useState(conditionsShared(patient));
+  const toggle = (k: string) => setPicked((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+  const ordered = CONDITIONS.map((c) => c.key).filter((k) => picked.includes(k));
+
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-5 bg-muted/20">
+        <FieldSection icon={Activity} title="Conditions" description="Tap everything that applies. Caregivers see these so they know what to watch for.">
+          <div className="flex flex-wrap gap-2">
+            {CONDITIONS.map((c) => {
+              const on = picked.includes(c.key);
+              return (
+                <button
+                  key={c.key} type="button" aria-pressed={on} onClick={() => toggle(c.key)}
+                  data-testid={`chip-condition-${c.key}`}
+                  className={`min-h-11 rounded-full border px-4 py-2 text-[15px] font-semibold leading-tight transition-colors ${
+                    on ? "border-primary bg-primary text-primary-foreground" : "border-[hsl(var(--field-border))] bg-[hsl(var(--field))] text-foreground"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+          {picked.includes("cancer") && (
+            <div className="space-y-2">
+              <Label className={labelClass}>Type of cancer</Label>
+              <Select value={cancerType} onValueChange={setCancerType}>
+                <SelectTrigger className={controlClass} data-testid="select-cancer-type"><SelectValue placeholder="Choose a type" /></SelectTrigger>
+                <SelectContent>
+                  {CANCER_TYPES.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {picked.includes("other") && (
+            <div className="space-y-2">
+              <Label htmlFor="pf-cond-other" className={labelClass}>Other condition</Label>
+              <Input id="pf-cond-other" className={controlClass} value={other} onChange={(e) => setOther(e.target.value)}
+                placeholder="Arthritis, hip replacement..." data-testid="input-condition-other" />
+            </div>
+          )}
+        </FieldSection>
+        <section className="rounded-xl border bg-card px-4 sm:px-5 py-4 flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <Label htmlFor="pf-cond-share" className={labelClass}>Share with caregivers</Label>
+            <p className="text-sm text-muted-foreground mt-1">Shown on the caregiver page alongside the care log.</p>
+          </div>
+          <Switch id="pf-cond-share" checked={shared} onCheckedChange={setShared} data-testid="switch-conditions-shared" />
+        </section>
+      </div>
+      <FormFooter
+        onCancel={onCancel}
+        saveLabel="Save Conditions"
+        onSave={() => onSubmit({
+          careConditions: ordered,
+          cancerType: ordered.includes("cancer") ? cancerType || null : null,
+          careConditionOther: ordered.includes("other") ? other.trim() || null : null,
+          careConditionsShared: shared,
+        })}
+      />
+    </>
+  );
+}
+
+function ConditionsCard({ patient, onEdit }: { patient: Patient; onEdit: () => void }) {
+  const labels = conditionLabels(patient);
+  return (
+    <Card className="shadow-sm" data-testid="card-conditions">
+      <CardContent className="p-4 sm:p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+            <Activity className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-heading text-lg font-semibold leading-tight">Health Conditions</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {labels.length ? (conditionsShared(patient) ? "Shared with caregivers" : "Not shared with caregivers") : "Helps caregivers know what to watch for."}
+            </p>
+          </div>
+        </div>
+        {labels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5" data-testid="list-conditions">
+            {labels.map((l) => (
+              <span key={l} className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">{l}</span>
+            ))}
+          </div>
+        )}
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={onEdit} data-testid="button-edit-conditions">
+          <Edit2 className="w-3.5 h-3.5" /> {labels.length ? "Edit conditions" : "Add conditions"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Profile() {
   const { activePatientId, activePatient, isLoading } = usePatient();
   const pid = activePatientId;
   const { toast } = useToast();
   const [editingPersonal, setEditingPersonal] = useState(false);
+  const [editingConditions, setEditingConditions] = useState(false);
+  const care = useCare();
 
   const { data: physicians = [] } = useQuery<Physician[]>({
     queryKey: ["physicians", pid],
@@ -915,6 +1026,7 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       setEditingPersonal(false);
+      setEditingConditions(false);
     },
     onError: () => {
       toast({ title: "Error", description: "Could not save. Please try again.", variant: "destructive" });
@@ -995,6 +1107,8 @@ export default function Profile() {
           )}
         </CardContent>
       </Card>
+
+      {care && <ConditionsCard patient={patient} onEdit={() => setEditingConditions(true)} />}
 
       <InsuranceCardSection
         icon={IdCard}
@@ -1103,6 +1217,18 @@ export default function Profile() {
               physicians={physicians}
               onSubmit={(data) => updateMut.mutate(data)}
               onCancel={() => setEditingPersonal(false)}
+            />
+          </DialogShell>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingConditions} onOpenChange={setEditingConditions}>
+        <DialogContent className={PROFILE_DIALOG_CLASS}>
+          <DialogShell title="Health Conditions" description="Stays on this device and in your backups. Shared with caregivers only if you leave sharing on.">
+            <ConditionsForm
+              patient={patient}
+              onSubmit={(data) => updateMut.mutate(data)}
+              onCancel={() => setEditingConditions(false)}
             />
           </DialogShell>
         </DialogContent>
