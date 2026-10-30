@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { getSupabase } from "@/lib/supabase";
 import { createGroup, firstName, getActiveGroup, getOwnerLabel, linkFor, setOwnerLabel } from "@/lib/caregiver-share";
-import { isCareShared, setCareShared } from "@/lib/care-share";
+import { getCareShare, setCareShared, setOwnerEntriesShared } from "@/lib/care-share";
 import { conditionLabels, conditionsShared } from "@/lib/care";
 
 // Same key as the dose-sharing card, so both stay in step.
@@ -28,7 +28,9 @@ export function CareShareCard({ patient }: { patient: Patient }) {
   const pid = patient.id!;
   const who = firstName(patient.name) || "this person";
 
-  const { data: shared = false } = useQuery({ queryKey: ["care-shared", pid], queryFn: () => isCareShared(pid) });
+  const { data: share } = useQuery({ queryKey: ["care-shared", pid], queryFn: () => getCareShare(pid) });
+  const shared = !!share?.shared;
+  const ownerEntries = !!share?.ownerEntries;
   const { data: groupState } = useQuery({ queryKey: KEY_GROUP, queryFn: getActiveGroup, enabled: shared });
 
   if (!getSupabase()) return null;
@@ -97,8 +99,31 @@ export function CareShareCard({ patient }: { patient: Patient }) {
             <p className="text-sm text-muted-foreground break-words">
               Caregivers see {who}'s first name
               {conditionsShared(patient) && conds.length ? ` and conditions (${conds.join(", ")})` : ""}, plus the last two days
-              of entries. Entries you log on this phone stay private.
+              of entries.
             </p>
+            <div className="flex items-start gap-3 rounded-lg border p-3" data-testid="row-owner-entries">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium leading-snug">Caregivers see entries I log</p>
+                <p className="mt-0.5 text-xs text-muted-foreground break-words" data-testid="text-owner-entries">
+                  {ownerEntries
+                    ? `Your entries for ${who} from the last two days show on their phones with your name. Only you can change them.`
+                    : "Off: entries you log on this phone stay private."}
+                </p>
+              </div>
+              <Switch
+                checked={ownerEntries}
+                disabled={busy}
+                aria-label="Caregivers see entries I log"
+                onCheckedChange={(on) =>
+                  act(async () => {
+                    await setOwnerEntriesShared(patient, on);
+                    queryClient.invalidateQueries({ queryKey: ["care-shared", pid] });
+                    toast({ title: on ? "Caregivers will see your entries" : "Your entries are private again" });
+                  })
+                }
+                data-testid="switch-owner-entries"
+              />
+            </div>
             {!group ? (
               <>
                 <div className="space-y-1.5">

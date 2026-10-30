@@ -11,6 +11,9 @@
 //   delete  { token, device_id, id }                   -> own entry, within 30 minutes
 //
 // Every caregiver on the link sees every caregiver's entries (shift handoff).
+// When the owner switches it on for a person, caregivers also see the
+// entries she logs herself (owner_local_id set), labeled with her name and
+// never editable here.
 // Only the person who logged an entry can change it, and only for 30 minutes;
 // after that the owner's phone copies it into the family record.
 //
@@ -139,28 +142,34 @@ function cleanEntry(e: any): { row?: Record<string, unknown>; error?: string } {
 async function sharedPeople(ownerUser: string) {
   const { data } = await supabase
     .from("care_people")
-    .select("id, name, conditions")
+    .select("id, name, conditions, share_owner_entries")
     .eq("owner_user", ownerUser)
     .eq("shared", true)
     .order("name");
-  return (data ?? []) as { id: string; name: string; conditions: string[] }[];
+  return (data ?? []) as { id: string; name: string; conditions: string[]; share_owner_entries: boolean }[];
 }
 
 async function buildState(group: { owner_user: string; owner_label: string | null }, memberId: string) {
-  const people = await sharedPeople(group.owner_user);
+  const all = await sharedPeople(group.owner_user);
+  const ownerOn = new Set(all.filter((p) => p.share_owner_entries).map((p) => p.id));
+  const people = all.map(({ share_owner_entries: _s, ...p }) => p);
   let entries: any[] = [];
   if (people.length) {
     const { data } = await supabase
       .from("care_entries")
-      .select("id, person_id, member_id, actor_label, at, kind, status, meal, amount, therapy, minutes, task, help, score, level, reason, details, note, created_at")
+      .select("id, person_id, member_id, owner_local_id, actor_label, at, kind, status, meal, amount, therapy, minutes, task, help, score, level, reason, details, note, created_at")
       .in("person_id", people.map((p) => p.id))
       .is("deleted_at", null)
       .gte("at", new Date(Date.now() - WINDOW_MS).toISOString())
       .order("at", { ascending: false })
       .limit(400);
     // Member ids stay on the server; the page only learns "you can edit this".
-    entries = ((data ?? []) as any[]).map(({ member_id, ...e }) => ({
+    // The owner's own entries show only while her switch is on for that person.
+    entries = ((data ?? []) as any[])
+      .filter((e) => e.owner_local_id == null || ownerOn.has(e.person_id))
+      .map(({ member_id, owner_local_id, ...e }) => ({
       ...e,
+      actor_label: owner_local_id != null ? e.actor_label || group.owner_label || "Family" : e.actor_label,
       mine: member_id === memberId,
       can_edit: member_id === memberId && Date.now() - new Date(e.created_at).getTime() < EDIT_MS,
     }));
@@ -176,7 +185,7 @@ async function ownEntry(id: unknown, memberId: string) {
     .select("id, member_id, created_at, deleted_at")
     .eq("id", id)
     .maybeSingle();
-  if (!data || data.deleted_at || data.member_id !== memberId) return null;
+  if (!data || data.deleted_at || !data.member_id || data.member_id !== memberId) return null;
   if (Date.now() - new Date(data.created_at).getTime() >= EDIT_MS) return null;
   return data;
 }

@@ -35,7 +35,7 @@ import {
 } from "@/lib/care";
 import { formatPersonName } from "@/lib/format-name";
 import type { CareEntry } from "@shared/schema";
-import { fetchCaregiverEntries, type CloudCareEntry } from "@/lib/care-share";
+import { fetchCaregiverEntries, syncOwnerEntries, type CloudCareEntry } from "@/lib/care-share";
 import { CareShareCard } from "@/components/care-share-card";
 
 const DIALOG_CLASS =
@@ -465,7 +465,11 @@ export default function CareLog() {
     return before?.level ?? null;
   }, [editing, recentAwareness]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["care-entries", pid] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["care-entries", pid] });
+    // Caregivers see the owner's entries only when she has switched that on.
+    syncOwnerEntries(pid).catch(() => {});
+  };
 
   const saveMut = useMutation({
     mutationFn: async ({ id, draft }: { id?: number; draft: Draft }) => {
