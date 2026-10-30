@@ -514,8 +514,15 @@ export default function CareLog() {
       <div className="w-full max-w-4xl min-w-0 p-4 md:p-6 space-y-4">
         <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">Care Log</h1>
         <Card className="border-primary/25 bg-primary/5" data-testid="card-care-lock">
-          <CardContent className="p-4 sm:p-5 text-sm text-muted-foreground leading-relaxed">
-            The Care Log is part of MedRecords Care, coming soon.
+          <CardContent className="p-4 sm:p-5">
+            <p className="font-heading text-base font-semibold text-primary">The Care Log is part of MedRecords Care</p>
+            <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+              Log meals, PT and OT, bathing and dressing, mood and awareness, and anything the patient declined. Caregivers
+              log from their own phone and join free. Care includes everything in Max.
+            </p>
+            <Button asChild size="sm" className="mt-3 gradient-primary text-white border-none" data-testid="button-see-care">
+              <Link href="/max">See MedRecords Care</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
