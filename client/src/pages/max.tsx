@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MaxTag } from "@/components/max-lock";
-import { activateKey, BUY_URL, ORDERS_URL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
+import { useCare } from "@/lib/care-plan";
+import { activateKey, hasCareLicense, BUY_URL, ORDERS_URL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
 
 const FREE = [
   "Medications, dose reminders and dose history",
@@ -51,7 +52,7 @@ export default function MaxPage() {
     setBusy(false);
     if (r.ok) {
       setKey("");
-      toast({ title: "MedRecords Max is on", description: "Thanks for supporting MedRecords." });
+      toast({ title: hasCareLicense() ? "MedRecords Care is on" : "MedRecords Max is on", description: "Thanks for supporting MedRecords." });
     } else setError(r.message || "That key wasn't recognized.");
   };
 
@@ -72,8 +73,13 @@ export default function MaxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const subscriber = plan.max && !plan.grandfathered;
-  const lapsed = !plan.max && !!plan.key;
+  // Care is visible (preview on or a Care key). Before launch nobody else sees Care wording.
+  const careOn = useCare();
+  const keyOk = plan.max && !!plan.key && plan.status === "active";
+  const lapsed = !!plan.key && (plan.status !== "active" || (!plan.max && !plan.grandfathered));
+  // Paste a key: anyone without a key yet, plus grandfathered people once Care
+  // is visible (they keep Max for free but can buy Care).
+  const showKeyBox = !plan.care && (!plan.max || (plan.grandfathered && careOn && !keyOk) || lapsed);
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-3xl w-full min-w-0 overflow-x-hidden" data-testid="page-max">
@@ -98,14 +104,22 @@ export default function MaxPage() {
         <Card className="border-primary/25 bg-primary/5" data-testid="card-max-status">
           <CardContent className="p-4 sm:p-5 space-y-2">
             <p className="font-heading text-lg font-semibold flex items-center gap-2">
-              <Check className="w-5 h-5 text-primary" /> You have MedRecords Max
+              <Check className="w-5 h-5 text-primary" /> {plan.care ? "You have MedRecords Care" : "You have MedRecords Max"}
             </p>
-            {plan.grandfathered ? (
+            {plan.care && (
+              <p className="text-sm text-muted-foreground" data-testid="text-care-included">
+                Care includes everything in Max, plus the shared care log.
+              </p>
+            )}
+            {plan.grandfathered && !plan.key ? (
               <p className="text-sm text-muted-foreground">
                 You were using MedRecords before Max existed, so it's yours for good. Thank you for being here early.
               </p>
             ) : (
               <>
+                {plan.grandfathered && (
+                  <p className="text-sm text-muted-foreground">Max stays yours for good, even without a key.</p>
+                )}
                 <p className="text-sm text-muted-foreground">
                   {plan.plan ? `${plan.plan} plan. ` : ""}
                   {niceDate(plan.expiresAt) ? `Paid through ${niceDate(plan.expiresAt)}. ` : ""}
@@ -127,6 +141,20 @@ export default function MaxPage() {
                     }}
                   >
                     Remove key from this device
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    data-testid="button-check-plan"
+                    onClick={async () => {
+                      setBusy(true);
+                      await revalidate(true);
+                      setBusy(false);
+                      toast({ title: "Plan checked", description: hasCareLicense() ? "You have MedRecords Care." : "You have MedRecords Max." });
+                    }}
+                  >
+                    {busy && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Check my plan
                   </Button>
                 </div>
               </>
@@ -192,7 +220,7 @@ export default function MaxPage() {
         </Card>
       </div>
 
-      {!subscriber && !plan.grandfathered && (
+      {showKeyBox && (
         <Card data-testid="card-enter-key">
           <CardContent className="p-4 sm:p-5 space-y-3">
             <p className="font-heading text-base font-semibold flex items-center gap-2">
@@ -201,7 +229,9 @@ export default function MaxPage() {
             <p className="text-sm text-muted-foreground">
               {lapsed
                 ? "Your plan isn't active right now. After you renew, tap Check again."
-                : "Paste the license key from your receipt email."}
+                : plan.grandfathered
+                  ? "Bought MedRecords Care? Paste the license key from your receipt email."
+                  : "Paste the license key from your receipt email."}
             </p>
             {lapsed ? (
               <Button
