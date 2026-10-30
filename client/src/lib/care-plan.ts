@@ -12,6 +12,16 @@ import { useSyncExternalStore } from "react";
 import { getPlan, hasCareLicense, subscribePlan, CARE_VARIANT_IDS } from "./plan";
 
 const PREVIEW_KEY = "mrCarePreview";
+
+/**
+ * Flip to true on launch day, after the Care price options are switched on in
+ * Lemon Squeezy. Until then only the preview shows Care on the Max page.
+ */
+export const CARE_ON_SALE = false;
+
+/** Care Monthly price option, preselected; the checkout also lists Care Yearly. */
+export const CARE_BUY_URL =
+  "https://cleartrackapps.lemonsqueezy.com/checkout/buy/aed5235d-4f96-402a-b722-29dbd1dc6c53";
 const listeners = new Set<() => void>();
 
 function readPreview(): boolean {

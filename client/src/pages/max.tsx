@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MaxTag } from "@/components/max-lock";
-import { useCare } from "@/lib/care-plan";
+import { useCare, CARE_ON_SALE, CARE_BUY_URL } from "@/lib/care-plan";
 import { activateKey, hasCareLicense, BUY_URL, ORDERS_URL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
 
 const FREE = [
@@ -26,6 +26,14 @@ const MAX = [
   "Vitals",
   "Timeline",
   "Visit notes for past appointments",
+];
+
+const CARE = [
+  "Daily care log: meals and snacks, PT and OT, bathing, changing clothes and cleaning",
+  "Mood from 1 to 10 and awareness, each with notes",
+  "Mark anything the patient declined",
+  "Caregivers log from their own phone and see each other's entries",
+  "Conditions shared with caregivers",
 ];
 
 function niceDate(iso?: string | null) {
@@ -79,6 +87,10 @@ export default function MaxPage() {
   const lapsed = !!plan.key && (plan.status !== "active" || (!plan.max && !plan.grandfathered));
   // Paste a key: anyone without a key yet, plus grandfathered people once Care
   // is visible (they keep Max for free but can buy Care).
+  // The Care card: everyone once Care is on sale, preview devices before that.
+  const showCare = CARE_ON_SALE || careOn;
+  // A paid Max subscriber switches plans in Lemon Squeezy instead of buying again.
+  const maxSubscriber = keyOk && !plan.care;
   const showKeyBox = !plan.care && (!plan.max || (plan.grandfathered && careOn && !keyOk) || lapsed);
 
   return (
@@ -219,6 +231,61 @@ export default function MaxPage() {
           </CardContent>
         </Card>
       </div>
+
+      {showCare && (
+        <Card className="border-primary/40" data-testid="card-plan-care">
+          <CardContent className="p-4 sm:p-5">
+            <p className="font-heading text-lg font-semibold">MedRecords Care</p>
+            <p className="mt-1">
+              <span className="font-heading text-2xl font-bold">$7.99</span>{" "}
+              <span className="text-sm text-muted-foreground">a month</span>
+            </p>
+            <p className="text-sm text-muted-foreground">or $49.99 a year. Cancel any time. Caregivers join free.</p>
+            <ul className="mt-3 space-y-1.5">
+              <li className="flex gap-2 text-sm font-medium">
+                <span className="w-4 text-center flex-shrink-0 text-primary">+</span>
+                <span>Everything in Max</span>
+              </li>
+              {CARE.map((f) => (
+                <li key={f} className="flex gap-2 text-sm">
+                  <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            {plan.care ? (
+              <p className="mt-4 text-sm font-medium text-primary flex items-center gap-1.5" data-testid="text-care-current">
+                <Check className="w-4 h-4" /> This is your plan
+              </p>
+            ) : maxSubscriber ? (
+              <div className="mt-4 space-y-2" data-testid="care-upgrade-steps">
+                <p className="text-sm font-medium">Switch your Max plan to Care</p>
+                <ol className="list-decimal pl-5 space-y-1 text-sm text-muted-foreground">
+                  <li>Open My Orders and sign in with the email you used to buy Max.</li>
+                  <li>Open your MedRecords Max subscription, tap the three dots, then Update.</li>
+                  <li>Pick Care Monthly or Care Yearly and tap Save. You only pay the difference.</li>
+                  <li>Come back here and tap Check my plan. Your key stays the same.</li>
+                </ol>
+                <Button asChild className="w-full gradient-primary text-white border-none" data-testid="button-upgrade-care">
+                  <a href={ORDERS_URL} target="_blank" rel="noopener noreferrer">
+                    Open My Orders <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <Button asChild className="mt-4 w-full gradient-primary text-white border-none" data-testid="button-buy-care">
+                <a href={CARE_BUY_URL} target="_blank" rel="noopener noreferrer">
+                  Get MedRecords Care
+                </a>
+              </Button>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              One key works on up to 3 devices. Yearly plans can be refunded within 30 days. If you stop paying, your
+              records stay visible, printable and exportable.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {showKeyBox && (
         <Card data-testid="card-enter-key">
