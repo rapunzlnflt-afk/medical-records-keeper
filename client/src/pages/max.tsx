@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MaxTag } from "@/components/max-lock";
-import { useCare, setCarePreview, CARE_ON_SALE, CARE_BUY_URL } from "@/lib/care-plan";
+import { CARE_ON_SALE, CARE_BUY_URL } from "@/lib/care-plan";
 import { activateKey, hasCareLicense, BUY_URL, ORDERS_URL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
 
 const FREE = [
@@ -81,30 +81,13 @@ export default function MaxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Care is visible (preview on or a Care key). Before launch nobody else sees Care wording.
-  const careOn = useCare();
-  // Hidden preview switch: 5 taps on the title within 3 seconds.
-  const taps = useRef<number[]>([]);
-  const onTitleTap = () => {
-    const now = Date.now();
-    taps.current = [...taps.current.filter((t) => now - t < 4000), now];
-    if (taps.current.length < 5) return;
-    taps.current = [];
-    if (plan.care) return;
-    const on = !careOn;
-    setCarePreview(on);
-    toast({ title: on ? "Care preview on" : "Care preview off", description: "Reopening the app…" });
-    setTimeout(() => window.location.reload(), 900);
-  };
   const keyOk = plan.max && !!plan.key && plan.status === "active";
   const lapsed = !!plan.key && (plan.status !== "active" || (!plan.max && !plan.grandfathered));
-  // Paste a key: anyone without a key yet, plus grandfathered people once Care
-  // is visible (they keep Max for free but can buy Care).
-  // The Care card: everyone once Care is on sale, preview devices before that.
-  const showCare = CARE_ON_SALE || careOn;
+  // The Care card shows for everyone now that Care is on sale.
+  const showCare = CARE_ON_SALE;
   // A paid Max subscriber switches plans in Lemon Squeezy instead of buying again.
   const maxSubscriber = keyOk && !plan.care;
-  const showKeyBox = !plan.care && (!plan.max || (plan.grandfathered && careOn && !keyOk) || lapsed);
+  const showKeyBox = !plan.care && (!plan.max || lapsed);
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-3xl w-full min-w-0 overflow-x-hidden" data-testid="page-max">
@@ -117,9 +100,7 @@ export default function MaxPage() {
 
       <div className="min-w-0">
         <h1
-          className="font-heading text-2xl sm:text-3xl font-bold tracking-tight select-none cursor-default"
-          style={{ touchAction: "manipulation", WebkitTouchCallout: "none" }}
-          onPointerUp={onTitleTap}
+          className="font-heading text-2xl sm:text-3xl font-bold tracking-tight"
           data-testid="text-max-title"
         >
           MedRecords <MaxTag />
@@ -143,12 +124,12 @@ export default function MaxPage() {
             )}
             {plan.grandfathered && !plan.key ? (
               <p className="text-sm text-muted-foreground">
-                You were using MedRecords before Max existed, so it's yours for good. Thank you for being here early.
+                You were using MedRecords before Max existed, so Max and Care are yours for good. Thank you for being here early.
               </p>
             ) : (
               <>
                 {plan.grandfathered && (
-                  <p className="text-sm text-muted-foreground">Max stays yours for good, even without a key.</p>
+                  <p className="text-sm text-muted-foreground">Max and Care stay yours for good, even without a key.</p>
                 )}
                 <p className="text-sm text-muted-foreground">
                   {plan.plan ? `${plan.plan} plan. ` : ""}
@@ -275,15 +256,6 @@ export default function MaxPage() {
               <p className="mt-4 text-sm font-medium text-primary flex items-center gap-1.5" data-testid="text-care-current">
                 <Check className="w-4 h-4" /> This is your plan
               </p>
-            ) : careOn ? (
-              <div className="mt-4 space-y-2" data-testid="text-care-preview">
-                <p className="text-sm font-medium text-primary flex items-center gap-1.5">
-                  <Check className="w-4 h-4" /> Care preview is on for this phone
-                </p>
-                <Button asChild className="w-full gradient-primary text-white border-none" data-testid="button-open-care-log">
-                  <Link href="/care">Open the Care Log</Link>
-                </Button>
-              </div>
             ) : maxSubscriber ? (
               <div className="mt-4 space-y-2" data-testid="care-upgrade-steps">
                 <p className="text-sm font-medium">Switch your Max plan to Care</p>

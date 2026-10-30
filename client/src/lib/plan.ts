@@ -104,8 +104,9 @@ function computeMax(l: PlanState): boolean {
   return !!l.grandfathered || keyActive(l);
 }
 
-/** Care needs a key on a Care price option. Grandfathering covers Max only. */
+/** Care: grandfathered phones (free for good, since 2026-10-30), or a key on a Care price option. */
 function computeCare(l: PlanState): boolean {
+  if (l.grandfathered) return true;
   return !!l.key && keyActive(l) && CARE_VARIANT_IDS.includes(Number(l.variantId));
 }
 
