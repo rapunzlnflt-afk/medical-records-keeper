@@ -2,16 +2,13 @@
 //
 // Care is a tier above Max: a Lemon Squeezy key on a Care price option
 // (see CARE_VARIANT_IDS in plan.ts) unlocks it, together with everything in Max.
+// Grandfathered phones also get Care for good (see computeCare in plan.ts).
 //
-// Care launched on 2026-10-30. The owner's test switch remains: tap the
-// "MedRecords" title on the Max page 5 times to turn Care on or off for one
-// device without a key (works inside an installed iPhone home-screen app).
-// The old ?carepreview=1 link is gone; ?carepreview=0 still clears it.
+// Care launched on 2026-10-30. The old owner preview switch (5 taps on the Max
+// page title) was removed; any leftover preview flag is cleared on load.
 
 import { useSyncExternalStore } from "react";
 import { getPlan, hasCareLicense, subscribePlan, CARE_VARIANT_IDS } from "./plan";
-
-const PREVIEW_KEY = "mrCarePreview";
 
 /** Care is on sale: everyone sees the Care card on the Max page. */
 export const CARE_ON_SALE = true;
@@ -19,47 +16,21 @@ export const CARE_ON_SALE = true;
 /** Care Monthly price option, preselected; the checkout also lists Care Yearly. */
 export const CARE_BUY_URL =
   "https://cleartrackapps.lemonsqueezy.com/checkout/buy/aed5235d-4f96-402a-b722-29dbd1dc6c53";
-const listeners = new Set<() => void>();
 
-function readPreview(): boolean {
-  try {
-    const q = new URLSearchParams(window.location.search).get("carepreview");
-    if (q === "0") localStorage.removeItem(PREVIEW_KEY);
-    return localStorage.getItem(PREVIEW_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-let snapshot = typeof window !== "undefined" ? readPreview() : false;
-
-/** Turn the preview on or off for this device (the hidden 5-tap switch). */
-export function setCarePreview(on: boolean) {
-  try {
-    if (on) localStorage.setItem(PREVIEW_KEY, "1");
-    else localStorage.removeItem(PREVIEW_KEY);
-  } catch {
-    /* ignore */
-  }
-  snapshot = on;
-  listeners.forEach((l) => l());
+// Clear the retired preview flag so it can't unlock anything.
+try {
+  if (typeof window !== "undefined") localStorage.removeItem("mrCarePreview");
+} catch {
+  /* ignore */
 }
 
 export function hasCare(): boolean {
-  return snapshot || hasCareLicense();
+  return hasCareLicense();
 }
 
-/** Preview on, or a Care key. Re-renders when either changes. */
+/** Care key or grandfathered phone. Re-renders when the plan changes. */
 export function useCare(): boolean {
-  const preview = useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
-    },
-    () => snapshot,
-  );
-  const licensed = useSyncExternalStore(subscribePlan, () => hasCareLicense());
-  return preview || licensed;
+  return useSyncExternalStore(subscribePlan, () => hasCareLicense());
 }
 
 /** True when the saved key is on a Care price option (active or not). */
