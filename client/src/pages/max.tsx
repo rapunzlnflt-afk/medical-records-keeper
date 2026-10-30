@@ -87,7 +87,7 @@ export default function MaxPage() {
   const taps = useRef<number[]>([]);
   const onTitleTap = () => {
     const now = Date.now();
-    taps.current = [...taps.current.filter((t) => now - t < 3000), now];
+    taps.current = [...taps.current.filter((t) => now - t < 4000), now];
     if (taps.current.length < 5) return;
     taps.current = [];
     if (plan.care) return;
@@ -116,7 +116,12 @@ export default function MaxPage() {
       </Link>
 
       <div className="min-w-0">
-        <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight select-none" onClick={onTitleTap} data-testid="text-max-title">
+        <h1
+          className="font-heading text-2xl sm:text-3xl font-bold tracking-tight select-none cursor-default"
+          style={{ touchAction: "manipulation", WebkitTouchCallout: "none" }}
+          onPointerUp={onTitleTap}
+          data-testid="text-max-title"
+        >
           MedRecords <MaxTag />
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1.5">
@@ -270,6 +275,15 @@ export default function MaxPage() {
               <p className="mt-4 text-sm font-medium text-primary flex items-center gap-1.5" data-testid="text-care-current">
                 <Check className="w-4 h-4" /> This is your plan
               </p>
+            ) : careOn ? (
+              <div className="mt-4 space-y-2" data-testid="text-care-preview">
+                <p className="text-sm font-medium text-primary flex items-center gap-1.5">
+                  <Check className="w-4 h-4" /> Care preview is on for this phone
+                </p>
+                <Button asChild className="w-full gradient-primary text-white border-none" data-testid="button-open-care-log">
+                  <Link href="/care">Open the Care Log</Link>
+                </Button>
+              </div>
             ) : maxSubscriber ? (
               <div className="mt-4 space-y-2" data-testid="care-upgrade-steps">
                 <p className="text-sm font-medium">Switch your Max plan to Care</p>
