@@ -143,12 +143,12 @@ export default function MaxPage() {
             )}
             {plan.grandfathered && !plan.key ? (
               <p className="text-sm text-muted-foreground">
-                You were using MedRecords before Max existed, so it's yours for good. Thank you for being here early.
+                You were using MedRecords before Max existed, so Max and Care are yours for good. Thank you for being here early.
               </p>
             ) : (
               <>
                 {plan.grandfathered && (
-                  <p className="text-sm text-muted-foreground">Max stays yours for good, even without a key.</p>
+                  <p className="text-sm text-muted-foreground">Max and Care stay yours for good, even without a key.</p>
                 )}
                 <p className="text-sm text-muted-foreground">
                   {plan.plan ? `${plan.plan} plan. ` : ""}
