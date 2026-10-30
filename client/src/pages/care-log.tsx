@@ -36,6 +36,7 @@ import {
 import { formatPersonName } from "@/lib/format-name";
 import type { CareEntry } from "@shared/schema";
 import { fetchCaregiverEntries, syncOwnerEntries, type CloudCareEntry } from "@/lib/care-share";
+import { PersonChip } from "@/components/person-chip";
 import { CareShareCard } from "@/components/care-share-card";
 
 const DIALOG_CLASS =
@@ -537,7 +538,14 @@ export default function CareLog() {
       </Link>
       <div className="min-w-0">
         <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">Care Log</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">Daily care for {name}</p>
+        <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">Daily care for</p>
+        {activePatient ? (
+          <div className="mt-2">
+            <PersonChip patient={activePatient} testId="chip-care-person" />
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{name}</p>
+        )}
         {conds.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5" data-testid="list-care-conditions">
             {conds.map((c) => (

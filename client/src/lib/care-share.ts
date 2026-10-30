@@ -17,7 +17,7 @@
 import type { CareEntry, Patient } from "@shared/schema";
 import { getSupabase } from "./supabase";
 import { currentUserId, ensureAnonAuth } from "./reminder-sync";
-import { createCareEntry, getCareEntries, getPatients, hasCareEntrySource } from "./db";
+import { createCareEntry, getCareEntries, getMedication, getPatients, hasCareEntrySource } from "./db";
 import { firstName, getOwnerLabel } from "./caregiver-share";
 import { conditionLabels, conditionsShared, localStamp } from "./care";
 
@@ -54,6 +54,24 @@ export async function getCareShare(patientId: number): Promise<CareShareState> {
     .eq("local_id", patientId)
     .maybeSingle();
   return { shared: !!data?.shared, ownerEntries: !!data?.shared && !!data?.share_owner_entries };
+}
+
+/**
+ * Local ids of family members with anything shared with caregivers: a care
+ * log, or at least one medication's doses. Shown as "Shared" in the switcher.
+ */
+export async function listSharedPeople(): Promise<number[]> {
+  if (!getSupabase() || !(await currentUserId())) return [];
+  const c = client();
+  const ids = new Set<number>();
+  const { data: people } = await c.from("care_people").select("local_id").eq("shared", true);
+  for (const r of (people ?? []) as { local_id: number }[]) ids.add(r.local_id);
+  const { data: doses } = await c.from("dose_schedules").select("source_id").eq("shared", true).eq("enabled", true);
+  for (const r of (doses ?? []) as { source_id: number }[]) {
+    const med = await getMedication(r.source_id).catch(() => undefined);
+    if (med) ids.add(med.patientId);
+  }
+  return Array.from(ids);
 }
 
 /** Whether this person's care log is shared. False when sharing was never set up. */

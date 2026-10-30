@@ -15,6 +15,7 @@ import { getSupabase } from "./supabase";
 import { currentUserId, ensureAnonAuth } from "./reminder-sync";
 import { createMedicationLog, getMedication, getMedicationLogs, getPatient } from "./db";
 import type { DoseSchedule, MissedRule } from "./dose-schedule";
+import type { Patient } from "@shared/schema";
 
 export interface CaregiverGroup {
   id: string;
@@ -171,6 +172,8 @@ export interface ShareableSchedule {
   schedule: DoseSchedule;
   medName: string;
   personName: string | null;
+  /** The family member, so the card can show their color and full name. */
+  patient?: Patient;
 }
 
 /** Every medication with Dose reminders on, with its local name and person. */
@@ -186,7 +189,7 @@ export async function listShareableSchedules(): Promise<ShareableSchedule[]> {
     const med = await getMedication(s.source_id);
     if (!med) continue;
     const patient = await getPatient(med.patientId);
-    out.push({ schedule: s, medName: med.name, personName: firstName(patient?.name) });
+    out.push({ schedule: s, medName: med.name, personName: firstName(patient?.name), patient: patient || undefined });
   }
   return out;
 }

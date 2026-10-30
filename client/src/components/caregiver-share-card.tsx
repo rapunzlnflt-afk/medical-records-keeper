@@ -4,6 +4,7 @@
 // A port of Pawfolio's sitter sharing card; keep the wording in step.
 
 import { useState, type ReactNode } from "react";
+import { PersonAvatar } from "@/components/person-chip";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Users, Copy, Share2, Bell, BellOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +62,10 @@ function SharedMedRow({ item }: { item: ShareableSchedule }) {
   const [note, setNote] = useState(s.missed_note || "");
   const rule = (s.missed_rule || "") as "" | MissedRule;
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: KEY_SCHEDULES });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: KEY_SCHEDULES });
+    queryClient.invalidateQueries({ queryKey: ["shared-people"] });
+  };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -79,9 +83,17 @@ function SharedMedRow({ item }: { item: ShareableSchedule }) {
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm break-words">{s.label}</p>
-          <p className="text-xs text-muted-foreground break-words">
-            {item.personName ? `for ${item.personName}` : item.medName}
-          </p>
+          {item.patient ? (
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground min-w-0" data-testid={`text-med-person-${s.source_id}`}>
+              <PersonAvatar patient={item.patient} size="xs" />
+              <span className="break-words">
+                for <span className="font-semibold text-foreground">{item.patient.name}</span>
+                {item.patient.relationship ? ` (${item.patient.relationship})` : ""}
+              </span>
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground break-words">{item.personName ? `for ${item.personName}` : item.medName}</p>
+          )}
         </div>
         <Switch
           checked={!!s.shared}

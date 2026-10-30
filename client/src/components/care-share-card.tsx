@@ -16,6 +16,18 @@ import { getSupabase } from "@/lib/supabase";
 import { createGroup, firstName, getActiveGroup, getOwnerLabel, linkFor, setOwnerLabel } from "@/lib/caregiver-share";
 import { getCareShare, setCareShared, setOwnerEntriesShared } from "@/lib/care-share";
 import { conditionLabels, conditionsShared } from "@/lib/care";
+import { usePatient } from "@/lib/patient-context";
+import { PersonChip } from "@/components/person-chip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Same key as the dose-sharing card, so both stay in step.
 const KEY_GROUP = ["caregiver-group"];
@@ -25,6 +37,7 @@ export function CareShareCard({ patient }: { patient: Patient }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(getOwnerLabel());
   const [freshUrl, setFreshUrl] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const pid = patient.id!;
   const who = firstName(patient.name) || "this person";
 
@@ -32,6 +45,12 @@ export function CareShareCard({ patient }: { patient: Patient }) {
   const shared = !!share?.shared;
   const ownerEntries = !!share?.ownerEntries;
   const { data: groupState } = useQuery({ queryKey: KEY_GROUP, queryFn: getActiveGroup, enabled: shared });
+  // Caregivers see first names only, so two family members with the same
+  // first name would look alike on their phone.
+  const { patients: family } = usePatient();
+  const sameFirst = family.filter(
+    (p) => p.id !== pid && (firstName(p.name) || "").toLowerCase() === (firstName(patient.name) || "").toLowerCase(),
+  );
 
   if (!getSupabase()) return null;
 
@@ -69,9 +88,26 @@ export function CareShareCard({ patient }: { patient: Patient }) {
     }
   };
 
+  const turnOn = () =>
+    act(async () => {
+      await setCareShared(patient, true);
+      queryClient.invalidateQueries({ queryKey: ["care-shared", pid] });
+      queryClient.invalidateQueries({ queryKey: ["shared-people"] });
+      queryClient.invalidateQueries({ queryKey: KEY_GROUP });
+      toast({ title: `Sharing ${patient.name}'s care log` });
+    });
+
   return (
     <Card data-testid="card-care-share">
       <CardContent className="p-4 sm:p-5 space-y-4">
+        <PersonChip patient={patient} testId="chip-share-person">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold flex-shrink-0 ${shared ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+            data-testid="text-share-status"
+          >
+            {shared ? "Shared" : "Private"}
+          </span>
+        </PersonChip>
         <div className="flex items-center gap-3">
           <Users className="h-5 w-5 flex-shrink-0 text-primary" />
           <p className="min-w-0 flex-1 font-heading text-base font-semibold leading-tight">Share with caregivers</p>
@@ -80,15 +116,51 @@ export function CareShareCard({ patient }: { patient: Patient }) {
             disabled={busy}
             aria-label={`Share ${who}'s care log`}
             onCheckedChange={(on) =>
-              act(async () => {
-                await setCareShared(patient, on);
-                queryClient.invalidateQueries({ queryKey: ["care-shared", pid] });
-                if (on) queryClient.invalidateQueries({ queryKey: KEY_GROUP });
-              })
+              on
+                ? setConfirmOpen(true)
+                : act(async () => {
+                    await setCareShared(patient, false);
+                    queryClient.invalidateQueries({ queryKey: ["care-shared", pid] });
+                    queryClient.invalidateQueries({ queryKey: ["shared-people"] });
+                    toast({ title: `${patient.name}'s care log is private again` });
+                  })
             }
             data-testid="switch-care-share"
           />
         </div>
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md" data-testid="dialog-confirm-care-share">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="break-words">Share this person's care log?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3 text-left">
+                  <PersonChip patient={patient} />
+                  <p className="break-words">
+                    Caregivers on your link will see {who}'s first name
+                    {conditionsShared(patient) && conds.length ? `, conditions (${conds.join(", ")})` : ""} and care entries, and
+                    can log care for {who}.
+                  </p>
+                  {sameFirst.length > 0 && (
+                    <p
+                      className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-2.5 text-amber-900 dark:text-amber-200 break-words"
+                      data-testid="text-same-first-name"
+                    >
+                      {sameFirst.map((p) => p.name).join(" and ")} also {sameFirst.length > 1 ? "have" : "has"} the first name {who}.
+                      Caregivers see first names only, so consider changing one name in Profile (for example, a nickname) before
+                      sharing.
+                    </p>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-care-share">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={turnOn} data-testid="button-confirm-care-share">
+                Share {who}'s care log
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <p className="-mt-1 text-sm text-muted-foreground break-words">
           Caregivers log care for {who} from their phone. Everyone on the link sees each other's entries, and they
           appear here with their name.
