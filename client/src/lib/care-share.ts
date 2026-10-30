@@ -7,15 +7,18 @@
 // local Care Log once it is settled (30 minutes, when the caregiver can no
 // longer edit it), so it shows in backups and printouts like any other entry.
 //
-// Entries the owner logs on this phone stay on this phone.
+// Entries the owner logs on this phone stay on this phone, unless she turns
+// on "Caregivers see entries I log" for that person (off by default). Then
+// the last two days of her own entries are kept on the server too, marked
+// with owner_local_id, so caregivers see them. Turning it off removes them.
 //
 // Server side: care_people / care_entries (0006_care_log.sql).
 
 import type { CareEntry, Patient } from "@shared/schema";
 import { getSupabase } from "./supabase";
 import { currentUserId, ensureAnonAuth } from "./reminder-sync";
-import { createCareEntry, getPatients, hasCareEntrySource } from "./db";
-import { firstName } from "./caregiver-share";
+import { createCareEntry, getCareEntries, getPatients, hasCareEntrySource } from "./db";
+import { firstName, getOwnerLabel } from "./caregiver-share";
 import { conditionLabels, conditionsShared, localStamp } from "./care";
 
 const MIRRORED_KEY = "mrCareMirrored";
@@ -40,15 +43,22 @@ function personRow(p: Patient) {
   };
 }
 
-/** Whether this person's care log is shared. False when sharing was never set up. */
-export async function isCareShared(patientId: number): Promise<boolean> {
-  if (!getSupabase() || !(await currentUserId())) return false;
+export type CareShareState = { shared: boolean; ownerEntries: boolean };
+
+/** Whether this person's care log is shared, and whether the owner's own entries are. */
+export async function getCareShare(patientId: number): Promise<CareShareState> {
+  if (!getSupabase() || !(await currentUserId())) return { shared: false, ownerEntries: false };
   const { data } = await client()
     .from("care_people")
-    .select("shared")
+    .select("shared, share_owner_entries")
     .eq("local_id", patientId)
     .maybeSingle();
-  return !!data?.shared;
+  return { shared: !!data?.shared, ownerEntries: !!data?.shared && !!data?.share_owner_entries };
+}
+
+/** Whether this person's care log is shared. False when sharing was never set up. */
+export async function isCareShared(patientId: number): Promise<boolean> {
+  return (await getCareShare(patientId)).shared;
 }
 
 /** Switch care-log sharing on or off for one person. */
@@ -58,6 +68,97 @@ export async function setCareShared(p: Patient, shared: boolean): Promise<void> 
     .from("care_people")
     .upsert({ ...personRow(p), owner_user: owner, shared }, { onConflict: "owner_user,local_id" });
   if (error) throw new Error("Couldn't save that. Check your connection and try again.");
+  // Turning sharing off hides the owner's copies at once; drop them too.
+  if (!shared) await syncOwnerEntries(p.id!).catch(() => {});
+}
+
+/** "Caregivers see entries I log" for one person. Off removes every copy. */
+export async function setOwnerEntriesShared(p: Patient, on: boolean): Promise<void> {
+  await ensureAnonAuth();
+  const { error } = await client()
+    .from("care_people")
+    .update({ share_owner_entries: on, updated_at: new Date().toISOString() })
+    .eq("local_id", p.id!);
+  if (error) throw new Error("Couldn't save that. Check your connection and try again.");
+  await syncOwnerEntries(p.id!);
+}
+
+/** How far back the owner's entries are kept on the server (matches the caregiver view). */
+const OWNER_WINDOW_DAYS = 2;
+
+function ownerRow(e: CareEntry, personId: string, ownerUser: string) {
+  const n = <T,>(v: T | undefined) => (v === undefined ? null : v);
+  return {
+    person_id: personId,
+    owner_user: ownerUser,
+    owner_local_id: e.id!,
+    member_id: null,
+    actor_label: ((e.loggedBy || getOwnerLabel() || "").trim() || null)?.slice(0, 40) ?? null,
+    at: new Date(e.at).toISOString(),
+    kind: e.kind,
+    status: e.status,
+    meal: n(e.meal) ?? null,
+    amount: n(e.amount) ?? null,
+    therapy: n(e.therapy) ?? null,
+    minutes: n(e.minutes) ?? null,
+    task: n(e.task) ?? null,
+    help: n(e.help) ?? null,
+    score: n(e.score) ?? null,
+    level: n(e.level) ?? null,
+    reason: n(e.reason) ?? null,
+    details: e.details ? e.details.slice(0, 300) : null,
+    note: e.note ? e.note.slice(0, 1000) : null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Bring the server copies of the owner's own entries for one person in step
+ * with this phone: the last two days when her switch is on, nothing when it
+ * is off. Safe to run any time; called after each save or delete, when the
+ * switch changes, and when the app opens.
+ */
+export async function syncOwnerEntries(patientId: number): Promise<void> {
+  if (!getSupabase()) return;
+  const owner = await currentUserId();
+  if (!owner) return;
+  const c = client();
+  const { data: person } = await c
+    .from("care_people")
+    .select("id, shared, share_owner_entries")
+    .eq("local_id", patientId)
+    .maybeSingle();
+  if (!person) return;
+  const { data: copies } = await c
+    .from("care_entries")
+    .select("id, owner_local_id")
+    .eq("person_id", person.id)
+    .not("owner_local_id", "is", null);
+  const existing = (copies ?? []) as { id: string; owner_local_id: number }[];
+
+  let keep: CareEntry[] = [];
+  if (person.shared && person.share_owner_entries) {
+    const from = new Date(Date.now() - OWNER_WINDOW_DAYS * 86400000);
+    const to = new Date(Date.now() + 86400000);
+    // Only entries logged on this phone; caregiver entries copied here carry a sourceId.
+    keep = (await getCareEntries(patientId, localStamp(from), localStamp(to))).filter((e) => !e.sourceId && e.id != null);
+  }
+  if (keep.length) {
+    const { error } = await c
+      .from("care_entries")
+      .upsert(keep.map((e) => ownerRow(e, person.id, owner)), { onConflict: "person_id,owner_local_id" });
+    if (error) throw new Error("Couldn't update what caregivers see.");
+  }
+  const keepIds = new Set(keep.map((e) => e.id));
+  const stale = existing.filter((r) => !keepIds.has(r.owner_local_id)).map((r) => r.id);
+  if (stale.length) await c.from("care_entries").delete().in("id", stale);
+}
+
+/** syncOwnerEntries for everyone this phone shares a care log for. */
+export async function syncAllOwnerEntries(): Promise<void> {
+  if (!getSupabase() || !(await currentUserId())) return;
+  const { data } = await client().from("care_people").select("local_id");
+  for (const r of (data ?? []) as { local_id: number }[]) await syncOwnerEntries(r.local_id).catch(() => {});
 }
 
 /**
@@ -124,6 +225,7 @@ export async function fetchCaregiverEntries(patientId: number, day: string): Pro
     .from("care_entries")
     .select(`${ENTRY_COLS}, care_people!inner(local_id)`)
     .eq("care_people.local_id", patientId)
+    .is("owner_local_id", null)
     .is("deleted_at", null)
     .gte("at", from)
     .lt("at", to)
@@ -155,6 +257,7 @@ export async function syncCareEntries(): Promise<number> {
   const { data, error } = await client()
     .from("care_entries")
     .select(`${ENTRY_COLS}, care_people!inner(local_id)`)
+    .is("owner_local_id", null)
     .is("deleted_at", null)
     .gte("created_at", since)
     .lte("created_at", settled)

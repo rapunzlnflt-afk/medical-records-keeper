@@ -29,7 +29,7 @@ import CareLog from "@/pages/care-log";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { syncCaregiverDoses } from "@/lib/caregiver-share";
-import { syncCareEntries, syncCarePeople } from "@/lib/care-share";
+import { syncAllOwnerEntries, syncCareEntries, syncCarePeople } from "@/lib/care-share";
 import { hasCare } from "@/lib/care-plan";
 
 /** Copies settled caregiver doses into the local history on open and on return. */
@@ -43,7 +43,9 @@ function useCaregiverDoseSync() {
         .catch(() => {});
       // MedRecords Care: settled caregiver care-log entries.
       if (hasCare()) {
-        syncCarePeople().catch(() => {});
+        syncCarePeople()
+          .then(() => syncAllOwnerEntries())
+          .catch(() => {});
         syncCareEntries()
           .then((n) => {
             if (n > 0) queryClient.invalidateQueries({ queryKey: ["care-entries"] });
