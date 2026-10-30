@@ -386,7 +386,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.filter((item) => !("care" in item) || care).map((item) => {
+              {navItems.map((item) => {
                 const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -407,6 +407,11 @@ export function AppSidebar() {
                         <item.icon className="w-5 h-5" />
                         <span className="font-body text-base font-medium">{item.title}</span>
                         {"max" in item && item.max && !hasMax && <MaxTag className="ml-auto opacity-80" />}
+                        {"care" in item && item.care && !care && (
+                          <span className="ml-auto rounded-full bg-primary px-[0.48em] pt-[0.26em] pb-[0.22em] text-[0.72em] font-extrabold uppercase leading-none tracking-wider text-primary-foreground opacity-80">
+                            Care
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

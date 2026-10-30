@@ -3,21 +3,18 @@
 // Care is a tier above Max: a Lemon Squeezy key on a Care price option
 // (see CARE_VARIANT_IDS in plan.ts) unlocks it, together with everything in Max.
 //
-// Until launch the Care options are switched off in the store, so nobody can
-// buy them. For testing, the preview switch still turns Care on for one
-// device: open the app once with ?carepreview=1 (or ?carepreview=0 to turn it
-// off). Remove the preview at launch.
+// Care launched on 2026-10-30. The owner's test switch remains: tap the
+// "MedRecords" title on the Max page 5 times to turn Care on or off for one
+// device without a key (works inside an installed iPhone home-screen app).
+// The old ?carepreview=1 link is gone; ?carepreview=0 still clears it.
 
 import { useSyncExternalStore } from "react";
 import { getPlan, hasCareLicense, subscribePlan, CARE_VARIANT_IDS } from "./plan";
 
 const PREVIEW_KEY = "mrCarePreview";
 
-/**
- * Flip to true on launch day, after the Care price options are switched on in
- * Lemon Squeezy. Until then only the preview shows Care on the Max page.
- */
-export const CARE_ON_SALE = false;
+/** Care is on sale: everyone sees the Care card on the Max page. */
+export const CARE_ON_SALE = true;
 
 /** Care Monthly price option, preselected; the checkout also lists Care Yearly. */
 export const CARE_BUY_URL =
@@ -27,7 +24,6 @@ const listeners = new Set<() => void>();
 function readPreview(): boolean {
   try {
     const q = new URLSearchParams(window.location.search).get("carepreview");
-    if (q === "1") localStorage.setItem(PREVIEW_KEY, "1");
     if (q === "0") localStorage.removeItem(PREVIEW_KEY);
     return localStorage.getItem(PREVIEW_KEY) === "1";
   } catch {
@@ -36,6 +32,18 @@ function readPreview(): boolean {
 }
 
 let snapshot = typeof window !== "undefined" ? readPreview() : false;
+
+/** Turn the preview on or off for this device (the hidden 5-tap switch). */
+export function setCarePreview(on: boolean) {
+  try {
+    if (on) localStorage.setItem(PREVIEW_KEY, "1");
+    else localStorage.removeItem(PREVIEW_KEY);
+  } catch {
+    /* ignore */
+  }
+  snapshot = on;
+  listeners.forEach((l) => l());
+}
 
 export function hasCare(): boolean {
   return snapshot || hasCareLicense();

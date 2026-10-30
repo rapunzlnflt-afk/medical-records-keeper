@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MaxTag } from "@/components/max-lock";
-import { useCare, CARE_ON_SALE, CARE_BUY_URL } from "@/lib/care-plan";
+import { useCare, setCarePreview, CARE_ON_SALE, CARE_BUY_URL } from "@/lib/care-plan";
 import { activateKey, hasCareLicense, BUY_URL, ORDERS_URL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
 
 const FREE = [
@@ -83,6 +83,19 @@ export default function MaxPage() {
 
   // Care is visible (preview on or a Care key). Before launch nobody else sees Care wording.
   const careOn = useCare();
+  // Hidden preview switch: 5 taps on the title within 3 seconds.
+  const taps = useRef<number[]>([]);
+  const onTitleTap = () => {
+    const now = Date.now();
+    taps.current = [...taps.current.filter((t) => now - t < 3000), now];
+    if (taps.current.length < 5) return;
+    taps.current = [];
+    if (plan.care) return;
+    const on = !careOn;
+    setCarePreview(on);
+    toast({ title: on ? "Care preview on" : "Care preview off", description: "Reopening the app…" });
+    setTimeout(() => window.location.reload(), 900);
+  };
   const keyOk = plan.max && !!plan.key && plan.status === "active";
   const lapsed = !!plan.key && (plan.status !== "active" || (!plan.max && !plan.grandfathered));
   // Paste a key: anyone without a key yet, plus grandfathered people once Care
@@ -103,7 +116,7 @@ export default function MaxPage() {
       </Link>
 
       <div className="min-w-0">
-        <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight">
+        <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight select-none" onClick={onTitleTap} data-testid="text-max-title">
           MedRecords <MaxTag />
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1.5">
