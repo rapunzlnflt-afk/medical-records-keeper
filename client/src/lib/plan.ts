@@ -33,6 +33,11 @@ export const ORDERS_URL = "https://app.lemonsqueezy.com/my-orders";
 const LS_API = "https://api.lemonsqueezy.com/v1/licenses/";
 const STORE_ID = 478073;
 const PRODUCT_ID = 1438215;
+/**
+ * MedRecords Care: two price options on the same product (Care monthly and
+ * Care yearly). A key on one of these unlocks Care and everything in Max.
+ */
+export const CARE_VARIANT_IDS = [2245604, 2315392];
 const GRACE_DAYS = 30; // keeps working offline for 30 days
 const RECHECK_HOURS = 12; // how often an online device re-asks the store
 
@@ -44,6 +49,8 @@ export interface PlanState {
   key?: string;
   instanceId?: string | null;
   plan?: string | null;
+  /** Lemon Squeezy price option the key is on (Care is checked from this). */
+  variantId?: number | null;
   storeStatus?: string | null;
   expiresAt?: string | null;
   lastCheck?: string;
@@ -76,8 +83,8 @@ export function getPlan(): PlanState {
   return snapshot;
 }
 
-function computeMax(l: PlanState): boolean {
-  if (l.grandfathered) return true;
+/** Is the saved key currently good (active, checked recently, not past expiry)? */
+function keyActive(l: PlanState): boolean {
   if (l.status !== "active") return false;
   const now = Date.now();
   // Offline grace: a paying customer keeps working without a connection, but
@@ -91,6 +98,25 @@ function computeMax(l: PlanState): boolean {
     if (now > exp + 3 * 86400000 && Date.parse(l.lastCheck) < exp) return false;
   }
   return true;
+}
+
+function computeMax(l: PlanState): boolean {
+  return !!l.grandfathered || keyActive(l);
+}
+
+/** Care needs a key on a Care price option. Grandfathering covers Max only. */
+function computeCare(l: PlanState): boolean {
+  return !!l.key && keyActive(l) && CARE_VARIANT_IDS.includes(Number(l.variantId));
+}
+
+export function hasCareLicense(): boolean {
+  return computeCare(snapshot);
+}
+
+/** Subscribe to plan changes (for hooks outside this file). */
+export function subscribePlan(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
 }
 
 export function hasMax(): boolean {
@@ -109,7 +135,7 @@ export function useMax(): boolean {
   return computeMax(s);
 }
 
-export function usePlan(): PlanState & { max: boolean } {
+export function usePlan(): PlanState & { max: boolean; care: boolean } {
   const s = useSyncExternalStore(
     (cb) => {
       listeners.add(cb);
@@ -117,13 +143,18 @@ export function usePlan(): PlanState & { max: boolean } {
     },
     () => snapshot,
   );
-  return { ...s, max: computeMax(s) };
+  return { ...s, max: computeMax(s), care: computeCare(s) };
 }
 
 /* ---------- grandfathering ---------- */
 
 function grandfather(since: string | null) {
-  write({ status: "active", grandfathered: true, since, lastCheck: new Date().toISOString() });
+  const l = read();
+  // Keep a key already on this device (for example a Care key).
+  const keep = l.key
+    ? { key: l.key, instanceId: l.instanceId, plan: l.plan, variantId: l.variantId, storeStatus: l.storeStatus, expiresAt: l.expiresAt, status: l.status }
+    : {};
+  write({ status: "active", ...keep, grandfathered: true, since, lastCheck: l.lastCheck || new Date().toISOString() });
   try {
     localStorage.setItem(GF_KEY, "1");
   } catch {
@@ -198,7 +229,7 @@ interface LsReply {
   error?: string | null;
   license_key?: { status?: string; expires_at?: string | null };
   instance?: { id?: string };
-  meta?: { store_id?: number; product_id?: number; variant_name?: string };
+  meta?: { store_id?: number; product_id?: number; variant_id?: number; variant_name?: string };
 }
 
 async function lsPost(action: string, fields: Record<string, string>): Promise<LsReply> {
@@ -232,12 +263,16 @@ function deviceName() {
 
 function record(key: string, instanceId: string | null, d: LsReply) {
   const lk = d.license_key || {};
+  const prev = read();
   write({
+    // Grandfathered Max survives any key added on top of it.
+    ...(prev.grandfathered ? { grandfathered: true, since: prev.since } : {}),
     status: lk.status === "active" ? "active" : "lapsed",
     storeStatus: lk.status || null,
     key,
     instanceId,
     plan: d.meta?.variant_name || null,
+    variantId: d.meta?.variant_id != null ? Number(d.meta.variant_id) : null,
     expiresAt: lk.expires_at || null,
     lastCheck: new Date().toISOString(),
   });
@@ -261,7 +296,7 @@ export async function activateKey(raw: string): Promise<{ ok: boolean; message?:
   // Same key already on this device: re-check instead of using another activation.
   if (l.key === key && l.instanceId) {
     await revalidate(true);
-    return hasMax() ? { ok: true } : { ok: false, message: NOT_ACTIVE };
+    return keyActive(read()) ? { ok: true } : { ok: false, message: NOT_ACTIVE };
   }
   try {
     const d = await lsPost("activate", { license_key: key, instance_name: deviceName() });
@@ -271,8 +306,12 @@ export async function activateKey(raw: string): Promise<{ ok: boolean; message?:
       lsPost("deactivate", { license_key: key, instance_id: d.instance?.id || "" }).catch(() => {});
       return { ok: false, message: "That key is for a different product, not MedRecords Max." };
     }
+    // Replacing one key with another: free the old key's slot on this device.
+    if (l.key && l.instanceId && l.key !== key) {
+      lsPost("deactivate", { license_key: l.key, instance_id: l.instanceId }).catch(() => {});
+    }
     record(key, d.instance?.id || null, d);
-    return hasMax() ? { ok: true } : { ok: false, message: NOT_ACTIVE };
+    return keyActive(read()) ? { ok: true } : { ok: false, message: NOT_ACTIVE };
   } catch {
     return { ok: false, message: "Couldn't reach the license server. Check your connection and try again." };
   }
@@ -285,7 +324,8 @@ export async function activateKey(raw: string): Promise<{ ok: boolean; message?:
  */
 export async function revalidate(force = false): Promise<void> {
   const l = read();
-  if (!l.key || !l.instanceId || l.grandfathered) return;
+  // Grandfathered people are re-checked only for a key they added (Care).
+  if (!l.key || !l.instanceId) return;
   const age = l.lastCheck ? (Date.now() - Date.parse(l.lastCheck)) / 3600000 : Infinity;
   const pastExpiry =
     !!l.expiresAt &&
@@ -315,7 +355,9 @@ export async function removeKey(): Promise<void> {
   if (l.key && l.instanceId) {
     await lsPost("deactivate", { license_key: l.key, instance_id: l.instanceId }).catch(() => {});
   }
-  write({ status: "free", decidedOn: todayISO() });
+  // A grandfathered person goes back to grandfathered Max, not Free.
+  if (l.grandfathered) write({ status: "active", grandfathered: true, since: l.since ?? null, lastCheck: new Date().toISOString() });
+  else write({ status: "free", decidedOn: todayISO() });
 }
 
 /** The receipt's "Open MedRecords" button can carry the key as ?key=... */
