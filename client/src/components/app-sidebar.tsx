@@ -29,6 +29,9 @@ import {
 import { saveJsonBackup, isIosLike } from "@/lib/save-backup";
 import { GF_KEY, noteRestoredBackup, useMax } from "@/lib/plan";
 import { MaxTag } from "@/components/max-lock";
+import { PersonAvatar } from "@/components/person-chip";
+import { useQuery } from "@tanstack/react-query";
+import { listSharedPeople } from "@/lib/care-share";
 import { useCare } from "@/lib/care-plan";
 import { formatPersonName, formatTitleCase } from "@/lib/format-name";
 import type { Patient } from "@shared/schema";
@@ -60,23 +63,7 @@ const AVATAR_COLORS = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#ef4444",
 ];
 
-function PatientAvatar({ patient, size = "md" }: { patient: Patient; size?: "sm" | "md" }) {
-  const s = size === "sm" ? "w-7 h-7 text-xs" : "w-9 h-9 text-sm";
-  const initials = patient.name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-  return (
-    <div
-      className={`${s} rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}
-      style={{ backgroundColor: patient.color || "#3b82f6" }}
-    >
-      {initials}
-    </div>
-  );
-}
+const PatientAvatar = PersonAvatar;
 
 function PatientSwitcher() {
   const { patients, activePatient, activePatientId, setActivePatientId } = usePatient();
@@ -129,6 +116,9 @@ function PatientSwitcher() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  // People with anything shared with caregivers (care log or doses).
+  const { data: sharedIds = [] } = useQuery({ queryKey: ["shared-people"], queryFn: listSharedPeople, staleTime: 60000 });
 
   if (!activePatient) return null;
 
@@ -193,7 +183,16 @@ function PatientSwitcher() {
                   <PatientAvatar patient={p} size="sm" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate">{p.name}</p>
-                    {p.relationship && <p className="text-xs text-muted-foreground mt-0.5">{p.relationship}</p>}
+                    {(p.relationship || sharedIds.includes(p.id!)) && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {p.relationship}
+                        {sharedIds.includes(p.id!) && (
+                          <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary" data-testid={`badge-shared-${p.id}`}>
+                            Shared
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {p.id === activePatientId && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
