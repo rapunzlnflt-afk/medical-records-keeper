@@ -21,6 +21,7 @@ const FREE = [
 ];
 
 const MAX = [
+  "As many family members as you need",
   "Share doses with a caregiver",
   "Medical Records: lab results, scans and documents",
   "Vitals",

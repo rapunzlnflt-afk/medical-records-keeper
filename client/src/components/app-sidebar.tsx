@@ -61,12 +61,17 @@ const navItems = [
 
 const AVATAR_COLORS = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#ef4444",
+  "#0d9488", "#4f46e5", "#ea580c", "#65a30d", "#be123c", "#475569",
 ];
+
+/** Free covers 6 people; Max and Care have no cap. */
+export const FREE_PEOPLE = 6;
 
 const PatientAvatar = PersonAvatar;
 
 function PatientSwitcher() {
   const { patients, activePatient, activePatientId, setActivePatientId } = usePatient();
+  const unlimitedPeople = useMax();
   const [expanded, setExpanded] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -78,7 +83,8 @@ function PatientSwitcher() {
   const createMut = useMutation({
     mutationFn: async (data: any) => {
       const existing = await getPatients();
-      if (existing.length >= 6) throw new Error("Maximum of 6 family members allowed");
+      if (!unlimitedPeople && existing.length >= FREE_PEOPLE)
+        throw new Error(`MedRecords Free includes ${FREE_PEOPLE} people. Get MedRecords Max to add more.`);
       return createPatient(normalizePatientFields(data));
     },
     onSuccess: () => {
@@ -263,7 +269,7 @@ function PatientSwitcher() {
                 </Button>
               </div>
             </div>
-          ) : patients.length < 6 ? (
+          ) : unlimitedPeople || patients.length < FREE_PEOPLE ? (
             <button
               onClick={() => { setShowAdd(true); setNewColor(AVATAR_COLORS[patients.length % AVATAR_COLORS.length]); }}
               className="flex items-center gap-2 p-1.5 rounded-lg text-xs text-muted-foreground hover:bg-sidebar-accent/30 transition-colors w-full"
@@ -275,7 +281,10 @@ function PatientSwitcher() {
               Add Family Member
             </button>
           ) : (
-            <p className="text-[10px] text-muted-foreground text-center py-1">Maximum 6 members</p>
+            <p className="text-xs text-muted-foreground text-center py-1" data-testid="text-people-limit">
+              Free includes {FREE_PEOPLE} people.{" "}
+              <Link href="/max" className="underline font-medium text-foreground">Get Max to add more</Link>
+            </p>
           )}
         </div>
       )}
