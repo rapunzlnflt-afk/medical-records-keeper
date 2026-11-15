@@ -13,6 +13,9 @@
 // workflow; locally we fall back to a fixed string.
 const BUILD_TAG = "__BUILD_TAG__"; // replaced at build time
 const CACHE_NAME = `medical-records-${BUILD_TAG}`;
+// Only this app's own caches. Every CleartrackApps app shares cleartrackapps.com, so they all share one cache store.
+// medical-records-demo-* belongs to the public demo.
+const isOwnCache = (k) => k.startsWith("medical-records-") && !k.startsWith("medical-records-demo-");
 
 const APP_SHELL_URLS = [
   "./",
@@ -42,7 +45,7 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
+        keys.filter((k) => isOwnCache(k) && k !== CACHE_NAME).map((k) => caches.delete(k)),
       );
       await self.clients.claim();
     })(),
