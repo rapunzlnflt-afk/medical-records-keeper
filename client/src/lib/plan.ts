@@ -31,6 +31,8 @@ export const BUY_URL =
 export const PENDING_KEY = "mrPendingMaxKey";
 export const ORDERS_URL = "https://app.lemonsqueezy.com/my-orders";
 const LS_API = "https://api.lemonsqueezy.com/v1/licenses/";
+/** CleartrackApps' own key server (same requests and replies as Lemon Squeezy). */
+const CT_API = "https://mpanuzarzcfgjbheepmj.supabase.co/functions/v1/licenses/";
 const STORE_ID = 478073;
 const PRODUCT_ID = 1438215;
 /**
@@ -59,6 +61,8 @@ export interface PlanState {
   variantId?: number | null;
   storeStatus?: string | null;
   expiresAt?: string | null;
+  /** Where the key lives: "ct" (CleartrackApps) or "ls" (Lemon Squeezy, the default for older saves). */
+  src?: "ct" | "ls";
   lastCheck?: string;
 }
 
@@ -93,7 +97,7 @@ export function getPlan(): PlanState {
 function keyActive(l: PlanState): boolean {
   if (l.status !== "active") return false;
   const now = Date.now();
-  if (now >= LS_SUNSET) return true;
+  if (now >= LS_SUNSET && (l.src || "ls") === "ls") return true;
   // Offline grace: a paying customer keeps working without a connection, but
   // not forever. After GRACE_DAYS with no successful check, Max pauses until
   // the next check succeeds.
@@ -235,13 +239,40 @@ interface LsReply {
   activated?: boolean;
   valid?: boolean;
   error?: string | null;
-  license_key?: { status?: string; expires_at?: string | null };
+  license_key?: { status?: string; expires_at?: string | null } | null;
   instance?: { id?: string };
   meta?: { store_id?: number; product_id?: number; variant_id?: number; variant_name?: string };
+  /** Added here: which server answered. */
+  _src?: "ct" | "ls";
 }
 
-async function lsPost(action: string, fields: Record<string, string>): Promise<LsReply> {
-  const res = await fetch(LS_API + action, {
+/**
+ * A new key is looked up on CleartrackApps' server first; a key it doesn't know
+ * is tried on Lemon Squeezy until LS_SUNSET. `src` is where a saved key lives;
+ * every reply is tagged with it as `_src`.
+ */
+async function lsPost(action: string, fields: Record<string, string>, src?: "ct" | "ls"): Promise<LsReply> {
+  const lsOpen = Date.now() < LS_SUNSET;
+  const tagged = async (base: string, t: "ct" | "ls") => {
+    const d = await postTo(base, action, fields);
+    if (d && typeof d === "object") d._src = t;
+    return d;
+  };
+  if (src === "ct") return tagged(CT_API, "ct");
+  if (src === "ls") return tagged(LS_API, "ls");
+  let d: LsReply;
+  try {
+    d = await tagged(CT_API, "ct");
+  } catch (e) {
+    if (lsOpen) return tagged(LS_API, "ls");
+    throw e;
+  }
+  if (d && d.license_key === null && lsOpen) return tagged(LS_API, "ls");
+  return d;
+}
+
+async function postTo(base: string, action: string, fields: Record<string, string>): Promise<LsReply> {
+  const res = await fetch(base + action, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(fields).toString(),
@@ -279,6 +310,7 @@ function record(key: string, instanceId: string | null, d: LsReply) {
     storeStatus: lk.status || null,
     key,
     instanceId,
+    src: d._src || prev.src || "ls",
     plan: d.meta?.variant_name || null,
     variantId: d.meta?.variant_id != null ? Number(d.meta.variant_id) : null,
     expiresAt: lk.expires_at || null,
@@ -288,6 +320,7 @@ function record(key: string, instanceId: string | null, d: LsReply) {
 
 function friendly(err?: string | null) {
   const e = String(err || "");
+  if (/rate_limited/i.test(e)) return "Too many tries in a row. Wait 10 minutes, then try again.";
   if (/activation limit/i.test(e))
     return "This key is already in use on 3 devices. Remove one from My Orders at app.lemonsqueezy.com, then try again.";
   if (/not found|invalid/i.test(e)) return "That key wasn't recognized. Copy it again from your receipt email.";
@@ -311,12 +344,12 @@ export async function activateKey(raw: string): Promise<{ ok: boolean; message?:
     if (!d || !d.activated) return { ok: false, message: friendly(d?.error) };
     if (!ours(d.meta)) {
       // Free the slot we just took on another product.
-      lsPost("deactivate", { license_key: key, instance_id: d.instance?.id || "" }).catch(() => {});
+      lsPost("deactivate", { license_key: key, instance_id: d.instance?.id || "" }, d._src).catch(() => {});
       return { ok: false, message: "That key is for a different product, not MedRecords Max." };
     }
     // Replacing one key with another: free the old key's slot on this device.
     if (l.key && l.instanceId && l.key !== key) {
-      lsPost("deactivate", { license_key: l.key, instance_id: l.instanceId }).catch(() => {});
+      lsPost("deactivate", { license_key: l.key, instance_id: l.instanceId }, l.src || "ls").catch(() => {});
     }
     record(key, d.instance?.id || null, d);
     return keyActive(read()) ? { ok: true } : { ok: false, message: NOT_ACTIVE };
@@ -334,7 +367,8 @@ export async function revalidate(force = false): Promise<void> {
   const l = read();
   // Grandfathered people are re-checked only for a key they added (Care).
   if (!l.key || !l.instanceId) return;
-  if (Date.now() >= LS_SUNSET) return;
+  const src = l.src || "ls"; // keys saved before the key server existed are Lemon Squeezy keys
+  if (src === "ls" && Date.now() >= LS_SUNSET) return;
   const age = l.lastCheck ? (Date.now() - Date.parse(l.lastCheck)) / 3600000 : Infinity;
   const pastExpiry =
     !!l.expiresAt &&
@@ -343,7 +377,7 @@ export async function revalidate(force = false): Promise<void> {
   if (!force && !pastExpiry && age < RECHECK_HOURS) return;
   if (typeof navigator !== "undefined" && navigator.onLine === false) return;
   try {
-    const d = await lsPost("validate", { license_key: l.key, instance_id: l.instanceId });
+    const d = await lsPost("validate", { license_key: l.key, instance_id: l.instanceId }, src);
     if (!d || (d.valid === undefined && !d.license_key)) return; // unusable reply
     // "Not found" with no key details means the store can't answer (shut down
     // or keys removed), not that the plan ended: keep the current state.
@@ -365,7 +399,7 @@ export async function revalidate(force = false): Promise<void> {
 export async function removeKey(): Promise<void> {
   const l = read();
   if (l.key && l.instanceId) {
-    await lsPost("deactivate", { license_key: l.key, instance_id: l.instanceId }).catch(() => {});
+    await lsPost("deactivate", { license_key: l.key, instance_id: l.instanceId }, l.src || "ls").catch(() => {});
   }
   // A grandfathered person goes back to grandfathered Max, not Free.
   if (l.grandfathered) write({ status: "active", grandfathered: true, since: l.since ?? null, lastCheck: new Date().toISOString() });
