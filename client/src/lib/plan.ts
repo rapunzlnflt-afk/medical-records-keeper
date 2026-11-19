@@ -40,6 +40,12 @@ const PRODUCT_ID = 1438215;
 export const CARE_VARIANT_IDS = [2245604, 2315392];
 const GRACE_DAYS = 30; // keeps working offline for 30 days
 const RECHECK_HOURS = 12; // how often an online device re-asks the store
+/**
+ * Lemon Squeezy shuts down on 2027-03-31. From 2027-03-01 the app stops asking
+ * it and keeps whatever it last confirmed, so a paid device is not paused by the
+ * store going away (offline grace and expiry no longer apply to it).
+ */
+const LS_SUNSET = Date.parse("2027-03-01T00:00:00Z");
 
 export interface PlanState {
   status?: "free" | "active" | "lapsed";
@@ -87,6 +93,7 @@ export function getPlan(): PlanState {
 function keyActive(l: PlanState): boolean {
   if (l.status !== "active") return false;
   const now = Date.now();
+  if (now >= LS_SUNSET) return true;
   // Offline grace: a paying customer keeps working without a connection, but
   // not forever. After GRACE_DAYS with no successful check, Max pauses until
   // the next check succeeds.
@@ -327,6 +334,7 @@ export async function revalidate(force = false): Promise<void> {
   const l = read();
   // Grandfathered people are re-checked only for a key they added (Care).
   if (!l.key || !l.instanceId) return;
+  if (Date.now() >= LS_SUNSET) return;
   const age = l.lastCheck ? (Date.now() - Date.parse(l.lastCheck)) / 3600000 : Infinity;
   const pastExpiry =
     !!l.expiresAt &&
@@ -337,6 +345,9 @@ export async function revalidate(force = false): Promise<void> {
   try {
     const d = await lsPost("validate", { license_key: l.key, instance_id: l.instanceId });
     if (!d || (d.valid === undefined && !d.license_key)) return; // unusable reply
+    // "Not found" with no key details means the store can't answer (shut down
+    // or keys removed), not that the plan ended: keep the current state.
+    if (!d.license_key) return;
     if (d.valid && d.license_key && ours(d.meta)) record(l.key, l.instanceId, d);
     else
       write({
