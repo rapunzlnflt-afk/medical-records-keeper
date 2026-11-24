@@ -29,7 +29,7 @@ export const BUY_URL =
   "https://cleartrackapps.lemonsqueezy.com/checkout/buy/ac094b3b-9ed8-4571-a7d7-a538aff71666";
 /** sessionStorage slot for a key handed over in the address bar, read by the Max page. */
 export const PENDING_KEY = "mrPendingMaxKey";
-export const ORDERS_URL = "https://app.lemonsqueezy.com/my-orders";
+export const SUPPORT_EMAIL = "cleartrackapps@gmail.com";
 const LS_API = "https://api.lemonsqueezy.com/v1/licenses/";
 /** CleartrackApps' own key server (same requests and replies as Lemon Squeezy). */
 const CT_API = "https://mpanuzarzcfgjbheepmj.supabase.co/functions/v1/licenses/";
@@ -322,13 +322,13 @@ function friendly(err?: string | null) {
   const e = String(err || "");
   if (/rate_limited/i.test(e)) return "Too many tries in a row. Wait 10 minutes, then try again.";
   if (/activation limit/i.test(e))
-    return "This key is already in use on 3 devices. Remove one from My Orders at app.lemonsqueezy.com, then try again.";
+    return "This key is already in use on 3 devices. Tap Remove key from this device on one of them, or email cleartrackapps@gmail.com and we'll free one up.";
   if (/not found|invalid/i.test(e)) return "That key wasn't recognized. Copy it again from your receipt email.";
   return e || "That key wasn't recognized.";
 }
 
 const NOT_ACTIVE =
-  "This subscription isn't active. Renew it from My Orders at app.lemonsqueezy.com, then tap Activate again.";
+  "This subscription isn't active. Renew it from the link in your receipt email, or email cleartrackapps@gmail.com, then tap Activate again.";
 
 export async function activateKey(raw: string): Promise<{ ok: boolean; message?: string }> {
   const key = String(raw || "").trim();
