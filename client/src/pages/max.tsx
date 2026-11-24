@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Check, ExternalLink, KeyRound, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, KeyRound, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { MaxTag } from "@/components/max-lock";
 import { CARE_ON_SALE, CARE_BUY_URL } from "@/lib/care-plan";
-import { activateKey, hasCareLicense, BUY_URL, ORDERS_URL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
+import { activateKey, hasCareLicense, BUY_URL, SUPPORT_EMAIL, PENDING_KEY, removeKey, revalidate, usePlan } from "@/lib/plan";
 
 const FREE = [
   "Medications, dose reminders and dose history",
@@ -135,12 +135,12 @@ export default function MaxPage() {
                 <p className="text-sm text-muted-foreground">
                   {plan.plan ? `${plan.plan} plan. ` : ""}
                   {niceDate(plan.expiresAt) ? `Paid through ${niceDate(plan.expiresAt)}. ` : ""}
-                  Manage or cancel any time from My Orders at Lemon Squeezy.
+                  Manage or cancel any time from the link in your receipt email, or email {SUPPORT_EMAIL}.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button asChild size="sm" variant="outline">
-                    <a href={ORDERS_URL} target="_blank" rel="noopener noreferrer">
-                      My Orders <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                    <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("MedRecords subscription")}`}>
+                      Email us
                     </a>
                   </Button>
                   <Button
@@ -261,14 +261,13 @@ export default function MaxPage() {
               <div className="mt-4 space-y-2" data-testid="care-upgrade-steps">
                 <p className="text-sm font-medium">Switch your Max plan to Care</p>
                 <ol className="list-decimal pl-5 space-y-1 text-sm text-muted-foreground">
-                  <li>Open My Orders and sign in with the email you used to buy Max.</li>
-                  <li>Open your MedRecords Max subscription, tap the three dots, then Update.</li>
-                  <li>Pick Care Monthly or Care Yearly and tap Save. You only pay the difference.</li>
+                  <li>Open the manage-subscription link in your MedRecords Max receipt email.</li>
+                  <li>Pick Care Monthly or Care Yearly and save. You only pay the difference.</li>
                   <li>Come back here and tap Check my plan. Your key stays the same.</li>
                 </ol>
                 <Button asChild className="w-full gradient-primary text-white border-none" data-testid="button-upgrade-care">
-                  <a href={ORDERS_URL} target="_blank" rel="noopener noreferrer">
-                    Open My Orders <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                  <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Switch MedRecords Max to Care")}`}>
+                    Can't find the email? Email us
                   </a>
                 </Button>
               </div>
